@@ -1,0 +1,31 @@
+# Entorno virtual
+venv/
+env/
+.venv/
+../venv/
+
+# Variables de entorno
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+.vercel/
+.vscode/
+GEMINI.md
+GEMINI.md/
+./GEMINI.md
+./GEMINI.md/
+
+# Next.js build/cache
+frontend/.next/
+.next/
+.vercel
