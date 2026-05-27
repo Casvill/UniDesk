@@ -1,6 +1,7 @@
 import { db, auth } from "../config/firebase";
 import { UserProfile, CreateUserDTO, UpdateUserDTO } from "../types/user.types";
 import admin from "../config/firebase";
+import { normalizeUsername } from "./username.service";
 
 const USERS_COLLECTION = "users";
 
@@ -16,6 +17,7 @@ export async function createUserProfile(data: CreateUserDTO): Promise<UserProfil
 
   const userProfile: UserProfile = {
     ...data,
+    username: normalizeUsername(data.username),
     createdAt: now,
     updatedAt: now,
   };
@@ -56,6 +58,7 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
 
   const updated = {
     ...data,
+    ...(data.username && { username: normalizeUsername(data.username) }),
     updatedAt: admin.firestore.Timestamp.now(),
   };
 
