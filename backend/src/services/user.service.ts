@@ -44,14 +44,3 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
   return updatedDoc.data() as UserProfile;
 }
 
-export async function deleteUserProfile(uid: string): Promise<void> {
-  const docRef = db.collection(USERS_COLLECTION).doc(uid);
-  const doc = await docRef.get();
-
-  if (!doc.exists) {
-    throw new Error(`Usuario con uid ${uid} no existe en Firestore`);
-  }
-
-  await docRef.delete();
-  await auth.deleteUser(uid);
-}
