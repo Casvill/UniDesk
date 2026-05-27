@@ -15,30 +15,13 @@ const PORT = process.env.PORT || 3000;
 
 app.get("/", (req, res) => {
   res.json({
-    message: "Backend funcionando 🚀"
+    message: "Backend de UniDesk funcionando B)"
   });
 });
 
 db.collection("_health").doc("ping").set({ ok: true })
   .then(() => console.log("Prueba: Firestroe bien :)"))
   .catch((err) => console.error("Prueba: Firestore mal, error:", err));
-
-app.post("/test/user", async (req, res) => {
-  const user = await createUserProfile({
-    uid: "test-uid-123",
-    username: "juantest",
-    email: "juan@test.com",
-    displayName: "Juan Test",
-    photoURL: "",
-    provider: "password",
-  });
-  res.json(user);
-});
-
-app.get("/test/user/:uid", async (req, res) => {
-  const user = await getUserProfile(req.params.uid);
-  res.json(user);
-});
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
