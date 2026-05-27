@@ -24,6 +24,10 @@ function normalizeUsername(username: string): string {
  * @param username - Nombre de usuario a validar
  * @returns `true` si el username está disponible, `false` si ya está en uso
  * @throws Error si el username está vacío o es inválido
+ * 
+ * @example
+ * const available = await checkUsernameAvailability("Juan");
+ * // consulta por "juan" → true o false
  */
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
   if (!username || username.trim().length === 0) {
