@@ -59,7 +59,7 @@ export function Login({ onSubmit }: LoginProps) {
                   <input
                     type="email"
                     required
-                    placeholder="ejemplo@correo.com"
+                    placeholder="ejemplo@universidad.edu.co"
                     className="w-full pl-10 pr-4 py-3 border rounded-lg"
                   />
                 </div>
@@ -85,6 +85,27 @@ export function Login({ onSubmit }: LoginProps) {
                 <p className="text-xs text-gray-500 mt-1">
                   Usa tu contraseña para acceder a tus salas de estudio
                 </p>
+              </div>
+
+              {/* OPTIONS */}
+              <div className="flex items-center justify-between text-sm">
+
+                <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                  />
+                  Recordar mi sesión
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-indigo-600 hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+
               </div>
 
               {/* SUBMIT */}

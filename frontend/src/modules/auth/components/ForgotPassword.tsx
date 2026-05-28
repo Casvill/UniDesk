@@ -2,13 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 
-export function ForgotPassword() {
+interface ForgotPasswordProps {
+  onSubmit: () => void;
+}
+
+export function Forgot({ onSubmit }: ForgotPasswordProps) {
   const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     setSubmitted(true);
+
+    onSubmit();
   };
 
   return (
@@ -19,7 +26,11 @@ export function ForgotPassword() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
               <span className="text-white text-2xl font-bold">S</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Reset your password</h1>
+
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              Reset your password
+            </h1>
+
             <p className="text-gray-600">
               {!submitted
                 ? "Enter your email and we'll send you a reset link"
@@ -31,13 +42,18 @@ export function ForgotPassword() {
             {!submitted ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <label htmlFor="reset-email" className="block mb-2 text-sm font-semibold text-gray-700">
+                  <label
+                    htmlFor="reset-email"
+                    className="block mb-2 text-sm font-semibold text-gray-700"
+                  >
                     Email Address
                   </label>
+
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Mail className="h-5 w-5 text-gray-400" />
                     </div>
+
                     <input
                       type="email"
                       id="reset-email"
@@ -73,11 +89,15 @@ export function ForgotPassword() {
                     <div className="flex-shrink-0">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
+
                     <div>
-                      <h3 className="font-semibold text-green-900 mb-1">Email sent successfully!</h3>
+                      <h3 className="font-semibold text-green-900 mb-1">
+                        Email sent successfully!
+                      </h3>
+
                       <p className="text-sm text-green-700">
-                        We've sent a password reset link to your email. Please check your inbox and follow the
-                        instructions.
+                        We've sent a password reset link to your email.
+                        Please check your inbox and follow the instructions.
                       </p>
                     </div>
                   </div>
