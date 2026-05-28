@@ -1,25 +1,54 @@
-# Salón de Estudio Colaborativo (UniDiscord)
 
-Este es el frontend de la plataforma de estudio colaborativo en tiempo real.
+  # UniDesk
 
-## 🚀 Inicio Rápido
+  Proyecto frontend basado en Vite. El diseño original esta en https://www.figma.com/design/A9cnHIBl2ysvJ6xOllUFCW/UniDesk.
 
-1. Clonar el repositorio.
-2. Entrar en la carpeta: `cd frontend`.
-3. Instalar dependencias: `npm install`.
-4. Ejecutar en desarrollo: `npm run dev`.
+  ## Requisitos
 
-## ♿ Accesibilidad
+  - Node.js 18+ (LTS recomendado)
+  - Gestor de paquetes: `pnpm` (recomendado) o `npm`
 
-El proyecto sigue las pautas **WCAG 2.2**. Para asegurar el cumplimiento:
-- Se utiliza `eslint-plugin-jsx-a11y`.
-- Se prioriza la navegación por teclado y el uso de lectores de pantalla.
-- Consultar `GEMINI.md` para guías detalladas.
+  ## Instalacion
 
-## 🛠 Tecnologías
+  Con pnpm:
 
-- **React 19** + **TypeScript**
-- **Vite**
-- **Tailwind CSS**
-- **React Router 7**
-- **Lucide React** (Iconos)
+  ```bash
+  pnpm install
+  ```
+
+  Con npm:
+
+  ```bash
+  npm install
+  ```
+
+  ## Despliegue en local (modo desarrollo)
+
+  Con pnpm:
+
+  ```bash
+  pnpm run dev
+  ```
+
+  Con npm:
+
+  ```bash
+  npm run dev
+  ```
+
+  El servidor arranca en `http://localhost:5173` (o el puerto que indique Vite en consola).
+
+  ## Build local (opcional)
+
+  Generar build:
+
+  ```bash
+  pnpm run build
+  ```
+
+  Vista previa del build:
+
+  ```bash
+  pnpm exec vite preview
+  ```
+  
