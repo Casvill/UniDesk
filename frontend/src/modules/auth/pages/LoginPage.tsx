@@ -7,12 +7,6 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // aquí luego:
-    // - API login
-    // - Firebase
-    // - JWT
-    // - validaciones
-
     navigate("/dashboard");
   };
 

@@ -1,8 +1,14 @@
 import { createBrowserRouter } from "react-router-dom";
-import { Login } from "../modules/auth/components/Login";
-import { Register } from "../modules/auth/components/Register";
-import { ForgotPassword } from "../modules/auth/components/ForgotPassword";
+
+/* PAGES (NO COMPONENTS DIRECTOS) */
+import LoginPage from "../modules/auth/pages/LoginPage";
+import RegisterPage from "../modules/auth/pages/Register";
+import ForgotPassword from "../modules/auth/pages/ForgotPage";
+
+/* LAYOUT */
 import { TopbarLayout } from "./TopbarLayout";
+
+/* PROTECTED PAGES */
 import { Dashboard } from "../modules/dashboard/components/Dashboard";
 import { RoomList } from "../modules/room/components/RoomList";
 import { CreateRoom } from "../modules/room/components/CreateRoom";
@@ -13,18 +19,21 @@ import { Settings } from "../shared/components/Settings";
 import { NotFound } from "../shared/components/NotFound";
 
 export const router = createBrowserRouter([
+  /* PUBLIC ROUTES */
   {
     path: "/",
-    Component: Login,
+    Component: LoginPage,
   },
   {
     path: "/register",
-    Component: Register,
+    Component: RegisterPage,
   },
   {
     path: "/forgot-password",
     Component: ForgotPassword,
   },
+
+  /* PROTECTED LAYOUT */
   {
     path: "/",
     Component: TopbarLayout,
@@ -55,10 +64,14 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  /* STANDALONE ROUTE */
   {
     path: "/rooms/:roomId",
     Component: ActiveRoom,
   },
+
+  /* 404 */
   {
     path: "*",
     Component: NotFound,
