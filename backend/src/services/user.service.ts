@@ -1,6 +1,6 @@
 import { db, auth } from "../config/firebase";
 import { UserProfile, CreateUserDTO, UpdateUserDTO } from "../types/user.types";
-import admin from "../config/firebase";
+import { Timestamp } from "firebase-admin/firestore";
 import { normalizeUsername, getUsernameDocRef } from "./username.service";
 
 const USERS_COLLECTION = "users";
@@ -19,7 +19,7 @@ export async function createUserProfile(data: CreateUserDTO): Promise<UserProfil
     throw new Error("El username ya está en uso");
   }
   
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   const userProfile: UserProfile = {
     ...data,
     username: normalizeUsername(data.username),
@@ -81,7 +81,7 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
       const updated = {
         ...data,
         username: normalized,
-        updatedAt: admin.firestore.Timestamp.now(),
+        updatedAt: Timestamp.now(),
       };
 
       const batch = db.batch();
@@ -96,7 +96,7 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
 
   const updated = {
     ...data,
-    updatedAt: admin.firestore.Timestamp.now(),
+    updatedAt: Timestamp.now(),
   };
 
   await docRef.update(updated);
