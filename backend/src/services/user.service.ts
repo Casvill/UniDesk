@@ -1,10 +1,9 @@
 import { db, auth } from "../config/firebase";
 import { UserProfile, CreateUserDTO, UpdateUserDTO } from "../types/user.types";
 import admin from "../config/firebase";
-import { normalizeUsername } from "./username.service";
+import { normalizeUsername, getUsernameDocRef } from "./username.service";
 
 const USERS_COLLECTION = "users";
-
 
 /**
  * (C) Crea un perfil de usuario en Firestore.
@@ -13,8 +12,14 @@ const USERS_COLLECTION = "users";
  * @returns El perfil de usuario creado con timestamps
  */
 export async function createUserProfile(data: CreateUserDTO): Promise<UserProfile> {
-  const now = admin.firestore.Timestamp.now();
+  const usernameRef = getUsernameDocRef(normalizeUsername(data.username));
+  const usernameDoc = await usernameRef.get();
 
+  if (usernameDoc.exists) {
+    throw new Error("El username ya está en uso");
+  }
+  
+  const now = admin.firestore.Timestamp.now();
   const userProfile: UserProfile = {
     ...data,
     username: normalizeUsername(data.username),
@@ -22,7 +27,13 @@ export async function createUserProfile(data: CreateUserDTO): Promise<UserProfil
     updatedAt: now,
   };
 
-  await db.collection(USERS_COLLECTION).doc(data.uid).set(userProfile);
+  const userRef = db.collection(USERS_COLLECTION).doc(data.uid);
+
+  const batch = db.batch();
+  batch.set(userRef, userProfile);
+  batch.create(usernameRef, { uid: data.uid });
+  await batch.commit();
+
   return userProfile;
 }
 
@@ -56,15 +67,39 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
     throw new Error(`Usuario con uid ${uid} no existe en Firestore`);
   }
 
+  const currentData = doc.data() as UserProfile;
+
+  if (data.username) {
+    const normalized = normalizeUsername(data.username);
+
+    if (normalized !== currentData.username) {
+      const usernameDoc = await getUsernameDocRef(normalized).get();
+      if (usernameDoc.exists) {
+        throw new Error("El username ya está en uso");
+      }
+
+      const updated = {
+        ...data,
+        username: normalized,
+        updatedAt: admin.firestore.Timestamp.now(),
+      };
+
+      const batch = db.batch();
+      batch.update(docRef, updated);
+      batch.delete(getUsernameDocRef(currentData.username));
+      batch.create(getUsernameDocRef(normalized), { uid });
+      await batch.commit();
+
+      return { ...currentData, ...updated };
+    }
+  }
+
   const updated = {
     ...data,
-    ...(data.username && { username: normalizeUsername(data.username) }),
     updatedAt: admin.firestore.Timestamp.now(),
   };
 
   await docRef.update(updated);
-
-  const currentData = doc.data() as UserProfile;
   return { ...currentData, ...updated };
 }
 
@@ -82,6 +117,11 @@ export async function deleteUserProfile(uid: string): Promise<void> {
     throw new Error(`Usuario con uid ${uid} no existe en Firestore`);
   }
 
-  await docRef.delete();
+  const { username } = doc.data() as UserProfile;
+
+  const batch = db.batch();
+  batch.delete(docRef);
+  batch.delete(getUsernameDocRef(username));
+  await batch.commit();
   await auth.deleteUser(uid);
 }

@@ -1,6 +1,7 @@
 import { db } from "../config/firebase";
 
 const USERS_COLLECTION = "users";
+const USERNAMES_COLLECTION = "usernames";
 
 /**
  * Normaliza un username eliminando espacios y convirtiéndolo a minúsculas.
@@ -35,14 +36,12 @@ export async function checkUsernameAvailability(username: string): Promise<boole
   }
 
   const normalized = normalizeUsername(username);
+  const doc = await db.collection(USERNAMES_COLLECTION).doc(normalized).get();
+  return !doc.exists;
+}
 
-  const snapshot = await db
-    .collection(USERS_COLLECTION)
-    .where("username", "==", normalized)
-    .limit(1)
-    .get();
-
-  return snapshot.empty;
+export function getUsernameDocRef(username: string) {
+  return db.collection(USERNAMES_COLLECTION).doc(normalizeUsername(username));
 }
 
 export { normalizeUsername };
