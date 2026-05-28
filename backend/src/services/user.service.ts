@@ -64,8 +64,8 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
 
   await docRef.update(updated);
 
-  const updatedDoc = await docRef.get();
-  return updatedDoc.data() as UserProfile;
+  const currentData = doc.data() as UserProfile;
+  return { ...currentData, ...updated };
 }
 
 /**
