@@ -8,6 +8,16 @@ const options: swaggerJsdoc.Options = {
       version: "1.0.0",
       description: "Documentación de la API del backend de UniDesk",
     },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Token de Firebase Auth (ID token)",
+        },
+      },
+    },
   },
   apis: ["./src/types/*.ts", "./src/routes/*.ts"],
 };
