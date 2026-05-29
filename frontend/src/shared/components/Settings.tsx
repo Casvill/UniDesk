@@ -1,64 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Save, AlertTriangle, Shield, Bell, Video as VideoIcon, Loader2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
+import { User, Save, AlertTriangle, Shield, Bell, Video as VideoIcon } from "lucide-react";
 
 export function Settings() {
   const navigate = useNavigate();
-  const { user, profile, updateBackendProfile, deleteAccount, logout } = useAuth();
-  
-  const [formData, setFormData] = useState({
-    displayName: profile?.displayName || "",
-    username: profile?.username || "",
-  });
-
-  const [loading, setLoading] = useState(false);
-
   const [notifications, setNotifications] = useState({
     email: true,
     roomInvites: true,
     sessionReminders: false,
   });
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      await updateBackendProfile(formData);
-      toast.success("Perfil actualizado con éxito");
-    } catch (error: any) {
-      console.error("Update profile error:", error);
-      toast.error(error.message || "Error al actualizar el perfil");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleDeleteAccount = async () => {
-    if (confirm("¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.")) {
-      try {
-        await deleteAccount();
-        toast.success("Cuenta eliminada permanentemente");
-        navigate("/");
-      } catch (error) {
-        toast.error("No se pudo eliminar la cuenta");
-      }
-    }
+    alert("Settings saved successfully!");
   };
 
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Configuración</h2>
-        <p className="text-gray-600">Gestiona las preferencias y ajustes de tu cuenta</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Settings</h2>
+        <p className="text-gray-600">Manage your account preferences and settings</p>
       </div>
 
       <div className="max-w-[900px]">
@@ -69,53 +30,47 @@ export function Settings() {
                   <User className="h-5 w-5 text-indigo-600" />
                 </div>
                 <h3 id="account-settings-heading" className="text-xl font-bold text-gray-900">
-                  Ajustes de la Cuenta
+                  Account Settings
                 </h3>
               </div>
               <div className="space-y-5">
                 <div>
                   <label htmlFor="display-name" className="block mb-2 text-sm font-semibold text-gray-700">
-                    Nombre a Mostrar
+                    Display Name
                   </label>
                   <input
                     type="text"
                     id="display-name"
                     name="displayName"
-                    value={formData.displayName}
-                    onChange={handleChange}
+                    defaultValue="John Student"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="username" className="block mb-2 text-sm font-semibold text-gray-700">
-                    Nombre de Usuario
-                  </label>
-                  <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                    disabled={loading}
                   />
                 </div>
 
                 <div>
                   <label htmlFor="settings-email" className="block mb-2 text-sm font-semibold text-gray-700">
-                    Correo Electrónico
+                    Email Address
                   </label>
                   <input
                     type="email"
                     id="settings-email"
                     name="email"
-                    value={user?.email || ""}
-                    readOnly
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    defaultValue="john.student@university.edu"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                   />
-                  <p className="text-xs text-gray-400 mt-1">El correo no puede ser modificado por ahora.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="settings-university" className="block mb-2 text-sm font-semibold text-gray-700">
+                    University
+                  </label>
+                  <input
+                    type="text"
+                    id="settings-university"
+                    name="university"
+                    defaultValue="University of Example"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  />
                 </div>
               </div>
             </section>
@@ -126,7 +81,7 @@ export function Settings() {
                   <Bell className="h-5 w-5 text-purple-600" />
                 </div>
                 <h3 id="notification-settings-heading" className="text-xl font-bold text-gray-900">
-                  Preferencias de Notificación
+                  Notification Preferences
                 </h3>
               </div>
               <div className="space-y-4">
@@ -142,8 +97,8 @@ export function Settings() {
                     className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex-1">
-                    <span className="font-semibold text-gray-900 block">Notificaciones por Email</span>
-                    <span className="text-sm text-gray-600">Recibe actualizaciones por correo</span>
+                    <span className="font-semibold text-gray-900 block">Email Notifications</span>
+                    <span className="text-sm text-gray-600">Receive updates via email</span>
                   </div>
                 </label>
 
@@ -159,8 +114,8 @@ export function Settings() {
                     className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex-1">
-                    <span className="font-semibold text-gray-900 block">Invitaciones a Salas</span>
-                    <span className="text-sm text-gray-600">Recibe avisos cuando te inviten a una sala</span>
+                    <span className="font-semibold text-gray-900 block">Room Invitations</span>
+                    <span className="text-sm text-gray-600">Get notified when invited to rooms</span>
                   </div>
                 </label>
 
@@ -176,28 +131,175 @@ export function Settings() {
                     className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex-1">
-                    <span className="font-semibold text-gray-900 block">Recordatorios de Sesión</span>
-                    <span className="text-sm text-gray-600">Avisos antes de las sesiones programadas</span>
+                    <span className="font-semibold text-gray-900 block">Session Reminders</span>
+                    <span className="text-sm text-gray-600">Remind me before scheduled sessions</span>
                   </div>
                 </label>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8" aria-labelledby="audio-video-settings-heading">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <VideoIcon className="h-5 w-5 text-blue-600" />
+                </div>
+                <h3 id="audio-video-settings-heading" className="text-xl font-bold text-gray-900">
+                  Audio/Video Settings
+                </h3>
+              </div>
+              <div className="space-y-5">
+                <div>
+                  <label htmlFor="camera-device" className="block mb-2 text-sm font-semibold text-gray-700">
+                    Camera Device
+                  </label>
+                  <select
+                    id="camera-device"
+                    name="cameraDevice"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  >
+                    <option value="default">Default Camera</option>
+                    <option value="camera1">Built-in Camera</option>
+                    <option value="camera2">External Camera</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="microphone-device" className="block mb-2 text-sm font-semibold text-gray-700">
+                    Microphone Device
+                  </label>
+                  <select
+                    id="microphone-device"
+                    name="microphoneDevice"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  >
+                    <option value="default">Default Microphone</option>
+                    <option value="mic1">Built-in Microphone</option>
+                    <option value="mic2">External Microphone</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="speaker-device" className="block mb-2 text-sm font-semibold text-gray-700">
+                    Speaker Device
+                  </label>
+                  <select
+                    id="speaker-device"
+                    name="speakerDevice"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  >
+                    <option value="default">Default Speakers</option>
+                    <option value="speaker1">Built-in Speakers</option>
+                    <option value="speaker2">External Speakers</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8" aria-labelledby="privacy-settings-heading">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-green-600" />
+                </div>
+                <h3 id="privacy-settings-heading" className="text-xl font-bold text-gray-900">
+                  Privacy Settings
+                </h3>
+              </div>
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 transition">
+                  <input
+                    type="checkbox"
+                    id="show-profile"
+                    name="showProfile"
+                    defaultChecked
+                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <div className="flex-1">
+                    <span className="font-semibold text-gray-900 block">Show my profile to other users</span>
+                    <span className="text-sm text-gray-600">Make your profile visible in the community</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 transition">
+                  <input
+                    type="checkbox"
+                    id="show-stats"
+                    name="showStats"
+                    defaultChecked
+                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <div className="flex-1">
+                    <span className="font-semibold text-gray-900 block">Show my study statistics</span>
+                    <span className="text-sm text-gray-600">Display your session stats on your profile</span>
+                  </div>
+                </label>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8" aria-labelledby="password-settings-heading">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-orange-600" />
+                </div>
+                <h3 id="password-settings-heading" className="text-xl font-bold text-gray-900">
+                  Change Password
+                </h3>
+              </div>
+              <div className="space-y-5">
+                <div>
+                  <label htmlFor="current-password" className="block mb-2 text-sm font-semibold text-gray-700">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    id="current-password"
+                    name="currentPassword"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="new-password" className="block mb-2 text-sm font-semibold text-gray-700">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="new-password"
+                    name="newPassword"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="confirm-new-password" className="block mb-2 text-sm font-semibold text-gray-700">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="confirm-new-password"
+                    name="confirmNewPassword"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  />
+                </div>
               </div>
             </section>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                Guardar Cambios
+                <Save className="h-5 w-5" />
+                Save Changes
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/dashboard")}
                 className="w-full sm:w-auto bg-white border border-gray-300 px-8 py-3 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
               >
-                Cancelar
+                Cancel
               </button>
             </div>
           </form>
@@ -208,15 +310,19 @@ export function Settings() {
                 <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-red-900 mb-2">Zona de Peligro</h3>
+                <h3 className="text-xl font-bold text-red-900 mb-2">Danger Zone</h3>
                 <p className="text-red-700 mb-4">
-                  Una vez que elimines tu cuenta, no hay vuelta atrás. Por favor, asegúrate bien.
+                  Once you delete your account, there is no going back. Please be certain.
                 </p>
                 <button
-                  onClick={handleDeleteAccount}
+                  onClick={() => {
+                    if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+                      navigate("/");
+                    }
+                  }}
                   className="bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-md hover:shadow-lg"
                 >
-                  Eliminar Cuenta
+                  Delete Account
                 </button>
               </div>
             </div>
