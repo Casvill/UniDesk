@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Chrome, Loader2, CheckCircle, XCircle } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
-import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 export function Login() {
   const navigate = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +15,7 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const validate = () => {
     if (!email.trim()) return "El correo es obligatorio";
@@ -26,10 +30,9 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
-      setSuccess(false);
+    const err = validate();
+    if (err) {
+      setError(err);
       return;
     }
 
@@ -38,21 +41,12 @@ export function Login() {
     setSuccess(false);
 
     try {
-      await new Promise((res) => setTimeout(res, 1200));
-
-      const userExists = true;
-
-      if (!userExists) {
-        setError("Usuario no registrado");
-        return;
-      }
+      await login(email, password);
 
       setSuccess(true);
+      toast.success("Bienvenido");
 
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 900);
-
+      setTimeout(() => navigate("/dashboard"), 800);
     } catch {
       setError("Error al iniciar sesión");
     } finally {
@@ -61,33 +55,23 @@ export function Login() {
   };
 
   const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
     setError("");
-    setLoading(true);
-    setSuccess(false);
 
     try {
-      await new Promise((res) => setTimeout(res, 1200));
+      const result = await loginWithGoogle();
 
-      const googleUser = {
-        uid: "123",
-        fullName: "Juan Perez",
-        email: "juan.perez@correoinstitucional.edu.co",
-        photoURL: "https://i.pravatar.cc/200",
-      };
+      toast.success("Login con Google exitoso");
 
-      const userExists = false;
-
-      if (userExists) {
-        setSuccess(true);
-        setTimeout(() => navigate("/dashboard"), 800);
+      if (result?.isNewUser) {
+        navigate("/google-profile", { state: result.user });
       } else {
-        navigate("/google-profile", { state: googleUser });
+        navigate("/dashboard");
       }
-
     } catch {
       setError("Error con Google Login");
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -101,16 +85,16 @@ export function Login() {
           <div className="text-center mb-8">
             <img
               src={logo}
-              alt="UniDesk login"
+              alt="UniDesk, plataforma de salas de estudio colaborativo"
               className="h-20 w-auto inline-flex mb-3 mt-2"
             />
 
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               Bienvenido a UniDesk
             </h1>
 
             <p className="text-gray-600">
-              Inicia sesión en tu cuenta
+              Inicia sesión para entrar a tus salas de estudio en tiempo real
             </p>
           </div>
 
@@ -126,14 +110,16 @@ export function Login() {
                 </label>
 
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" aria-hidden="true" />
 
                   <input
                     type="email"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ejemplo@universidad.edu.co"
-                    className="w-full pl-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    disabled={loading || googleLoading}
                     aria-invalid={!!error}
                   />
                 </div>
@@ -146,30 +132,34 @@ export function Login() {
                 </label>
 
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" aria-hidden="true" />
 
                   <input
                     type="password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Tu contraseña"
-                    className="w-full pl-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Ingresa tu contraseña"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    disabled={loading || googleLoading}
                     aria-invalid={!!error}
                   />
                 </div>
 
                 <p className="text-xs text-gray-500 mt-1">
-                  Usa tu contraseña registrada
+                  Usa tu contraseña para acceder a tus salas de estudio
                 </p>
               </div>
 
               {/* ERROR */}
-              {error && (
-                <div className="flex items-center gap-2 text-red-600 text-sm">
-                  <XCircle className="h-4 w-4" />
-                  {error}
-                </div>
-              )}
+              <div aria-live="polite">
+                {error && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <XCircle className="h-4 w-4" />
+                    {error}
+                  </div>
+                )}
+              </div>
 
               {/* SUCCESS */}
               {success && (
@@ -182,12 +172,8 @@ export function Login() {
               {/* SUBMIT */}
               <button
                 type="submit"
-                disabled={loading || success}
-                className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2
-                  ${success
-                    ? "bg-green-600 text-white"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                  }`}
+                disabled={loading || googleLoading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50"
               >
                 {loading && <Loader2 className="h-5 w-5 animate-spin" />}
                 {success && <CheckCircle className="h-5 w-5" />}
@@ -196,18 +182,24 @@ export function Login() {
                   ? "Iniciando sesión..."
                   : success
                   ? "Bienvenido"
-                  : "Iniciar Sesión"}
+                  : "Iniciar sesión"}
               </button>
 
               {/* GOOGLE */}
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={loading}
-                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50"
+                disabled={loading || googleLoading}
+                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50"
               >
-                <Chrome className="h-5 w-5" />
-                Continuar con Google
+                {googleLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    <Chrome className="h-5 w-5" />
+                    Continuar con Google
+                  </>
+                )}
               </button>
 
               {/* REGISTER */}
@@ -216,7 +208,7 @@ export function Login() {
                 <button
                   type="button"
                   onClick={() => navigate("/register")}
-                  className="text-indigo-600 font-semibold"
+                  className="text-indigo-600 font-semibold hover:underline"
                 >
                   Crear cuenta
                 </button>
