@@ -13,13 +13,9 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // =========================
-  // VALIDACIÓN SIMPLE
-  // =========================
   const validate = () => {
     if (!email.trim()) return "El correo es obligatorio";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return "Correo inválido";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Correo inválido";
 
     if (!password) return "La contraseña es obligatoria";
     if (password.length < 8) return "Mínimo 8 caracteres";
@@ -27,15 +23,13 @@ export function Login() {
     return "";
   };
 
-  // =========================
-  // LOGIN NORMAL
-  // =========================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validationError = validate();
     if (validationError) {
       setError(validationError);
+      setSuccess(false);
       return;
     }
 
@@ -44,10 +38,9 @@ export function Login() {
     setSuccess(false);
 
     try {
-      // 🔥 Simulación backend login
       await new Promise((res) => setTimeout(res, 1200));
 
-      const userExists = true; // aquí iría tu backend real
+      const userExists = true;
 
       if (!userExists) {
         setError("Usuario no registrado");
@@ -58,7 +51,7 @@ export function Login() {
 
       setTimeout(() => {
         navigate("/dashboard");
-      }, 800);
+      }, 900);
 
     } catch {
       setError("Error al iniciar sesión");
@@ -67,15 +60,12 @@ export function Login() {
     }
   };
 
-  // =========================
-  // LOGIN GOOGLE (CORRECTO)
-  // =========================
   const handleGoogleLogin = async () => {
     setError("");
     setLoading(true);
+    setSuccess(false);
 
     try {
-      // 🔥 Simulación login Google
       await new Promise((res) => setTimeout(res, 1200));
 
       const googleUser = {
@@ -85,11 +75,11 @@ export function Login() {
         photoURL: "https://i.pravatar.cc/200",
       };
 
-      // 🔥 Simulación backend: ¿existe usuario?
       const userExists = false;
 
       if (userExists) {
-        navigate("/dashboard");
+        setSuccess(true);
+        setTimeout(() => navigate("/dashboard"), 800);
       } else {
         navigate("/google-profile", { state: googleUser });
       }
@@ -131,30 +121,31 @@ export function Login() {
 
               {/* EMAIL */}
               <div>
-                <label className="text-sm font-semibold text-gray-700">
-                  Correo
+                <label className="block mb-2 text-sm font-semibold text-gray-700">
+                  Correo institucional o personal
                 </label>
 
-                <div className="relative mt-1">
+                <div className="relative">
                   <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
 
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ejemplo@correo.com"
+                    placeholder="ejemplo@universidad.edu.co"
                     className="w-full pl-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    aria-invalid={!!error}
                   />
                 </div>
               </div>
 
               {/* PASSWORD */}
               <div>
-                <label className="text-sm font-semibold text-gray-700">
+                <label className="block mb-2 text-sm font-semibold text-gray-700">
                   Contraseña
                 </label>
 
-                <div className="relative mt-1">
+                <div className="relative">
                   <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
 
                   <input
@@ -163,6 +154,7 @@ export function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Tu contraseña"
                     className="w-full pl-10 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    aria-invalid={!!error}
                   />
                 </div>
 
@@ -176,6 +168,14 @@ export function Login() {
                 <div className="flex items-center gap-2 text-red-600 text-sm">
                   <XCircle className="h-4 w-4" />
                   {error}
+                </div>
+              )}
+
+              {/* SUCCESS */}
+              {success && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <CheckCircle className="h-4 w-4" />
+                  Inicio de sesión exitoso
                 </div>
               )}
 
@@ -196,7 +196,7 @@ export function Login() {
                   ? "Iniciando sesión..."
                   : success
                   ? "Bienvenido"
-                  : "Iniciar sesión"}
+                  : "Iniciar Sesión"}
               </button>
 
               {/* GOOGLE */}
