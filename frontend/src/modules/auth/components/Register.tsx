@@ -4,7 +4,7 @@ import logo from "@/assets/logo/unified-logo-light.svg";
 import { useState } from "react";
 
 type RegisterProps = {
-  onSubmit: () => void;
+  onSubmit: (data: any) => Promise<void> | void;
 };
 
 export function Register({ onSubmit }: RegisterProps) {
@@ -20,6 +20,12 @@ export function Register({ onSubmit }: RegisterProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  // estados nuevos
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -53,16 +59,34 @@ export function Register({ onSubmit }: RegisterProps) {
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    setGlobalError(null);
+    setSuccess(null);
 
     const validationErrors = validate();
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) return;
 
-    onSubmit();
-  };  
+    try {
+      setLoading(true);
+
+      await onSubmit(form);
+
+      setSuccess("Cuenta creada correctamente. Redirigiendo...");
+      
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1200);
+
+    } catch (err) {
+      setGlobalError("No se pudo crear la cuenta. Intenta nuevamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
@@ -79,6 +103,30 @@ export function Register({ onSubmit }: RegisterProps) {
     setAvatarPreview(imageUrl);
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setGoogleLoading(true);
+      setGlobalError(null);
+
+      // simulación login google
+      await new Promise((r) => setTimeout(r, 800));
+
+      navigate("/google-profile", {
+        state: {
+          uid: "123",
+          fullName: "Juan Perez",
+          email: "juan.perez@correoinstitucional.edu.co",
+          photoURL: "https://i.pravatar.cc/200",
+        },
+      });
+
+    } catch {
+      setGlobalError("Error iniciando sesión con Google");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8">
       <main className="w-full max-w-[1280px]">
@@ -86,16 +134,10 @@ export function Register({ onSubmit }: RegisterProps) {
 
           {/* HEADER */}
           <div className="text-center mb-8">
-            <img
-              src={logo}
-              alt="UniDesk, plataforma de estudio colaborativo"
-              className="h-20 w-auto inline-flex mb-3 mt-2"
-            />
-
+            <img src={logo} className="h-20 w-auto inline-flex mb-3 mt-2" />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               Crea tu cuenta
             </h1>
-
             <p className="text-gray-600">
               Únete a tu sala de estudio colaborativo en tiempo real
             </p>
@@ -104,20 +146,24 @@ export function Register({ onSubmit }: RegisterProps) {
           {/* CARD */}
           <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100">
 
+            {/* GLOBAL FEEDBACK */}
+            <div aria-live="polite">
+              {globalError && (
+                <p className="text-red-600 text-sm mb-3">{globalError}</p>
+              )}
+              {success && (
+                <p className="text-green-600 text-sm mb-3">{success}</p>
+              )}
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
 
               {/* AVATAR */}
               <div className="flex flex-col items-center mb-6">
-
                 <div className="relative">
-
                   <div className="w-24 h-24 rounded-full bg-gray-100 border border-gray-300 overflow-hidden flex items-center justify-center">
                     {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Foto de perfil"
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={avatarPreview} className="w-full h-full object-cover" />
                     ) : (
                       <User className="h-10 w-10 text-gray-400" />
                     )}
@@ -125,8 +171,7 @@ export function Register({ onSubmit }: RegisterProps) {
 
                   <label
                     htmlFor="avatar"
-                    className="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    aria-label="Subir imagen de perfil"
+                    className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full cursor-pointer"
                   >
                     <Pencil className="h-4 w-4" />
                   </label>
@@ -145,7 +190,7 @@ export function Register({ onSubmit }: RegisterProps) {
                 </p>
               </div>
 
-              {/* NOMBRE COMPLETO */}
+              {/* FULLNAME */}
               <div>
                 <label className="block mb-2 text-sm font-semibold text-gray-700">
                   Nombre completo
@@ -153,24 +198,16 @@ export function Register({ onSubmit }: RegisterProps) {
 
                 <div className="relative">
                   <User className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
-
                   <input
                     name="fullName"
                     value={form.fullName}
                     onChange={handleChange}
-                    required
-                    minLength={3}
                     placeholder="Ej: Juan Pérez"
-                    aria-invalid={!!errors.fullName}
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
                   />
                 </div>
 
-                {errors.fullName && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.fullName}
-                  </p>
-                )}
+                {errors.fullName && <p className="text-red-600 text-xs">{errors.fullName}</p>}
               </div>
 
               {/* USERNAME */}
@@ -183,20 +220,11 @@ export function Register({ onSubmit }: RegisterProps) {
                   name="username"
                   value={form.username}
                   onChange={handleChange}
-                  required
-                  minLength={3}
-                  pattern="[a-zA-Z0-9_]+"
-                  title="Solo letras, números y guiones bajos"
                   placeholder="Ej: estudiante_123"
-                  aria-invalid={!!errors.username}
-                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border rounded-lg"
                 />
 
-                {errors.username && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.username}
-                  </p>
-                )}
+                {errors.username && <p className="text-red-600 text-xs">{errors.username}</p>}
               </div>
 
               {/* EMAIL */}
@@ -207,24 +235,17 @@ export function Register({ onSubmit }: RegisterProps) {
 
                 <div className="relative">
                   <Mail className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
-
                   <input
                     name="email"
                     type="email"
                     value={form.email}
                     onChange={handleChange}
-                    required
                     placeholder="ejemplo@universidad.edu.co"
-                    aria-invalid={!!errors.email}
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
                   />
                 </div>
 
-                {errors.email && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.email}
-                  </p>
-                )}
+                {errors.email && <p className="text-red-600 text-xs">{errors.email}</p>}
               </div>
 
               {/* PASSWORD */}
@@ -235,25 +256,17 @@ export function Register({ onSubmit }: RegisterProps) {
 
                 <div className="relative">
                   <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
-
                   <input
                     type="password"
                     name="password"
                     value={form.password}
                     onChange={handleChange}
-                    required
-                    minLength={8}
                     placeholder="Mínimo 8 caracteres"
-                    aria-invalid={!!errors.password}
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
                   />
                 </div>
 
-                {errors.password && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.password}
-                  </p>
-                )}
+                {errors.password && <p className="text-red-600 text-xs">{errors.password}</p>}
               </div>
 
               {/* CONFIRM PASSWORD */}
@@ -264,42 +277,37 @@ export function Register({ onSubmit }: RegisterProps) {
 
                 <div className="relative">
                   <Lock className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
-
                   <input
                     type="password"
                     name="confirmPassword"
                     value={form.confirmPassword}
                     onChange={handleChange}
-                    required
                     placeholder="Repite tu contraseña"
-                    aria-invalid={!!errors.confirmPassword}
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
                   />
                 </div>
 
-                {errors.confirmPassword && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {errors.confirmPassword}
-                  </p>
-                )}
+                {errors.confirmPassword && <p className="text-red-600 text-xs">{errors.confirmPassword}</p>}
               </div>
 
               {/* SUBMIT */}
               <button
                 type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold"
               >
-                Crear cuenta
+                {loading ? "Creando cuenta..." : "Crear cuenta"}
               </button>
 
               {/* GOOGLE */}
               <button
                 type="button"
-                onClick={() => navigate("/dashboard")}
+                onClick={handleGoogleLogin}
+                disabled={googleLoading}
                 className="w-full border py-3 rounded-lg flex items-center justify-center gap-2"
               >
                 <Chrome className="h-5 w-5" />
-                Continuar con Google
+                {googleLoading ? "Cargando..." : "Continuar con Google"}
               </button>
 
               {/* LOGIN */}
