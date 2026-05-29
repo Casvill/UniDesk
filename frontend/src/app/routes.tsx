@@ -4,6 +4,7 @@ import { createBrowserRouter } from "react-router-dom";
 import LoginPage from "../modules/auth/pages/LoginPage";
 import RegisterPage from "../modules/auth/pages/Register";
 import Forgot from "../modules/auth/pages/ForgotPage";
+import GoogleprofilePage from "../modules/auth/pages/GooglePage";
 
 /* LAYOUT */
 import { TopbarLayout } from "./TopbarLayout";
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
   {
     path: "/forgot-password",
     Component: Forgot,
+  },
+  {
+    path: "/google-profile",
+    Component: GoogleprofilePage,
   },
 
   /* PROTECTED LAYOUT */
