@@ -3,19 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 
 interface ForgotPasswordProps {
-  onSubmit: () => void;
+  onSubmit: () => Promise<void> | void;
 }
 
 export function Forgot({ onSubmit }: ForgotPasswordProps) {
   const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setSubmitted(true);
-
-    onSubmit();
+    try {
+      await onSubmit();
+      setSubmitted(true);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -96,9 +99,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                       </h3>
 
                       <p className="text-sm text-green-700">
-                        Hemos enviado un enlace de recuperación a tu correo
-                        electrónico. Sigue las instrucciones para restablecer tu
-                        contraseña.
+                        Si la dirección de correo ingresada está asociada a una cuenta, recibirás un mensaje con instrucciones para restablecer tu contraseña. Revisa también tu carpeta de correo no deseado.
                       </p>
                     </div>
                   </div>

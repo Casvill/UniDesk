@@ -1,6 +1,6 @@
 import { RouterProvider } from 'react-router-dom';
 import { router } from './routes';
-import { AuthProvider } from '../context/AuthContext';
+import { auth, db } from '../shared/services/firebase';
 
 export default function App() {
   return (
