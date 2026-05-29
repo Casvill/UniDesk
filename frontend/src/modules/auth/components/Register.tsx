@@ -229,7 +229,7 @@ export function Register() {
               {/* EMAIL */}
               <div>
                 <label className="block mb-2 text-sm font-semibold text-gray-700">
-                  Correo institucional
+                  Correo institucional o personal
                 </label>
 
                 <div className="relative">

@@ -3,7 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 /* PAGES (NO COMPONENTS DIRECTOS) */
 import LoginPage from "../modules/auth/pages/LoginPage";
 import RegisterPage from "../modules/auth/pages/Register";
-import ForgotPassword from "../modules/auth/pages/ForgotPage";
+import Forgot from "../modules/auth/pages/ForgotPage";
 
 /* LAYOUT */
 import { TopbarLayout } from "./TopbarLayout";
@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/forgot-password",
-    Component: ForgotPassword,
+    Component: Forgot,
   },
 
   /* PROTECTED LAYOUT */

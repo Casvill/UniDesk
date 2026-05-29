@@ -28,13 +28,13 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              Reset your password
+              Recuperar contraseña
             </h1>
 
             <p className="text-gray-600">
               {!submitted
-                ? "Enter your email and we'll send you a reset link"
-                : "Check your email for the reset link"}
+                ? "Ingresa tu correo institucional y te enviaremos instrucciones para recuperar el acceso a tu cuenta."
+                : "Revisa tu correo electrónico para continuar con la recuperación de tu cuenta."}
             </p>
           </div>
 
@@ -46,7 +46,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                     htmlFor="reset-email"
                     className="block mb-2 text-sm font-semibold text-gray-700"
                   >
-                    Email Address
+                    Correo institucional o personal
                   </label>
 
                   <div className="relative">
@@ -60,7 +60,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                       name="email"
                       required
                       aria-required="true"
-                      placeholder="you@university.edu"
+                      placeholder="ejemplo@universidad.edu.co"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                     />
                   </div>
@@ -70,7 +70,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                   type="submit"
                   className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
                 >
-                  Send Reset Link
+                  Enviar enlace de recuperación
                 </button>
 
                 <button
@@ -79,7 +79,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                   className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded py-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back to Login
+                  Volver al inicio de sesión
                 </button>
               </form>
             ) : (
@@ -92,12 +92,13 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
 
                     <div>
                       <h3 className="font-semibold text-green-900 mb-1">
-                        Email sent successfully!
+                        Enlace enviado correctamente
                       </h3>
 
                       <p className="text-sm text-green-700">
-                        We've sent a password reset link to your email.
-                        Please check your inbox and follow the instructions.
+                        Hemos enviado un enlace de recuperación a tu correo
+                        electrónico. Sigue las instrucciones para restablecer tu
+                        contraseña.
                       </p>
                     </div>
                   </div>
@@ -107,16 +108,16 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                   onClick={() => navigate("/")}
                   className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
                 >
-                  Return to Login
+                  Volver al inicio de sesión
                 </button>
 
                 <p className="text-center text-sm text-gray-600">
-                  Didn't receive the email?{" "}
+                  ¿No recibiste el correo?{" "}
                   <button
                     onClick={() => setSubmitted(false)}
                     className="font-semibold text-indigo-600 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
                   >
-                    Try again
+                    Intentar nuevamente
                   </button>
                 </p>
               </div>
