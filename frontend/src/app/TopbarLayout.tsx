@@ -44,13 +44,16 @@ export function TopbarLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
     navigate("/");
     setIsMobileMenuOpen(false);
   };
+
+  const displayName = profile?.displayName || user?.displayName || user?.email;
+  const username = profile?.username ? `@${profile.username}` : "";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -77,7 +80,8 @@ export function TopbarLayout() {
                     {user && (
                       <div className="px-5 py-3 border-b border-gray-100">
                         <p className="text-xs text-gray-500 font-medium uppercase">Authenticated as</p>
-                        <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName || user.email}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                        {username && <p className="text-xs text-indigo-600 font-medium">{username}</p>}
                       </div>
                     )}
                     <nav aria-label="Mobile navigation" className="flex-1 px-4 py-4">
@@ -156,8 +160,9 @@ export function TopbarLayout() {
                   <div className="hidden lg:block text-right">
                     <p className="text-xs text-gray-500 font-medium leading-none mb-1">Signed in as</p>
                     <p className="text-sm font-semibold text-gray-900 truncate max-w-[150px]">
-                      {user.displayName || user.email}
+                      {displayName}
                     </p>
+                    {username && <p className="text-xs text-indigo-600 font-medium leading-none mt-1">{username}</p>}
                   </div>
                 )}
                 <button

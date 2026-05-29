@@ -1,8 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Book, Clock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+
+  const displayName = profile?.displayName || user?.displayName || "Estudiante";
 
   const activeRooms = [
     {
@@ -47,17 +51,17 @@ export function Dashboard() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, Student
+          ¡Bienvenido de nuevo, {displayName}!
         </h2>
         <p className="text-gray-600 mb-6">
-          Ready to start a productive study session?
+          ¿Listo para comenzar una sesión de estudio productiva?
         </p>
         <button
           onClick={() => navigate("/rooms/create")}
           className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
         >
           <Plus className="h-5 w-5" />
-          Create New Room
+          Crear Nueva Sala
         </button>
       </div>
 
@@ -66,7 +70,7 @@ export function Dashboard() {
           id="active-rooms-heading"
           className="text-2xl font-bold text-gray-900 mb-4"
         >
-          Active Study Rooms
+          Salas de Estudio Activas
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activeRooms.map((room) => (
@@ -89,13 +93,13 @@ export function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
                   <Users className="h-4 w-4" />
-                  <span>{room.participants} participants online</span>
+                  <span>{room.participants} participantes online</span>
                 </div>
                 <button
                   onClick={() => navigate(`/rooms/${room.id}`)}
                   className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
                 >
-                  Join Room
+                  Unirse a la Sala
                 </button>
               </div>
             </article>
@@ -108,7 +112,7 @@ export function Dashboard() {
           id="upcoming-sessions-heading"
           className="text-2xl font-bold text-gray-900 mb-4"
         >
-          Upcoming Sessions
+          Próximas Sesiones
         </h2>
         <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
           {upcomingSessions.map((session, index) => (
@@ -132,7 +136,7 @@ export function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      <span>{session.participants} participants</span>
+                      <span>{session.participants} participantes</span>
                     </div>
                   </div>
                 </div>
@@ -140,7 +144,7 @@ export function Dashboard() {
                   onClick={() => navigate(`/rooms/${session.id}`)}
                   className="w-full sm:w-auto bg-indigo-600 text-white py-2.5 px-6 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md hover:shadow-lg"
                 >
-                  View Details
+                  Ver Detalles
                 </button>
               </div>
             </div>

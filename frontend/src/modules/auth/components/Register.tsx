@@ -64,7 +64,7 @@ export function Register() {
 
     setLoading(true);
     try {
-      await register(form.email, form.password, form.fullName);
+      await register(form.email, form.password, form.fullName, form.username);
       toast.success("Cuenta creada exitosamente");
       navigate("/dashboard");
     } catch (error: any) {
