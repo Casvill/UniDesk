@@ -24,8 +24,6 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   register: (email: string, pass: string, name: string, username: string) => Promise<void>;
-  updateBackendProfile: (data: { username?: string; displayName?: string; photoURL?: string }) => Promise<void>;
-  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,28 +92,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProfile(newProfile);
   };
 
-  const updateBackendProfile = async (data: { username?: string; displayName?: string; photoURL?: string }) => {
-    if (!user) return;
-    const token = await user.getIdToken();
-    const updated = await api.updateProfile(user.uid, data, token);
-    setProfile(updated);
-  };
-
-  const deleteAccount = async () => {
-    if (!user) return;
-    try {
-      const token = await user.getIdToken();
-      await api.deleteProfile(user.uid, token);
-      // El backend ya elimina el usuario de Firebase Auth
-      setUser(null);
-      setProfile(null);
-      setStatus('unauthenticated');
-    } catch (error) {
-      console.error('Error deleting account:', error);
-      throw error;
-    }
-  };
-
   const logout = async () => {
     try {
       await signOut(auth);
@@ -134,8 +110,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     loginWithGoogle,
     register,
-    updateBackendProfile,
-    deleteAccount,
   };
 
   return (
