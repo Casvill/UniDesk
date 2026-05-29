@@ -1,14 +1,13 @@
 import { useNavigate } from "react-router-dom";
-import { User, Mail, Lock, Chrome, Pencil } from "lucide-react";
+import { User, Mail, Lock, Chrome, Pencil, Loader2 } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
-type RegisterProps = {
-  onSubmit: () => void;
-};
-
-export function Register({ onSubmit }: RegisterProps) {
+export function Register() {
   const navigate = useNavigate();
+  const { register, loginWithGoogle } = useAuth();
 
   const [form, setForm] = useState({
     fullName: "",
@@ -20,6 +19,8 @@ export function Register({ onSubmit }: RegisterProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -53,7 +54,7 @@ export function Register({ onSubmit }: RegisterProps) {
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validationErrors = validate();
@@ -61,8 +62,32 @@ export function Register({ onSubmit }: RegisterProps) {
 
     if (Object.keys(validationErrors).length > 0) return;
 
-    onSubmit();
+    setLoading(true);
+    try {
+      await register(form.email, form.password, form.fullName, form.username);
+      toast.success("Cuenta creada exitosamente");
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      toast.error("Error al crear la cuenta. Inténtalo de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };  
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("¡Bienvenido!");
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      toast.error("Error al autenticar con Google.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({
@@ -163,6 +188,7 @@ export function Register({ onSubmit }: RegisterProps) {
                     placeholder="Ej: Juan Pérez"
                     aria-invalid={!!errors.fullName}
                     className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={loading || googleLoading}
                   />
                 </div>
 
@@ -190,6 +216,7 @@ export function Register({ onSubmit }: RegisterProps) {
                   placeholder="Ej: estudiante_123"
                   aria-invalid={!!errors.username}
                   className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={loading || googleLoading}
                 />
 
                 {errors.username && (
@@ -217,6 +244,7 @@ export function Register({ onSubmit }: RegisterProps) {
                     placeholder="ejemplo@universidad.edu.co"
                     aria-invalid={!!errors.email}
                     className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={loading || googleLoading}
                   />
                 </div>
 
@@ -246,6 +274,7 @@ export function Register({ onSubmit }: RegisterProps) {
                     placeholder="Mínimo 8 caracteres"
                     aria-invalid={!!errors.password}
                     className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={loading || googleLoading}
                   />
                 </div>
 
@@ -274,6 +303,7 @@ export function Register({ onSubmit }: RegisterProps) {
                     placeholder="Repite tu contraseña"
                     aria-invalid={!!errors.confirmPassword}
                     className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={loading || googleLoading}
                   />
                 </div>
 
@@ -287,19 +317,25 @@ export function Register({ onSubmit }: RegisterProps) {
               {/* SUBMIT */}
               <button
                 type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700"
+                disabled={loading || googleLoading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Crear cuenta
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Crear cuenta"}
               </button>
 
               {/* GOOGLE */}
               <button
                 type="button"
-                onClick={() => navigate("/dashboard")}
-                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2"
+                onClick={handleGoogleLogin}
+                disabled={loading || googleLoading}
+                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                <Chrome className="h-5 w-5" />
-                Continuar con Google
+                {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                  <>
+                    <Chrome className="h-5 w-5" />
+                    Continuar con Google
+                  </>
+                )}
               </button>
 
               {/* LOGIN */}
@@ -308,7 +344,7 @@ export function Register({ onSubmit }: RegisterProps) {
                 <button
                   type="button"
                   onClick={() => navigate("/")}
-                  className="text-indigo-600 font-semibold"
+                  className="text-indigo-600 font-semibold hover:underline"
                 >
                   Iniciar sesión
                 </button>

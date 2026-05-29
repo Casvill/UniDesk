@@ -1,23 +1,45 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Chrome } from "lucide-react";
+import { Mail, Lock, Chrome, Loader2 } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
-type LoginProps = {
-  onSubmit?: (e: React.FormEvent) => void;
-};
-
-export function Login({ onSubmit }: LoginProps) {
+export function Login() {
   const navigate = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (onSubmit) {
-      onSubmit(e);
-      return;
+    setLoading(true);
+    try {
+      await login(email, password);
+      toast.success("¡Bienvenido de nuevo!");
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast.error("Error al iniciar sesión. Verifica tus credenciales.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    navigate("/dashboard");
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("¡Bienvenido!");
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      toast.error("Error al autenticar con Google.");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -59,8 +81,11 @@ export function Login({ onSubmit }: LoginProps) {
                   <input
                     type="email"
                     required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="ejemplo@universidad.edu.co"
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    disabled={loading || googleLoading}
                   />
                 </div>
               </div>
@@ -77,8 +102,11 @@ export function Login({ onSubmit }: LoginProps) {
                   <input
                     type="password"
                     required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ingresa tu contraseña"
-                    className="w-full pl-10 pr-4 py-3 border rounded-lg"
+                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    disabled={loading || googleLoading}
                   />
                 </div>
 
@@ -111,19 +139,25 @@ export function Login({ onSubmit }: LoginProps) {
               {/* SUBMIT */}
               <button
                 type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold"
+                disabled={loading || googleLoading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Iniciar Sesión
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Iniciar Sesión"}
               </button>
 
               {/* GOOGLE */}
               <button
                 type="button"
-                onClick={() => navigate("/dashboard")}
-                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2"
+                onClick={handleGoogleLogin}
+                disabled={loading || googleLoading}
+                className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                <Chrome className="h-5 w-5" />
-                Continuar con Google
+                {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                  <>
+                    <Chrome className="h-5 w-5" />
+                    Continuar con Google
+                  </>
+                )}
               </button>
 
               {/* REGISTER */}
@@ -132,7 +166,7 @@ export function Login({ onSubmit }: LoginProps) {
                 <button
                   type="button"
                   onClick={() => navigate("/register")}
-                  className="text-indigo-600 font-semibold"
+                  className="text-indigo-600 font-semibold hover:underline"
                 >
                   Crear cuenta
                 </button>
