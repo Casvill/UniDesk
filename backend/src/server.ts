@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { db } from "./config/firebase";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
+import userRoutes from "./routes/user.routes";
 
 dotenv.config();
 
@@ -18,9 +21,12 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/users", userRoutes);
+
 db.collection("_health").doc("ping").set({ ok: true })
-  .then(() => console.log("Prueba: Firestroe bien :)"))
-  .catch((err) => console.error("Prueba: Firestore mal, error:", err));
+  .then(() => console.log("Firestore bien :)"))
+  .catch((err) => console.error("Firestore mal, error:", err));
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
