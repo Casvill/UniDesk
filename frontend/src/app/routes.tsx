@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 /* PAGES (NO COMPONENTS DIRECTOS) */
 import LoginPage from "../modules/auth/pages/LoginPage";
@@ -18,57 +18,69 @@ import { UserProfile } from "../modules/users/components/UserProfile";
 import { Settings } from "../shared/components/Settings";
 import { NotFound } from "../shared/components/NotFound";
 
+/* AUTH GUARDS */
+import ProtectedRoute from "../shared/components/ProtectedRoute";
+import PublicRoute from "../shared/components/PublicRoute";
+
 export const router = createBrowserRouter([
   /* PUBLIC ROUTES */
   {
-    path: "/",
-    Component: LoginPage,
-  },
-  {
-    path: "/register",
-    Component: RegisterPage,
-  },
-  {
-    path: "/forgot-password",
-    Component: ForgotPassword,
+    element: <PublicRoute />,
+    children: [
+      {
+        path: "/",
+        Component: LoginPage,
+      },
+      {
+        path: "/register",
+        Component: RegisterPage,
+      },
+      {
+        path: "/forgot-password",
+        Component: ForgotPassword,
+      },
+    ]
   },
 
   /* PROTECTED LAYOUT */
   {
-    path: "/",
-    Component: TopbarLayout,
+    element: <ProtectedRoute />,
     children: [
       {
-        path: "dashboard",
-        Component: Dashboard,
+        element: <TopbarLayout />,
+        children: [
+          {
+            path: "dashboard",
+            Component: Dashboard,
+          },
+          {
+            path: "rooms",
+            Component: RoomList,
+          },
+          {
+            path: "rooms/create",
+            Component: CreateRoom,
+          },
+          {
+            path: "rooms/join/:roomId",
+            Component: JoinRoom,
+          },
+          {
+            path: "profile",
+            Component: UserProfile,
+          },
+          {
+            path: "settings",
+            Component: Settings,
+          },
+        ],
       },
+      /* STANDALONE PROTECTED ROUTE */
       {
-        path: "rooms",
-        Component: RoomList,
-      },
-      {
-        path: "rooms/create",
-        Component: CreateRoom,
-      },
-      {
-        path: "rooms/join/:roomId",
-        Component: JoinRoom,
-      },
-      {
-        path: "profile",
-        Component: UserProfile,
-      },
-      {
-        path: "settings",
-        Component: Settings,
+        path: "/rooms/:roomId",
+        Component: ActiveRoom,
       },
     ],
-  },
-
-  /* STANDALONE ROUTE */
-  {
-    path: "/rooms/:roomId",
-    Component: ActiveRoom,
   },
 
   /* 404 */

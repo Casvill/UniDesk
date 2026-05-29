@@ -4,6 +4,7 @@ import { Home, Search, User, Settings as SettingsIcon, LogOut, Menu } from "luci
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/shared/components/ui/sheet";
+import { useAuth } from "@/context/AuthContext";
 
 type NavItem = {
   label: string;
@@ -43,6 +44,13 @@ export function TopbarLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+    setIsMobileMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -66,6 +74,12 @@ export function TopbarLayout() {
                     <div className="px-5 py-4 border-b border-gray-200">
                       <img src={logo} alt="UniDesk" className="h-8 w-auto" />
                     </div>
+                    {user && (
+                      <div className="px-5 py-3 border-b border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium uppercase">Authenticated as</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{user.displayName || user.email}</p>
+                      </div>
+                    )}
                     <nav aria-label="Mobile navigation" className="flex-1 px-4 py-4">
                       <ul className="space-y-2">
                         {navItems.map((item) => {
@@ -96,10 +110,7 @@ export function TopbarLayout() {
                     </nav>
                     <div className="px-4 py-4 border-t border-gray-200">
                       <button
-                        onClick={() => {
-                          navigate("/");
-                          setIsMobileMenuOpen(false);
-                        }}
+                        onClick={handleLogout}
                         className="w-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition flex items-center gap-2"
                       >
                         <LogOut className="h-4 w-4" />
@@ -114,9 +125,8 @@ export function TopbarLayout() {
                 alt="UniDesk"
                 className="h-9 sm:h-10 w-auto"
               />
-              {/* <h1 className="text-2xl font-bold text-gray-900">UniDesk</h1> */}
             </div>
-            <nav aria-label="Main navigation" className="hidden md:block md:ml-auto">
+            <nav aria-label="Main navigation" className="hidden md:flex items-center gap-6">
               <ul className="flex flex-wrap gap-2 md:gap-1">
                 {navItems.map((item) => {
                   const isActive = item.isActive(pathname);
@@ -139,16 +149,25 @@ export function TopbarLayout() {
                     </li>
                   );
                 })}
-                <li>
-                  <button
-                    onClick={() => navigate("/")}
-                    className="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition flex items-center gap-1"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </button>
-                </li>
               </ul>
+              <div className="h-6 w-px bg-gray-200 mx-2" />
+              <div className="flex items-center gap-4">
+                {user && (
+                  <div className="hidden lg:block text-right">
+                    <p className="text-xs text-gray-500 font-medium leading-none mb-1">Signed in as</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate max-w-[150px]">
+                      {user.displayName || user.email}
+                    </p>
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition flex items-center gap-1"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
             </nav>
           </div>
         </div>
