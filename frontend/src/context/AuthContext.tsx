@@ -130,6 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
 
     setProfile(newProfile);
+    setStatus('authenticated'); 
   };
 
   const logout = async () => {
