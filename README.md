@@ -1,4 +1,4 @@
-# UniDiscor
+# UniDesk
 
 Proyecto desarrollado para la asignatura **Proyecto Integrador I**
 ___
@@ -24,17 +24,17 @@ ___
 ___
 # Requisitos
 ### Backend:
-* Python 3.12
-* pip
+* Node.js 18.x o superior
+* API (Express + Firebase)
+* npm
 * Git
 
 ###  Frontend 
 * Node.js 18.x o superior
-* npm (o yarn/pnpm según prefieras)
+* npm
 * Git
-Desarrollado con **Next.js**, y **Tailwind CSS**.
-- **Iniciar:** `cd frontend && npm run dev`
-- **Linter:** `npm run lint` (Configuración en proceso)
+* Desarrollado con **React 19**, **Vite**, y **Tailwind CSS 4**.
+
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
@@ -43,8 +43,8 @@ ___
 ```bash 
 UniTasker/
 │
-├── backend/      # API (Django Rest Framework)
-├── frontend/     # Cliente web(React +  Next.js)
+├── backend/      # API (Express + Firebase)
+├── frontend/     # Cliente web (React + Vite)
 ├── .gitignore
 ├── pull_request_template.md
 └── README.md
@@ -58,7 +58,6 @@ ___
 
 **Variables de Entorno:**
 El proyecto utiliza variables de entorno para configuración sensible.
-El archivo .env real no debe subirse al repositorio.
 Para configurar el entorno local:
 
 1. Copiar el archivo de ejemplo:
@@ -72,25 +71,11 @@ cp .env.example .env
 **Configuración del entorno**
 ```bash
 cd backend
-python -m venv venv
-
-# Mac/Linux
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-
-# Instalar dependencias:
-pip install -r requirements.txt
-
-# Aplicar migraciones:
-python manage.py migrate
-
-# Ejecutar servidor:
-python manage.py runserver
+npm install
+npm run dev
 ```
 
-Con esto ya estará andando el backend de manera local en http://localhost:8000/
+Con esto ya estará andando el backend de manera local en http://localhost:3000/
 
 ## Frontend
 
@@ -104,46 +89,36 @@ npm install
 npm run dev
 ```
 
-**Nota:** Por defecto, el frontend estará disponible en http://localhost:3000.
-
-## 🚀 Inicio Rápido (Servidores en simultáneo)
-
-Si ya tienes configurado tu entorno (`venv` y `npm install`), puedes iniciar ambos servidores con un solo comando:
-
-### 🐧 Linux y macOS (Terminal)
-1.  Otorga permisos al script: `chmod +x start-dev.sh`
-2.  Ejecuta: `./start-dev.sh`
-    *(Usa `Ctrl + C` para detener ambos servidores)*
-
-### 🪟 Windows (CMD / PowerShell)
-1.  Ejecuta el archivo: `start-dev.bat` o haz doble clic sobre él.
-    *(Esto abrirá dos ventanas independientes. Ciérralas para detener los servidores)*
+**Nota:** Por defecto, el frontend estará disponible en http://localhost:5173.
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
 # Calidad de código (Backend)
 
-El backend utiliza herramientas de estandarización y control de calidad:
+El backend utiliza **Jest** + **ts-jest** para pruebas unitarias.
 
-`Black` → Formateador automático de código.
-
-`Flake8` → Linter para detección de errores y validación de estilo.
-
-Configuración ubicada en:
-```bash
-backend/pyproject.toml
-```
-
-### Formatear código:
+### Ejecutar tests:
 Desde la carpeta backend:
 ```bash
-black .
+npm test
 ```
-Verificar errores de estilo:
+En modo watch:
 ```bash
-flake8 .
+npm run test:watch
 ```
-Antes de crear un Pull Request, el código debe estar correctamente formateado y no presentar errores de linting.
+Antes de crear un Pull Request, los tests deben pasar correctamente.
+
+[Tabla de Contenido](#tabla-de-contenido) 
+___
+# Calidad de código (Frontend)
+
+El frontend utiliza **ESLint** con `eslint-plugin-jsx-a11y` para accesibilidad WCAG 2.2.
+
+### Ejecutar linter:
+Desde la carpeta frontend:
+```bash
+npm run lint
+```
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
@@ -205,8 +180,11 @@ Todos los cambios deben realizarse mediante Pull Request hacia la rama develop.
 - Antes de enviar un PR:
 Desde backend/ ejecutar:
     ```bash
-    black .
-    flake8 .
+    npm test
+    ```
+Desde frontend/ ejecutar:
+    ```bash
+    npm run lint
     ```
 
 [Plantilla de Pull Request](pull_request_template.md)
@@ -216,7 +194,14 @@ Desde backend/ ejecutar:
 ___
 # Estado del Proyecto
 
-🟢 Sprint 0 — Configuración inicial del entorno y flujo de trabajo.
+🟢 Sprint 0 — Equipo operativo + Arquitectura base + UX preliminar  
+🟡 Sprint 1 - Identidad y Autenticación (T1)  
+⚪ Sprint 2 - Perfil y Gestión Base de Salas (T1)  
+⚪ Sprint 3 - Salas Colaborativas y Mensajería Instantánea (T2)  
+⚪ Sprint 4 - Infraestructura WebRTC y Video Básico (T3)  
+⚪ Sprint 5 - Control de Medios y Presentación (T3, T4)  
+⚪ Sprint 6 - Accesibilidad, Pruebas Heurísticas y Estabilización  
+⚪ Sprint 7 - Integración final, despliegues y cierre de producto  
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
