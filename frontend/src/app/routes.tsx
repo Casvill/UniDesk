@@ -20,24 +20,30 @@ import { UserProfile } from "../modules/users/components/UserProfile";
 import { Settings } from "../shared/components/Settings";
 import { NotFound } from "../shared/components/NotFound";
 
+import PublicRoute from "../shared/components/PublicRoute";
+
 export const router = createBrowserRouter([
   {
-    path: "/",
-    Component: LoginPage,
+    element: <PublicRoute />,
+    children: [
+      {
+        path: "/",
+        Component: LoginPage,
+      },
+      {
+        path: "/register",
+        Component: RegisterPage,
+      },
+      {
+        path: "/forgot-password",
+        Component: Forgot,
+      },
+      {
+        path: "/google-profile",
+        Component: GoogleprofilePage,
+      },
+    ],
   },
-  {
-    path: "/register",
-    Component: RegisterPage,
-  },
-  {
-    path: "/forgot-password",
-    Component: Forgot,
-  },
-  {
-    path: "/google-profile",
-    Component: GoogleprofilePage,
-  },
-
   {
     element: <ProtectedRoute />,
     children: [
