@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, User, Settings as SettingsIcon, LogOut, Menu } from "lucide-react";
+import { Home, Search, User, Settings as SettingsIcon, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/shared/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 
@@ -26,24 +35,12 @@ const navItems: NavItem[] = [
     isActive: (pathname) => pathname.startsWith("/rooms"),
     Icon: Search,
   },
-  {
-    label: "Profile",
-    path: "/profile",
-    isActive: (pathname) => pathname.startsWith("/profile"),
-    Icon: User,
-  },
-  {
-    label: "Settings",
-    path: "/settings",
-    isActive: (pathname) => pathname.startsWith("/settings"),
-    Icon: SettingsIcon,
-  },
 ];
 
 export function TopbarLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { logout } = useAuth();
+  const { logout, profile, isAuthenticated } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -51,112 +48,163 @@ export function TopbarLayout() {
     navigate("/");
   };
 
+  const UserMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-auto p-1 rounded-full" aria-label="User account menu">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={profile?.photoURL} alt={profile?.displayName || "User profile"} />
+            <AvatarFallback>{profile?.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+          {profile ? (
+            <>
+              Logged in as<br />
+              <span className="font-medium text-foreground text-sm">@{profile.username}</span>
+            </>
+          ) : (
+            "Loading profile..."
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/profile")}>
+          <User className="mr-2 h-4 w-4" aria-hidden="true" />
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/settings")}>
+          <SettingsIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+          Settings
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            {/* Left: Mobile Menu & Logo Container */}
+            <div className="flex items-center flex-1 md:flex-none">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="md:hidden hover:bg-gray-100 transition"
-                    aria-label="Open menu"
+                    className="md:hidden"
+                    aria-label="Open mobile menu"
                   >
-                    <Menu className="h-6 w-6" />
+                    <Menu className="h-6 w-6" aria-hidden="true" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-64">
-                  <div className="h-full flex flex-col">
-                    <div className="px-5 py-4 border-b border-gray-200">
-                      <img src={logo} alt="UniDesk" className="h-8 w-auto" />
-                    </div>
-                    <nav aria-label="Mobile navigation" className="flex-1 px-4 py-4">
-                      <ul className="space-y-2">
-                        {navItems.map((item) => {
-                          const isActive = item.isActive(pathname);
-                          const Icon = item.Icon;
-
-                          return (
-                            <li key={item.path}>
-                              <button
-                                onClick={() => {
-                                  navigate(item.path);
-                                  setIsMobileMenuOpen(false);
-                                }}
-                                className={`w-full px-3 py-2 text-sm font-semibold rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition flex items-center gap-2 ${
-                                  isActive
-                                    ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
-                                    : "text-gray-700 hover:bg-gray-100"
-                                }`}
-                                aria-current={isActive ? "page" : undefined}
-                              >
-                                <Icon className="h-4 w-4" />
-                                {item.label}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </nav>
-                    <div className="px-4 py-4 border-t border-gray-200">
-                      <button
+                <SheetContent side="left" className="w-64">
+                  <nav className="flex flex-col gap-6 mt-8" aria-label="Mobile navigation">
+                    {isAuthenticated && profile && (
+                      <div className="flex items-center gap-3 px-2">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={profile.photoURL} alt={profile.displayName} />
+                          <AvatarFallback>{profile.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-sm truncate">@{profile.username}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-full" title={profile.email}>{profile.email}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      {navItems.map((item) => (
+                        <Button
+                          key={item.path}
+                          variant={item.isActive(pathname) ? "secondary" : "ghost"}
+                          onClick={() => {
+                            navigate(item.path);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="justify-start gap-2"
+                        >
+                          <item.Icon className="h-4 w-4" aria-hidden="true" />
+                          {item.label}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="ghost"
                         onClick={() => {
-                          handleLogout();
+                          navigate("/profile");
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition flex items-center gap-2"
+                        className="justify-start gap-2"
                       >
-                        <LogOut className="h-4 w-4" />
-                        Logout
-                      </button>
+                        <User className="h-4 w-4" aria-hidden="true" />
+                        Profile
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          navigate("/settings");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="justify-start gap-2"
+                      >
+                        <SettingsIcon className="h-4 w-4" aria-hidden="true" />
+                        Settings
+                      </Button>
                     </div>
-                  </div>
+                    <Button
+                      variant="ghost"
+                      onClick={handleLogout}
+                      className="text-red-600 justify-start gap-2 mt-auto"
+                      aria-label="Log out"
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      Logout
+                    </Button>
+                  </nav>
                 </SheetContent>
               </Sheet>
-              <img
-                src={logo}
-                alt="UniDesk"
-                className="h-9 sm:h-10 w-auto"
-              />
-              {/* <h1 className="text-2xl font-bold text-gray-900">UniDesk</h1> */}
-            </div>
-            <nav aria-label="Main navigation" className="hidden md:block md:ml-auto">
-              <ul className="flex flex-wrap gap-2 md:gap-1">
+
+              {/* Logo - Centered on Mobile, Left on Desktop */}
+              <div className="flex-1 flex justify-center md:justify-start md:flex-none">
+                <img src={logo} alt="UniDesk" className="h-9 w-auto" />
+              </div>
+              
+              <nav className="hidden md:flex items-center gap-2 ml-6">
                 {navItems.map((item) => {
                   const isActive = item.isActive(pathname);
                   const Icon = item.Icon;
-
                   return (
-                    <li key={item.path}>
-                      <button
-                        onClick={() => navigate(item.path)}
-                        className={`px-3 py-2 text-sm font-semibold rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition flex items-center gap-1 ${
-                          isActive
-                            ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                        aria-current={isActive ? "page" : undefined}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </button>
-                    </li>
+                    <Button
+                      key={item.path}
+                      variant={isActive ? "secondary" : "ghost"}
+                      onClick={() => navigate(item.path)}
+                      className="gap-2"
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      {item.label}
+                    </Button>
                   );
                 })}
-                <li>
-                  <button
+              </nav>
+            </div>
+
+            {/* Right: User Menu & Logout */}
+            <div className="hidden md:flex items-center gap-2">
+              {isAuthenticated && (
+                <>
+                  <UserMenu />
+                  <Button
+                    variant="ghost"
                     onClick={handleLogout}
-                    className="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition flex items-center gap-1"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
-                  </button>
-                </li>
-              </ul>
-            </nav>
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
