@@ -51,9 +51,9 @@ export function TopbarLayout() {
   const UserMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-auto p-1 rounded-full">
+        <Button variant="ghost" className="h-auto p-1 rounded-full" aria-label="User account menu">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={profile?.photoURL} alt={profile?.displayName} />
+            <AvatarImage src={profile?.photoURL} alt={profile?.displayName || "User profile"} />
             <AvatarFallback>{profile?.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
           </Avatar>
         </Button>
@@ -71,11 +71,11 @@ export function TopbarLayout() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate("/profile")}>
-          <User className="mr-2 h-4 w-4" />
+          <User className="mr-2 h-4 w-4" aria-hidden="true" />
           Profile
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/settings")}>
-          <SettingsIcon className="mr-2 h-4 w-4" />
+          <SettingsIcon className="mr-2 h-4 w-4" aria-hidden="true" />
           Settings
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -95,12 +95,13 @@ export function TopbarLayout() {
                     variant="ghost"
                     size="icon"
                     className="md:hidden"
+                    aria-label="Open mobile menu"
                   >
-                    <Menu className="h-6 w-6" />
+                    <Menu className="h-6 w-6" aria-hidden="true" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64">
-                  <nav className="flex flex-col gap-6 mt-8">
+                  <nav className="flex flex-col gap-6 mt-8" aria-label="Mobile navigation">
                     {isAuthenticated && profile && (
                       <div className="flex items-center gap-3 px-2">
                         <Avatar className="h-10 w-10">
@@ -124,7 +125,7 @@ export function TopbarLayout() {
                           }}
                           className="justify-start gap-2"
                         >
-                          <item.Icon className="h-4 w-4" />
+                          <item.Icon className="h-4 w-4" aria-hidden="true" />
                           {item.label}
                         </Button>
                       ))}
@@ -136,7 +137,7 @@ export function TopbarLayout() {
                         }}
                         className="justify-start gap-2"
                       >
-                        <User className="h-4 w-4" />
+                        <User className="h-4 w-4" aria-hidden="true" />
                         Profile
                       </Button>
                       <Button
@@ -147,7 +148,7 @@ export function TopbarLayout() {
                         }}
                         className="justify-start gap-2"
                       >
-                        <SettingsIcon className="h-4 w-4" />
+                        <SettingsIcon className="h-4 w-4" aria-hidden="true" />
                         Settings
                       </Button>
                     </div>
@@ -155,8 +156,9 @@ export function TopbarLayout() {
                       variant="ghost"
                       onClick={handleLogout}
                       className="text-red-600 justify-start gap-2 mt-auto"
+                      aria-label="Log out"
                     >
-                      <LogOut className="h-4 w-4" />
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
                       Logout
                     </Button>
                   </nav>
@@ -176,7 +178,7 @@ export function TopbarLayout() {
                       onClick={() => navigate(item.path)}
                       className="gap-2"
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-4 w-4" aria-hidden="true" />
                       {item.label}
                     </Button>
                   );
@@ -203,7 +205,6 @@ export function TopbarLayout() {
           </div>
         </div>
       </header>
-...
 
       <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Outlet />
