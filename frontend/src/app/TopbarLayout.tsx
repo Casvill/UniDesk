@@ -89,6 +89,80 @@ export function TopbarLayout() {
           <div className="flex items-center justify-between">
             {/* Left: Logo & Nav */}
             <div className="flex items-center gap-6">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                  >
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64">
+                  <nav className="flex flex-col gap-6 mt-8">
+                    {isAuthenticated && profile && (
+                      <div className="flex items-center gap-3 px-2">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={profile.photoURL} alt={profile.displayName} />
+                          <AvatarFallback>{profile.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-sm">@{profile.username}</span>
+                          <span className="text-xs text-muted-foreground">{profile.email}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      {navItems.map((item) => (
+                        <Button
+                          key={item.path}
+                          variant={item.isActive(pathname) ? "secondary" : "ghost"}
+                          onClick={() => {
+                            navigate(item.path);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="justify-start gap-2"
+                        >
+                          <item.Icon className="h-4 w-4" />
+                          {item.label}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          navigate("/profile");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="justify-start gap-2"
+                      >
+                        <User className="h-4 w-4" />
+                        Profile
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          navigate("/settings");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="justify-start gap-2"
+                      >
+                        <SettingsIcon className="h-4 w-4" />
+                        Settings
+                      </Button>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={handleLogout}
+                      className="text-red-600 justify-start gap-2 mt-auto"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </Button>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              
               <img src={logo} alt="UniDesk" className="h-9 w-auto" />
               
               <nav className="hidden md:flex items-center gap-2">
@@ -111,7 +185,7 @@ export function TopbarLayout() {
             </div>
 
             {/* Right: User Menu & Logout */}
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               {isAuthenticated && (
                 <>
                   <UserMenu />
@@ -126,16 +200,6 @@ export function TopbarLayout() {
                 </>
               )}
             </div>
-            
-            {/* Mobile Trigger */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
           </div>
         </div>
       </header>
