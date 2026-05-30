@@ -106,7 +106,7 @@ export function GooglePage() {
   const cleanUsername = username.trim();
 
   const isUsernameFormatValid =
-    cleanUsername.length >= 3 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
+    cleanUsername.length >= 3 && cleanUsername.length <= 15 && /^[a-zA-Z0-9_-]+$/.test(cleanUsername);
 
   const isUsernameValid =
     isUsernameFormatValid && usernameAvailable === true && !checkingUsername;
@@ -138,13 +138,7 @@ export function GooglePage() {
       return;
     }
 
-    if (cleanUsername.length < 3) {
-      setUsernameAvailable(null);
-      setCheckingUsername(false);
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+    if (cleanUsername.length < 3 || cleanUsername.length > 15 || !/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
       setUsernameAvailable(null);
       setCheckingUsername(false);
       return;
@@ -174,12 +168,12 @@ export function GooglePage() {
       return "El nombre de usuario es obligatorio";
     }
 
-    if (cleanUsername.length < 3) {
-      return "Mínimo 3 caracteres";
+    if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+      return "El nombre debe tener entre 3 y 15 caracteres";
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      return "Solo letras, números y guiones bajos";
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      return "Solo caracteres alfanuméricos, '_' y '-'";
     }
 
     if (checkingUsername) {

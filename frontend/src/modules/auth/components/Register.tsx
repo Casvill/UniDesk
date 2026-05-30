@@ -347,14 +347,30 @@ export function Register() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fieldName = e.target.name as keyof FormState;
+    const value = e.target.value;
 
     setForm({
       ...form,
-      [fieldName]: e.target.value,
+      [fieldName]: value,
     });
 
     clearFieldError(fieldName);
     clearFeedback();
+
+    if (fieldName === 'username') {
+      const trimmedValue = value.trim();
+      let error = "";
+      if (trimmedValue.length > 0 && (trimmedValue.length < 3 || trimmedValue.length > 15)) {
+        error = "El nombre debe tener entre 3 y 15 caracteres";
+      } else if (trimmedValue.length > 0 && !/^[a-zA-Z0-9_-]+$/.test(trimmedValue)) {
+        error = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+      }
+      
+      setErrors(prev => ({
+        ...prev,
+        username: error
+      }));
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
