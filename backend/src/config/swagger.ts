@@ -5,9 +5,19 @@ const options: swaggerJsdoc.Options = {
     openapi: "3.0.0",
     info: {
       title: "UniDesk API",
-      version: "1.0.0",
+      version: "Sprint 1",
       description: "Documentación de la API del backend de UniDesk",
+      contact: {
+        name: "Despliegue de la app",
+        url: "https://unidesk.app",
+      },
     },
+    // servers: [
+    //   {
+    //     url: "http://localhost:3000",
+    //     description: "Servidor de Desarrollo",
+    //   },
+    // ],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -18,8 +28,9 @@ const options: swaggerJsdoc.Options = {
         },
       },
     },
+    security: [{ bearerAuth: [] }],
   },
-  apis: ["./src/types/*.ts", "./src/routes/*.ts"],
+  apis: ["./src/types/*.ts", "./src/routes/*.ts", "./src/server.ts"],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

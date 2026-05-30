@@ -40,6 +40,13 @@ export async function checkUsernameAvailability(username: string): Promise<boole
   return !doc.exists;
 }
 
+/**
+ * Obtiene una referencia al documento de un username en la colección
+ * de usernames. El username se normaliza antes de la consulta.
+ *
+ * @param username - Nombre de usuario (se normaliza internamente)
+ * @returns Referencia al documento de Firestore
+ */
 export function getUsernameDocRef(username: string) {
   return db.collection(USERNAMES_COLLECTION).doc(normalizeUsername(username));
 }

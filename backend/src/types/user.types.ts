@@ -2,6 +2,17 @@
  * @swagger
  * components:
  *   schemas:
+ *     ApiError:
+ *       type: object
+ *       description: Error estándar de la API.
+ *       properties:
+ *         message:
+ *           type: string
+ *           description: Descripción del error.
+ *           example: "Usuario no encontrado"
+ *       required:
+ *         - message
+ *
  *     UserProfile:
  *       type: object
  *       description: Representa el perfil de un usuario en el sistema.

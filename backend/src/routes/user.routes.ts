@@ -20,24 +20,12 @@ const router = Router();
  *       Crea el perfil en Firestore usando los datos del token Firebase
  *       (uid, email, provider). El body solo incluye campos de perfil.
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - username
- *               - displayName
- *             properties:
- *               username:
- *                 type: string
- *               displayName:
- *                 type: string
- *               photoURL:
- *                 type: string
+ *             $ref: '#/components/schemas/CreateUserDTO'
  *     responses:
  *       201:
  *         description: Perfil creado exitosamente
@@ -47,10 +35,22 @@ const router = Router();
  *               $ref: '#/components/schemas/UserProfile'
  *       400:
  *         description: Datos inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       401:
  *         description: Token requerido o inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       409:
  *         description: El username ya está en uso o el usuario ya tiene un perfil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.post("/", verifyToken, async (req: Request, res: Response) => {
   try {
@@ -98,12 +98,15 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  *     summary: Verificar disponibilidad de username
  *     description: Endpoint público. Retorna si un username está disponible.
  *     tags: [Users]
+ *     security: []
  *     parameters:
  *       - in: path
  *         name: username
  *         required: true
+ *         description: Nombre de usuario a verificar
  *         schema:
  *           type: string
+ *           example: "juan_dev"
  *     responses:
  *       200:
  *         description: Resultado de disponibilidad
@@ -114,8 +117,13 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  *               properties:
  *                 available:
  *                   type: boolean
+ *                   example: true
  *       400:
  *         description: Username inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.get("/username/:username/available", async (req: Request, res: Response) => {
   try {
@@ -134,14 +142,14 @@ router.get("/username/:username/available", async (req: Request, res: Response) 
  *     summary: Obtener perfil de usuario
  *     description: Retorna el perfil público de un usuario por su UID.
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: uid
  *         required: true
+ *         description: UID de Firebase del usuario
  *         schema:
  *           type: string
+ *           example: "abc123"
  *     responses:
  *       200:
  *         description: Perfil del usuario
@@ -151,8 +159,16 @@ router.get("/username/:username/available", async (req: Request, res: Response) 
  *               $ref: '#/components/schemas/UserProfile'
  *       401:
  *         description: Token requerido o inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       404:
  *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.get("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
@@ -177,14 +193,14 @@ router.get("/:uid", verifyToken, async (req: Request, res: Response) => {
  *       Actualiza el perfil del usuario autenticado.
  *       Solo el dueño de la cuenta puede actualizar su perfil.
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: uid
  *         required: true
+ *         description: UID de Firebase del usuario
  *         schema:
  *           type: string
+ *           example: "abc123"
  *     requestBody:
  *       required: true
  *       content:
@@ -200,12 +216,28 @@ router.get("/:uid", verifyToken, async (req: Request, res: Response) => {
  *               $ref: '#/components/schemas/UserProfile'
  *       401:
  *         description: Token requerido o inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       403:
  *         description: No tienes permiso para modificar este perfil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       404:
  *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       409:
  *         description: El username ya está en uso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
@@ -236,23 +268,43 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
  *       Elimina el perfil en Firestore y la cuenta en Firebase Auth.
  *       Solo el dueño de la cuenta puede eliminarla.
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: uid
  *         required: true
+ *         description: UID de Firebase del usuario
  *         schema:
  *           type: string
+ *           example: "abc123"
  *     responses:
  *       200:
  *         description: Cuenta eliminada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Cuenta eliminada exitosamente"
  *       401:
  *         description: Token requerido o inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       403:
  *         description: No tienes permiso para eliminar esta cuenta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  *       404:
  *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.delete("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
@@ -274,4 +326,13 @@ router.delete("/:uid", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Router de Express con las rutas del recurso de usuarios.
+ *
+ * - POST   /users                          → Crear perfil (auth)
+ * - GET    /users/username/{username}/available → Verificar disponibilidad (público)
+ * - GET    /users/{uid}                     → Obtener perfil (auth)
+ * - PUT    /users/{uid}                     → Actualizar perfil (auth, dueño)
+ * - DELETE /users/{uid}                     → Eliminar cuenta (auth, dueño)
+ */
 export default router;
