@@ -87,8 +87,8 @@ export function TopbarLayout() {
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
-            {/* Left: Logo & Nav */}
-            <div className="flex items-center gap-6">
+            {/* Left: Mobile Menu & Logo Container */}
+            <div className="flex items-center flex-1 md:flex-none">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -164,10 +164,13 @@ export function TopbarLayout() {
                   </nav>
                 </SheetContent>
               </Sheet>
+
+              {/* Logo - Centered on Mobile, Left on Desktop */}
+              <div className="flex-1 flex justify-center md:justify-start md:flex-none">
+                <img src={logo} alt="UniDesk" className="h-9 w-auto" />
+              </div>
               
-              <img src={logo} alt="UniDesk" className="h-9 w-auto" />
-              
-              <nav className="hidden md:flex items-center gap-2">
+              <nav className="hidden md:flex items-center gap-2 ml-6">
                 {navItems.map((item) => {
                   const isActive = item.isActive(pathname);
                   const Icon = item.Icon;
