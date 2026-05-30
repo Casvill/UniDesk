@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Book, Clock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   const activeRooms = [
     {
@@ -47,7 +49,7 @@ export function Dashboard() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, Student
+          Welcome back, {profile?.username || "Student"}
         </h2>
         <p className="text-gray-600 mb-6">
           Ready to start a productive study session?
