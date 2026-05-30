@@ -193,10 +193,10 @@ export function Register() {
 
     if (!form.username.trim()) {
       newErrors.username = "El nombre de usuario es obligatorio";
-    } else if (form.username.trim().length < 3) {
-      newErrors.username = "Mínimo 3 caracteres";
-    } else if (/\s/.test(form.username)) {
-      newErrors.username = "El usuario no debe tener espacios";
+    } else if (form.username.trim().length < 3 || form.username.trim().length > 15) {
+      newErrors.username = "El nombre debe tener entre 3 y 15 caracteres";
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(form.username.trim())) {
+      newErrors.username = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
     }
 
     if (!form.email.trim()) {
