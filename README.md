@@ -195,8 +195,8 @@ ___
 # Estado del Proyecto
 
 🟢 Sprint 0 — Equipo operativo + Arquitectura base + UX preliminar  
-🟡 Sprint 1 - Identidad y Autenticación (T1)  
-⚪ Sprint 2 - Perfil y Gestión Base de Salas (T1)  
+🟢 Sprint 1 - Identidad y Autenticación (T1)  
+🟡 Sprint 2 - Perfil y Gestión Base de Salas (T1)  
 ⚪ Sprint 3 - Salas Colaborativas y Mensajería Instantánea (T2)  
 ⚪ Sprint 4 - Infraestructura WebRTC y Video Básico (T3)  
 ⚪ Sprint 5 - Control de Medios y Presentación (T3, T4)  
