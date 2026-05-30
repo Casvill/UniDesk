@@ -49,7 +49,7 @@ export function Dashboard() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, {profile?.username || "Student"}
+          Welcome back, {profile?.username ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1) : "Student"}
         </h2>
         <p className="text-gray-600 mb-6">
           Ready to start a productive study session?
