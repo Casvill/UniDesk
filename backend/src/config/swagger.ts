@@ -9,7 +9,7 @@ const options: swaggerJsdoc.Options = {
       description: "Documentación de la API del backend de UniDesk",
       contact: {
         name: "Despliegue de la app",
-        url: "https://unidesk.app",
+        url: "https://un1desk.vercel.app",
       },
     },
     // servers: [
