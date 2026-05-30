@@ -10,6 +10,17 @@ declare global {
   }
 }
 
+/**
+ * Middleware de autenticación que verifica el token JWT de Firebase
+ * presente en el header Authorization (Bearer token).
+ *
+ * Si el token es válido, asigna los datos decodificados a `req.user`
+ * y llama a `next()`. Si no hay token o es inválido, responde con 401.
+ *
+ * @param req - Request de Express
+ * @param res - Response de Express
+ * @param next - Función next de Express
+ */
 export async function verifyToken(
   req: Request,
   res: Response,
