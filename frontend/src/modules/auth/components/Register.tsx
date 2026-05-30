@@ -74,10 +74,15 @@ export function Register() {
     setGoogleLoading(true);
 
     try {
-      await loginWithGoogle();
-      toast.success("Cuenta creada con Google");
+      const result = await loginWithGoogle();
 
-      navigate("/dashboard");
+      if (result?.isNewUser) {
+        navigate("/google-profile");
+      } else {
+        navigate("/dashboard");
+      }
+
+      toast.success("Cuenta creada con Google");
     } catch {
       toast.error("Error con Google");
     } finally {
