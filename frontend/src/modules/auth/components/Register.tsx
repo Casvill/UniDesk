@@ -69,14 +69,20 @@ export function Register() {
       setLoading(false);
     }
   };
-
+  
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
 
     try {
-      await loginWithGoogle();
+      const result = await loginWithGoogle();
+
+      if (result?.isNewUser) {
+        navigate("/google-profile");
+      } else {
+        navigate("/dashboard");
+      }
+
       toast.success("Cuenta creada con Google");
-      navigate("/dashboard");
     } catch {
       toast.error("Error con Google");
     } finally {

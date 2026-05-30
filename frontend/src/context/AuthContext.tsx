@@ -13,7 +13,7 @@ import {
 import { auth } from '../shared/services/firebase';
 import { api, UserProfile } from '../services/api';
 
-type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'needs-profile';
 
 interface AuthContextType {
   user: User | null;
@@ -26,8 +26,9 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<{
     user: User;
     isNewUser: boolean;
-    profile: UserProfile;
+    profile: UserProfile | null;
   }>;
+  completeProfile: (data: { username: string; displayName: string; photoURL?: string }) => Promise<UserProfile>;
   register: (email: string, pass: string, name: string, username: string) => Promise<void>;
 }
 
@@ -47,8 +48,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const token = await currentUser.getIdToken();
           const backendProfile = await api.getProfile(currentUser.uid, token);
 
-          setProfile(backendProfile);
-          setStatus('authenticated');
+          if (backendProfile) {
+            setProfile(backendProfile);
+            setStatus('authenticated');
+          } else {
+            setProfile(null);
+            setStatus('needs-profile');
+          }
         } catch (error) {
           console.error('Error fetching profile:', error);
           setStatus('authenticated');
@@ -75,28 +81,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const existingProfile = await api.getProfile(result.user.uid, token);
 
-    const isNewUser = !existingProfile;
+    if (existingProfile) {
+      setProfile(existingProfile);
+      setStatus('authenticated');
 
-    const profile = isNewUser
-      ? await api.createProfile(
-          {
-            username:
-              result.user.email?.split('@')[0] ||
-              `user_${result.user.uid.slice(0, 5)}`,
-            displayName: result.user.displayName || 'Usuario de Google',
-            photoURL: result.user.photoURL || ''
-          },
-          token
-        )
-      : existingProfile;
+      return {
+        user: result.user,
+        isNewUser: false,
+        profile: existingProfile
+      };
+    } else {
+      setProfile(null);
+      setStatus('needs-profile');
 
-    setProfile(profile);
+      return {
+        user: result.user,
+        isNewUser: true,
+        profile: null
+      };
+    }
+  };
 
-    return {
-      user: result.user,
-      isNewUser,
-      profile
-    };
+  const completeProfile = async (data: { username: string; displayName: string; photoURL?: string }): Promise<UserProfile> => {
+    if (!user) throw new Error('Not authenticated');
+
+    const token = await user.getIdToken();
+    const newProfile = await api.createProfile(data, token);
+
+    setProfile(newProfile);
+    setStatus('authenticated');
+
+    return newProfile;
   };
 
   const register = async (email: string, pass: string, name: string, username: string) => {
@@ -130,6 +145,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     login,
     loginWithGoogle,
+    completeProfile,
     register,
   };
 

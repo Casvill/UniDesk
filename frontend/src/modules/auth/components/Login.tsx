@@ -8,7 +8,7 @@ import { toast } from "sonner";
 export function Login() {
   const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
-
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -24,7 +24,6 @@ export function Login() {
     try {
       await login(email, password);
 
-      // UX: guardar preferencia si el usuario lo desea
       if (rememberMe) {
         localStorage.setItem("rememberUser", email);
       } else {
@@ -45,9 +44,15 @@ export function Login() {
     setGoogleLoading(true);
 
     try {
-      await loginWithGoogle();
-      toast.success("¡Bienvenido!");
-      navigate("/dashboard");
+      const result = await loginWithGoogle();
+
+      if (result?.isNewUser) {
+        navigate("/google-profile");
+      } else {
+        navigate("/dashboard");
+      }
+
+      toast.success("Login con Google exitoso");
     } catch (error: any) {
       console.error("Google login error:", error);
       toast.error("Error al autenticar con Google.");

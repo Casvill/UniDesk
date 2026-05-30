@@ -4,6 +4,7 @@ import { Home, Search, User, Settings as SettingsIcon, LogOut, Menu } from "luci
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/shared/components/ui/sheet";
+import { useAuth } from "@/context/AuthContext";
 
 type NavItem = {
   label: string;
@@ -42,7 +43,13 @@ const navItems: NavItem[] = [
 export function TopbarLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -97,7 +104,7 @@ export function TopbarLayout() {
                     <div className="px-4 py-4 border-t border-gray-200">
                       <button
                         onClick={() => {
-                          navigate("/");
+                          handleLogout();
                           setIsMobileMenuOpen(false);
                         }}
                         className="w-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition flex items-center gap-2"
@@ -141,7 +148,7 @@ export function TopbarLayout() {
                 })}
                 <li>
                   <button
-                    onClick={() => navigate("/")}
+                    onClick={handleLogout}
                     className="px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition flex items-center gap-1"
                   >
                     <LogOut className="h-4 w-4" />

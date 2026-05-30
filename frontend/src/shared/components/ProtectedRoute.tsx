@@ -18,6 +18,10 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
+  if (status === 'needs-profile') {
+    return <Navigate to="/google-profile" replace />;
+  }
+
   return <Outlet />;
 };
 

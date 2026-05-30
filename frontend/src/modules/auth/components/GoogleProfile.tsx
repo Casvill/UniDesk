@@ -1,43 +1,58 @@
-import { useLocation, useNavigate } from "react-router-dom";
-import { User, Mail, Pencil, Loader2, CheckCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-
-type GoogleState = {
-  uid: string;
-  fullName: string;
-  email: string;
-  photoURL: string;
-};
+import { useNavigate } from "react-router-dom";
+import { User, Mail, Pencil, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { api } from "@/services/api";
 
 export function GooglePage() {
   const navigate = useNavigate();
-  const { state } = useLocation() as { state: GoogleState | null };
+  const { user, status, completeProfile } = useAuth();
 
   const [username, setUsername] = useState("");
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const user = state;
-
   useEffect(() => {
-    if (!user) {
-      navigate("/register");
-    } else {
+    if (status === 'unauthenticated') {
+      navigate('/', { replace: true });
+    } else if (status === 'authenticated') {
+      navigate('/dashboard', { replace: true });
+    } else if (user?.photoURL) {
       setAvatarPreview(user.photoURL);
     }
-  }, [user, navigate]);
+  }, [status, user, navigate]);
 
-  const validate = () => {
+  useEffect(() => {
+    if (username.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const available = await api.checkUsername(username);
+        setUsernameAvailable(available);
+      } catch {
+        setUsernameAvailable(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username]);
+
+  const validate = useCallback(() => {
     if (!username.trim()) return "El nombre de usuario es obligatorio";
     if (username.length < 3) return "Mínimo 3 caracteres";
     if (!/^[a-zA-Z0-9_]+$/.test(username))
       return "Solo letras, números y guiones bajos";
+    if (usernameAvailable === false) return "Este nombre de usuario ya está en uso";
 
     return "";
-  };
+  }, [username, usernameAvailable]);
 
   const handleSubmit = async () => {
     const validationError = validate();
@@ -52,14 +67,10 @@ export function GooglePage() {
     setSuccess(false);
 
     try {
-      await new Promise((res) => setTimeout(res, 1500));
-
-      console.log({
-        uid: user?.uid,
-        fullName: user?.fullName,
-        email: user?.email,
-        photoURL: avatarPreview,
+      await completeProfile({
         username,
+        displayName: user?.displayName || 'Usuario de Google',
+        photoURL: avatarPreview || user?.photoURL || ''
       });
 
       setSuccess(true);
@@ -68,8 +79,14 @@ export function GooglePage() {
         navigate("/dashboard");
       }, 1200);
 
-    } catch {
-      setError("Error al completar el registro");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.toLowerCase().includes('username') || message.toLowerCase().includes('ya existe')) {
+        setError("Este nombre de usuario ya está en uso");
+        setUsernameAvailable(false);
+      } else {
+        setError("Error al completar el registro");
+      }
     } finally {
       setLoading(false);
     }
@@ -83,7 +100,7 @@ export function GooglePage() {
     setAvatarPreview(imageUrl);
   };
 
-  if (!user) return null;
+  if (status !== 'needs-profile' || !user) return null;
 
   return (
     <div
@@ -157,7 +174,7 @@ export function GooglePage() {
               </label>
 
               <input
-                value={user.fullName}
+                value={user.displayName || ''}
                 disabled
                 className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
                 aria-label="Nombre completo del usuario (no editable)"
@@ -180,6 +197,21 @@ export function GooglePage() {
                 autoComplete="username"
               />
 
+              <div className="flex items-center gap-1 mt-1">
+                {usernameAvailable === true && (
+                  <span className="text-green-600 text-xs flex items-center gap-1">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Disponible
+                  </span>
+                )}
+                {usernameAvailable === false && (
+                  <span className="text-red-500 text-xs flex items-center gap-1">
+                    <XCircle className="h-3.5 w-3.5" />
+                    No disponible
+                  </span>
+                )}
+              </div>
+
               {error && (
                 <p
                   id="username-error"
@@ -199,7 +231,7 @@ export function GooglePage() {
               </label>
 
               <input
-                value={user.email}
+                value={user.email || ''}
                 disabled
                 className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
                 aria-label="Correo del usuario (no editable)"
