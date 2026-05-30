@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import logo from "@/assets/logo/unified-logo-light.svg";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 
 interface ForgotPasswordProps {
@@ -9,31 +10,44 @@ interface ForgotPasswordProps {
 export function Forgot({ onSubmit }: ForgotPasswordProps) {
   const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    setLoading(true);
 
     try {
       await onSubmit();
       setSubmitted(true);
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8">
+    <div
+      className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8"
+      aria-label="Recuperación de contraseña"
+    >
       <main className="w-full max-w-[1280px]">
         <div className="max-w-[440px] mx-auto">
+
+          {/* HEADER */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-              <span className="text-white text-2xl font-bold">S</span>
-            </div>
+            <img
+              src={logo}
+              alt="UniDesk plataforma de estudio colaborativo"
+              className="h-20 w-auto mb-3 mx-auto"
+            />
 
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               Recuperar contraseña
             </h1>
 
+            {/* TEXTO NORMAL (SIN aria-live AQUÍ) */}
             <p className="text-gray-600">
               {!submitted
                 ? "Ingresa tu correo institucional y te enviaremos instrucciones para recuperar el acceso a tu cuenta."
@@ -41,9 +55,27 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100">
+          {/* ANNOUNCER GLOBAL (CLAVE PARA VOICEOVER) */}
+          <div
+            className="sr-only"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {loading && "Enviando enlace de recuperación de contraseña"}
+            {submitted &&
+              "Enlace enviado correctamente. Revisa tu correo electrónico."}
+          </div>
+
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100"
+            role="region"
+            aria-label="Formulario de recuperación de contraseña"
+          >
+
             {!submitted ? (
               <form onSubmit={handleSubmit} className="space-y-6">
+
+                {/* EMAIL */}
                 <div>
                   <label
                     htmlFor="reset-email"
@@ -54,7 +86,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
 
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
+                      <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
                     </div>
 
                     <input
@@ -69,29 +101,44 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                   </div>
                 </div>
 
+                {/* BUTTON */}
                 <button
                   type="submit"
+                  disabled={loading}
+                  aria-busy={loading}
                   className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
                 >
                   Enviar enlace de recuperación
                 </button>
 
+                {/* BACK */}
                 <button
                   type="button"
                   onClick={() => navigate("/")}
+                  aria-label="Volver al inicio de sesión"
                   className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded py-2"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Volver al inicio de sesión
                 </button>
+
               </form>
             ) : (
-              <div className="space-y-6" role="status" aria-live="polite">
+              <div
+                className="space-y-6"
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+              >
+
+                {/* SUCCESS MESSAGE */}
                 <div className="bg-green-50 border border-green-200 rounded-xl p-6">
                   <div className="flex gap-4">
-                    <div className="flex-shrink-0">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
+
+                    <CheckCircle
+                      className="h-6 w-6 text-green-600"
+                      aria-hidden="true"
+                    />
 
                     <div>
                       <h3 className="font-semibold text-green-900 mb-1">
@@ -99,16 +146,21 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                       </h3>
 
                       <p className="text-sm text-green-700">
-                        Si la dirección de correo ingresada está asociada a una cuenta, recibirás un mensaje con instrucciones para restablecer tu contraseña. Revisa también tu carpeta de correo no deseado.
+                        Si la dirección de correo ingresada está asociada a una cuenta, recibirás un mensaje con instrucciones para restablecer tu contraseña.
                       </p>
                     </div>
+
                   </div>
                 </div>
 
+                {/* BACK BUTTON */}
                 <button
+                  type="button"
                   onClick={() => navigate("/")}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
+                  aria-label="Volver al inicio de sesión"
+                  className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded py-2"
                 >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Volver al inicio de sesión
                 </button>
 
@@ -121,6 +173,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                     Intentar nuevamente
                   </button>
                 </p>
+
               </div>
             )}
           </div>
