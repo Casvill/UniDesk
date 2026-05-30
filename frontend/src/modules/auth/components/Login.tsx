@@ -64,7 +64,7 @@ export function Login() {
       toast.success("Login con Google exitoso");
 
       if (result?.isNewUser) {
-        navigate("/google-profile", { state: result.user });
+        navigate("/google-profile");
       } else {
         navigate("/dashboard");
       }
