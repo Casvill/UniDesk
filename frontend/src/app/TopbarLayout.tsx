@@ -108,9 +108,9 @@ export function TopbarLayout() {
                           <AvatarImage src={profile.photoURL} alt={profile.displayName} />
                           <AvatarFallback>{profile.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-sm">@{profile.username}</span>
-                          <span className="text-xs text-muted-foreground">{profile.email}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-sm truncate">@{profile.username}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-full" title={profile.email}>{profile.email}</span>
                         </div>
                       </div>
                     )}
