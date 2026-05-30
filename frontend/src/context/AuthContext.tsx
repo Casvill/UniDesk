@@ -7,7 +7,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  deleteUser
 } from 'firebase/auth';
 
 import { auth } from '../shared/services/firebase';
@@ -33,6 +34,49 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function createCodedError(code: string, message: string) {
+  const error = new Error(message) as Error & { code?: string };
+  error.code = code;
+  return error;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return '';
+}
+
+function getBackendErrorCode(error: unknown): string {
+  const message = getErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes('failed to fetch') ||
+    message.includes('networkerror') ||
+    message.includes('load failed') ||
+    message.includes('err_connection_refused')
+  ) {
+    return 'backend/profile-create-failed';
+  }
+
+  if (
+    message.includes('username') ||
+    message.includes('usuario') ||
+    message.includes('already exists') ||
+    message.includes('ocupado')
+  ) {
+    return 'backend/username-already-exists';
+  }
+
+  return 'backend/profile-create-failed';
+}
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -117,20 +161,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (email: string, pass: string, name: string, username: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
 
-    await updateProfile(userCredential.user, { displayName: name });
+    try {
+      await updateProfile(userCredential.user, { displayName: name });
 
-    const token = await userCredential.user.getIdToken();
+      const token = await userCredential.user.getIdToken();
 
-    const newProfile = await api.createProfile(
-      {
-        username,
-        displayName: name
-      },
-      token
-    );
+      const newProfile = await api.createProfile(
+        {
+          username,
+          displayName: name
+        },
+        token
+      );
 
-    setProfile(newProfile);
-    setStatus('authenticated'); 
+      setProfile(newProfile);
+      setStatus('authenticated');
+    } catch (error) {
+      const backendErrorCode = getBackendErrorCode(error);
+
+      try {
+        await deleteUser(userCredential.user);
+      } catch (deleteError) {
+        console.error('Error deleting Firebase user after profile creation failed:', deleteError);
+      }
+
+      throw createCodedError(
+        backendErrorCode,
+        getErrorMessage(error) || 'Profile creation failed'
+      );
+    }
   };
 
   const logout = async () => {
