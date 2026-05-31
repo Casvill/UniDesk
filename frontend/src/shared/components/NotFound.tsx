@@ -61,13 +61,13 @@ export function NotFound() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8">
       <main className="max-w-[600px] text-center">
         <div className="mb-8">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl mb-6 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-600 to-purple-600 rounded-3xl mb-6 shadow-2xl">
             <span className="text-white text-5xl font-bold">?</span>
           </div>
-          <h1 className="text-6xl sm:text-8xl lg:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-4">
+          <h1 className="text-6xl sm:text-8xl lg:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600 mb-4">
             404
           </h1>
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Page Not Found</h2>
@@ -84,7 +84,7 @@ export function NotFound() {
           <div className="flex flex-col gap-3">
             <button
               onClick={() => navigate("/dashboard")}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
             >
               <IconHome className="h-5 w-5" />
               Go to Dashboard

@@ -27,7 +27,7 @@ export function JoinRoom() {
     <div className="max-w-[700px] mx-auto">
       <button
         onClick={() => navigate("/rooms")}
-        className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1 transition"
+        className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-1 transition"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Room List
@@ -126,7 +126,7 @@ export function JoinRoom() {
                   type="checkbox"
                   id="join-camera"
                   name="joinCamera"
-                  className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                  className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                 />
                 <span className="font-medium text-gray-700">Join with camera on</span>
               </label>
@@ -136,7 +136,7 @@ export function JoinRoom() {
                   id="join-microphone"
                   name="joinMicrophone"
                   defaultChecked
-                  className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                  className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                 />
                 <span className="font-medium text-gray-700">Join with microphone on</span>
               </label>
@@ -146,7 +146,7 @@ export function JoinRoom() {
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               onClick={handleJoinRoom}
-              className="w-full sm:flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
+              className="w-full sm:flex-1 bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl"
             >
               Join Room
             </button>

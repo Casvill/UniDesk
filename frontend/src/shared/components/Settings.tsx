@@ -26,8 +26,8 @@ export function Settings() {
         <form onSubmit={handleSave} className="space-y-6">
             <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8" aria-labelledby="account-settings-heading">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <User className="h-5 w-5 text-indigo-600" />
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary-600" />
                 </div>
                 <h3 id="account-settings-heading" className="text-xl font-bold text-gray-900">
                   Account Settings
@@ -43,7 +43,7 @@ export function Settings() {
                     id="display-name"
                     name="displayName"
                     defaultValue="John Student"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
 
@@ -56,7 +56,7 @@ export function Settings() {
                     id="settings-email"
                     name="email"
                     defaultValue="john.student@university.edu"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
 
@@ -69,7 +69,7 @@ export function Settings() {
                     id="settings-university"
                     name="university"
                     defaultValue="University of Example"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
               </div>
@@ -94,7 +94,7 @@ export function Settings() {
                     onChange={(e) =>
                       setNotifications({ ...notifications, email: e.target.checked })
                     }
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   />
                   <div className="flex-1">
                     <span className="font-semibold text-gray-900 block">Email Notifications</span>
@@ -111,7 +111,7 @@ export function Settings() {
                     onChange={(e) =>
                       setNotifications({ ...notifications, roomInvites: e.target.checked })
                     }
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   />
                   <div className="flex-1">
                     <span className="font-semibold text-gray-900 block">Room Invitations</span>
@@ -128,7 +128,7 @@ export function Settings() {
                     onChange={(e) =>
                       setNotifications({ ...notifications, sessionReminders: e.target.checked })
                     }
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   />
                   <div className="flex-1">
                     <span className="font-semibold text-gray-900 block">Session Reminders</span>
@@ -155,7 +155,7 @@ export function Settings() {
                   <select
                     id="camera-device"
                     name="cameraDevice"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   >
                     <option value="default">Default Camera</option>
                     <option value="camera1">Built-in Camera</option>
@@ -170,7 +170,7 @@ export function Settings() {
                   <select
                     id="microphone-device"
                     name="microphoneDevice"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   >
                     <option value="default">Default Microphone</option>
                     <option value="mic1">Built-in Microphone</option>
@@ -185,7 +185,7 @@ export function Settings() {
                   <select
                     id="speaker-device"
                     name="speakerDevice"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   >
                     <option value="default">Default Speakers</option>
                     <option value="speaker1">Built-in Speakers</option>
@@ -211,7 +211,7 @@ export function Settings() {
                     id="show-profile"
                     name="showProfile"
                     defaultChecked
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   />
                   <div className="flex-1">
                     <span className="font-semibold text-gray-900 block">Show my profile to other users</span>
@@ -225,7 +225,7 @@ export function Settings() {
                     id="show-stats"
                     name="showStats"
                     defaultChecked
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
                   />
                   <div className="flex-1">
                     <span className="font-semibold text-gray-900 block">Show my study statistics</span>
@@ -254,7 +254,7 @@ export function Settings() {
                     id="current-password"
                     name="currentPassword"
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
 
@@ -267,7 +267,7 @@ export function Settings() {
                     id="new-password"
                     name="newPassword"
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
 
@@ -280,7 +280,7 @@ export function Settings() {
                     id="confirm-new-password"
                     name="confirmNewPassword"
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
                   />
                 </div>
               </div>
@@ -289,7 +289,7 @@ export function Settings() {
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="submit"
-                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-gradient-to-r from-primary-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
                 <Save className="h-5 w-5" />
                 Save Changes

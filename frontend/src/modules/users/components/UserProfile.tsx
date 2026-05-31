@@ -27,7 +27,7 @@ export function UserProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
-            <div className="w-32 h-32 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
+            <div className="w-32 h-32 bg-gradient-to-br from-primary-600 to-purple-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
               <span className="text-white text-5xl font-bold">JS</span>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">John Student</h3>
@@ -35,7 +35,7 @@ export function UserProfile() {
             <p className="text-gray-500 text-sm mb-6">University of Example</p>
             <button
               onClick={() => navigate("/settings")}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
+              className="w-full bg-gradient-to-r from-primary-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl"
             >
               Edit Profile
             </button>
@@ -111,7 +111,7 @@ export function UserProfile() {
                       </div>
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-lg font-bold text-indigo-600">{session.duration}</p>
+                      <p className="text-lg font-bold text-primary-600">{session.duration}</p>
                     </div>
                   </div>
                 </div>

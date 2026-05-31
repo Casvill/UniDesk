@@ -1,0 +1,8 @@
+/* Respect user preference for reduced motion — disables card flip animation */
+@media (prefers-reduced-motion: reduce) {
+  [style*="transform"],
+  [style*="opacity"] {
+    transition: none !important;
+    animation: none !important;
+  }
+}
