@@ -35,54 +35,44 @@ export function AnimatedCard({ children, className = "" }: AnimatedCardProps) {
       const oldWrapperHeight = wrapper ? wrapper.scrollHeight : 0;
       if (wrapper) {
         wrapper.style.height = `${oldWrapperHeight}px`;
-        // overflow hidden es clave: evita que el logo "vuele" fuera del wrapper
-        // mientras el card colapsa hacia arriba
+        // overflow hidden: evita que el logo "vuele" fuera del wrapper
+        // mientras el card colapsa
         wrapper.style.overflow = "hidden";
       }
 
-      // Fijar altura del card para que scaleY tenga un punto de referencia estable
       const oldCardHeight = card.scrollHeight;
       card.style.height = `${oldCardHeight}px`;
 
-      // ── FASE 2: colapsar el card (scaleY 1 → 0) ──────────────────────────
-      card.style.transition =
-        "transform 200ms cubic-bezier(0.4, 0, 1, 1), opacity 180ms ease";
-      card.style.transformOrigin = "top center";
-      card.style.transform = "scaleY(0)";
+      // ── FASE 2: fade out del contenido actual ─────────────────────────────
+      card.style.transition = "opacity 120ms ease";
       card.style.opacity = "0";
 
-      await new Promise<void>((resolve) => setTimeout(resolve, 210));
+      await new Promise<void>((resolve) => setTimeout(resolve, 130));
 
       // ── FASE 3: navegar y montar nuevo contenido ──────────────────────────
       navigate(path);
       await new Promise<void>((resolve) => setTimeout(resolve, 30));
       setDisplayedChildren(latestChildren.current);
 
-      // ── FASE 4: medir la nueva altura del card ya con el nuevo contenido ──
-      // Forzamos height: auto momentáneamente para poder leer scrollHeight real
+      // ── FASE 4: medir la nueva altura del card ────────────────────────────
       card.style.height = "auto";
       const newCardHeight = card.scrollHeight;
-      // Volvemos a fijar para poder hacer la transición desde 0
-      card.style.height = `${newCardHeight}px`;
+      card.style.height = `${oldCardHeight}px`;
 
-      // Calcular la nueva altura del wrapper:
-      // wrapper = logo (mb-8) + card. 
-      // La diferencia entre el nuevo y viejo card nos da la diferencia del wrapper.
       const heightDelta = newCardHeight - oldCardHeight;
       const newWrapperHeight = oldWrapperHeight + heightDelta;
 
-      // ── FASE 5: expandir card y wrapper en paralelo ───────────────────────
-      card.style.transition =
-        "transform 220ms cubic-bezier(0, 0, 0.2, 1), opacity 200ms ease, height 220ms ease";
-      card.style.transform = "scaleY(1)";
+      // ── FASE 5: transicionar altura + fade in ─────────────────────────────
+      card.style.transition = "height 250ms ease, opacity 200ms ease";
+      card.style.height = `${newCardHeight}px`;
       card.style.opacity = "1";
 
       if (wrapper) {
-        wrapper.style.transition = "height 220ms cubic-bezier(0, 0, 0.2, 1)";
+        wrapper.style.transition = "height 250ms ease";
         wrapper.style.height = `${newWrapperHeight}px`;
       }
 
-      await new Promise<void>((resolve) => setTimeout(resolve, 230));
+      await new Promise<void>((resolve) => setTimeout(resolve, 260));
 
       // ── FASE 6: limpiar todos los estilos inline ──────────────────────────
       card.style.height = "";
@@ -102,8 +92,7 @@ export function AnimatedCard({ children, className = "" }: AnimatedCardProps) {
       ref={cardRef}
       className={className}
       style={{
-        willChange: "transform, opacity, height",
-        transformOrigin: "top center",
+        willChange: "opacity, height",
       }}
     >
       {displayedChildren}
