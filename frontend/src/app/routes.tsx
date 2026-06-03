@@ -17,7 +17,7 @@ import { CreateRoom } from "../modules/room/components/CreateRoom";
 import { JoinRoom } from "../modules/room/components/JoinRoom";
 import { ActiveRoom } from "../modules/room/components/ActiveRoom";
 import { UserProfile } from "../modules/users/components/UserProfile";
-import { Settings } from "../shared/components/Settings";
+import { Settings } from "../modules/users/components/Settings";
 import { NotFound } from "../shared/components/NotFound";
 
 import PublicRoute from "../shared/components/PublicRoute";
