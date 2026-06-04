@@ -4,6 +4,7 @@ import {
   createRoom,
   getRoom,
   getRoomsByOwner,
+  listRooms,
   updateRoom,
   deleteRoom,
 } from "../services/room.service";
@@ -198,6 +199,38 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
  *         required: true
  *     responses:
  *       200:
+ *         description: Sala eliminada
+ *       403:
+ *         description: No tienes permiso para eliminar esta sala
+ */
+router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
+    const room = await getRoom(req.params.id);
+    if (!room) {
+      res.status(404).json({ message: "Sala no encontrada" });
+      return;
+    }
+
+    if (room.ownerUid !== req.user.uid) {
+      res.status(403).json({ message: "No tienes permiso para eliminar esta sala" });
+      return;
+    }
+
+    await deleteRoom(req.params.id);
+    res.json({ message: "Sala eliminada exitosamente" });
+  } catch (error) {
+    const handled = handleFirebaseError(error);
+    res.status(handled.statusCode).json({ message: handled.message });
+  }
+});
+
+export default router;
+     200:
  *         description: Sala eliminada
  *       403:
  *         description: No tienes permiso para eliminar esta sala
