@@ -144,8 +144,7 @@ export function UserProfile() {
 
             <button
               onClick={() => navigate("/settings")}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
-              aria-label="Editar mi perfil"
+              className="w-full bg-gradient-to-r from-primary-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl"
             >
               Editar perfil
             </button>
@@ -260,6 +259,9 @@ export function UserProfile() {
                           {session.duration}
                         </p>
                       </div>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-lg font-bold text-primary-600">{session.duration}</p>
                     </div>
                   </div>
                 ))

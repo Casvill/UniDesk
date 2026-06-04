@@ -26,7 +26,7 @@ export function ActiveRoom() {
     { id: "1", name: "Sarah Johnson", isSpeaking: false, initials: "SJ", color: "from-blue-500 to-cyan-500" },
     { id: "2", name: "Mike Chen", isSpeaking: true, initials: "MC", color: "from-purple-500 to-pink-500" },
     { id: "3", name: "Emma Davis", isSpeaking: false, initials: "ED", color: "from-green-500 to-emerald-500" },
-    { id: "4", name: "You", isSpeaking: false, initials: "YO", color: "from-indigo-500 to-purple-500" },
+    { id: "4", name: "You", isSpeaking: false, initials: "YO", color: "from-primary-500 to-purple-500" },
   ];
 
   const chatMessages = [
@@ -134,9 +134,9 @@ export function ActiveRoom() {
                 onClick={() => setIsCameraOn(!isCameraOn)}
                 className={`p-3 sm:p-4 rounded-xl font-semibold transition shadow-lg hover:shadow-xl ${
                   isCameraOn
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900`}
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900`}
                 aria-pressed={isCameraOn}
                 aria-label="Toggle camera"
                 title={isCameraOn ? "Turn camera off" : "Turn camera on"}
@@ -148,9 +148,9 @@ export function ActiveRoom() {
                 onClick={() => setIsMicOn(!isMicOn)}
                 className={`p-3 sm:p-4 rounded-xl font-semibold transition shadow-lg hover:shadow-xl ${
                   isMicOn
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                    ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900`}
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900`}
                 aria-pressed={isMicOn}
                 aria-label="Toggle microphone"
                 title={isMicOn ? "Mute microphone" : "Unmute microphone"}
@@ -184,15 +184,15 @@ export function ActiveRoom() {
         </main>
 
         <aside className="w-full lg:w-96 bg-white flex flex-col shadow-2xl" aria-label="Chat panel">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
+          <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
             <h2 className="text-xl font-bold text-white mb-1">Chat</h2>
-            <p className="text-sm text-indigo-100">{participants.length} participants</p>
+            <p className="text-sm text-primary-100">{participants.length} participants</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50">
             {chatMessages.map((msg) => (
               <div key={msg.id} className="flex gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
+                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
                   <span className="text-white text-sm font-bold">{msg.initials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -219,11 +219,11 @@ export function ActiveRoom() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
               />
               <button
                 type="submit"
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                className="bg-gradient-to-r from-primary-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
               >
                 <Send className="h-5 w-5" />
               </button>

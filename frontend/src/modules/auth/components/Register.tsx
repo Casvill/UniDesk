@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Chrome, Pencil, Loader2 } from "lucide-react";
-import logo from "@/assets/logo/unified-logo-light.svg";
+import { User, Chrome, Pencil, Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useCardTransition } from "@/context/CardTransitionContext";
 import { toast } from "sonner";
 
 type FormState = {
@@ -28,7 +28,7 @@ function getFeedbackClasses(type: FeedbackType): string {
   }
 
   if (type === "info") {
-    return "rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700";
+    return "rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700";
   }
 
   return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
@@ -157,6 +157,7 @@ function getGoogleRegisterErrorMessage(error: unknown): string {
 
 export function Register() {
   const navigate = useNavigate();
+  const { navigateWithTransition } = useCardTransition();
   const { register, loginWithGoogle } = useAuth();
 
   const feedbackRef = useRef<HTMLDivElement | null>(null);
@@ -172,6 +173,8 @@ export function Register() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -324,7 +327,7 @@ export function Register() {
 
       setTimeout(() => {
         if (result?.isNewUser) {
-          navigate("/google-profile", { replace: true });
+          navigateWithTransition("/google-profile");
         } else {
           navigate("/dashboard", { replace: true });
         }
@@ -386,326 +389,331 @@ export function Register() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4"
-      aria-label="Pantalla de registro"
-    >
-      <main className="w-full max-w-[1280px]">
-        <div className="max-w-[440px] mx-auto">
+    <>
+      <div className="text-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+          Crea tu cuenta
+        </h1>
+        <p className="text-muted-foreground">
+          Compartenos los siguientes datos para crearla
+        </p>
+      </div>
 
-          {/* HEADER */}
-          <header className="text-center mb-8">
-            <img
-              src={logo}
-              alt="UniDesk plataforma de estudio colaborativo"
-              className="h-20 w-auto mb-3 mx-auto"
-            />
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        aria-describedby={feedback ? "form-feedback" : "form-status"}
+        noValidate
+      >
 
-            <h1 className="text-2xl font-bold">
-              Crea tu cuenta
-            </h1>
-
-            <p className="text-gray-600">
-              Únete a UniDesk
-            </p>
-          </header>
-
-          {/* CARD */}
-          <section
-            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100"
-            aria-label="Formulario de registro"
-          >
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5"
-              aria-describedby={feedback ? "form-feedback" : "form-status"}
-              noValidate
-            >
-
-              {feedback && (
-                <div
-                  id="form-feedback"
-                  ref={feedbackRef}
-                  tabIndex={-1}
-                  role={feedback.type === "error" ? "alert" : "status"}
-                  aria-live={feedback.type === "error" ? "assertive" : "polite"}
-                  aria-atomic="true"
-                  className={getFeedbackClasses(feedback.type)}
-                >
-                  {feedback.message}
-                </div>
-              )}
-
-              {/* AVATAR */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative">
-
-                  <div
-                    className="w-24 h-24 rounded-full bg-gray-100 border flex items-center justify-center overflow-hidden"
-                    aria-label={
-                      avatarPreview
-                        ? "Vista previa del avatar seleccionado"
-                        : "Vista previa del avatar"
-                    }
-                  >
-                    {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Vista previa del avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
-                    )}
-                  </div>
-
-                  <label
-                    htmlFor="avatar"
-                    className="absolute bottom-0 right-0 bg-indigo-600 p-2 rounded-full text-white cursor-pointer"
-                    aria-label="Subir imagen de perfil"
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                  </label>
-
-                  <input
-                    id="avatar"
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    aria-label="Seleccionar imagen de perfil"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </div>
-
-              {/* FULL NAME */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="fullName">
-                  Nombre completo
-                </label>
-
-                <input
-                  id="fullName"
-                  name="fullName"
-                  value={form.fullName}
-                  onChange={handleChange}
-                  placeholder="Ej: Juan Pérez"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.fullName)}
-                  aria-describedby={errors.fullName ? "fullName-error" : undefined}
-                  autoComplete="name"
-                  disabled={isSubmitting}
-                />
-
-                {errors.fullName && (
-                  <p
-                    id="fullName-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.fullName}
-                  </p>
-                )}
-              </div>
-
-              {/* USERNAME */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="username">
-                  Usuario
-                </label>
-
-                <input
-                  id="username"
-                  name="username"
-                  value={form.username}
-                  onChange={handleChange}
-                  placeholder="Ej: estudiante_123"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.username)}
-                  aria-describedby={errors.username ? "username-error" : undefined}
-                  autoComplete="username"
-                  disabled={isSubmitting}
-                />
-
-                {errors.username && (
-                  <p
-                    id="username-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.username}
-                  </p>
-                )}
-              </div>
-
-              {/* EMAIL */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="email">
-                  Correo institucional o personal
-                </label>
-
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="ejemplo@universidad.edu.co"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? "email-error" : undefined}
-                  autoComplete="email"
-                  disabled={isSubmitting}
-                />
-
-                {errors.email && (
-                  <p
-                    id="email-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.email}
-                  </p>
-                )}
-              </div>
-
-              {/* PASSWORD */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="password">
-                  Contraseña
-                </label>
-
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder="Mínimo 8 caracteres"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.password)}
-                  aria-describedby={errors.password ? "password-error" : undefined}
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                />
-
-                {errors.password && (
-                  <p
-                    id="password-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.password}
-                  </p>
-                )}
-              </div>
-
-              {/* CONFIRM PASSWORD */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="confirmPassword">
-                  Confirmar contraseña
-                </label>
-
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repite tu contraseña"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.confirmPassword)}
-                  aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                />
-
-                {errors.confirmPassword && (
-                  <p
-                    id="confirm-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.confirmPassword}
-                  </p>
-                )}
-              </div>
-
-              {/* STATUS ANNOUNCER */}
-              <div
-                id="form-status"
-                aria-live="polite"
-                aria-atomic="true"
-                className="sr-only"
-              >
-                {loading && "Creando tu cuenta. Por favor espera."}
-                {googleLoading && "Procesando registro con Google. Por favor espera."}
-              </div>
-
-              {/* SUBMIT */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                aria-busy={loading}
-                aria-disabled={isSubmitting}
-                aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg flex justify-center gap-2"
-              >
-                {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                {loading ? "Creando..." : "Crear cuenta"}
-              </button>
-
-              {/* GOOGLE */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isSubmitting}
-                aria-busy={googleLoading}
-                aria-disabled={isSubmitting}
-                aria-label={
-                  googleLoading
-                    ? "Procesando registro con Google, por favor espera"
-                    : "Continuar con Google"
-                }
-                className="w-full border py-3 rounded-lg flex justify-center gap-2"
-              >
-                {googleLoading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <Chrome className="h-5 w-5" aria-hidden="true" />
-                    Continuar con Google
-                  </>
-                )}
-              </button>
-
-              {/* LOGIN */}
-              <p className="text-center text-sm">
-                ¿Ya tienes cuenta?{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  className="text-indigo-600 font-semibold"
-                  disabled={isSubmitting}
-                  aria-label="Ir a iniciar sesión"
-                >
-                  Iniciar sesión
-                </button>
-              </p>
-
-            </form>
-          </section>
+      {feedback && (
+        <div
+          id="form-feedback"
+          ref={feedbackRef}
+          tabIndex={-1}
+          role={feedback.type === "error" ? "alert" : "status"}
+          aria-live={feedback.type === "error" ? "assertive" : "polite"}
+          aria-atomic="true"
+          className={getFeedbackClasses(feedback.type)}
+        >
+          {feedback.message}
         </div>
-      </main>
-    </div>
+      )}
+
+      {/* AVATAR */}
+      <div className="flex flex-col items-center mb-6">
+        <div className="relative">
+
+          <div
+            className="w-24 h-24 rounded-full bg-gray-100 border flex items-center justify-center overflow-hidden"
+            aria-label={
+              avatarPreview
+                ? "Vista previa del avatar seleccionado"
+                : "Vista previa del avatar"
+            }
+          >
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="Vista previa del avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
+            )}
+          </div>
+
+          <label
+            htmlFor="avatar"
+            className="absolute bottom-0 right-0 bg-primary-600 p-2 rounded-full text-white cursor-pointer"
+            aria-label="Subir imagen de perfil"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
+
+          <input
+            id="avatar"
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={handleAvatarChange}
+            aria-label="Seleccionar imagen de perfil"
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+
+      {/* FULL NAME */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="fullName">
+          Nombre completo
+        </label>
+
+        <input
+          id="fullName"
+          name="fullName"
+          value={form.fullName}
+          onChange={handleChange}
+          placeholder="Ej: Juan Pérez"
+          className="w-full px-4 py-3 border rounded-lg"
+          aria-invalid={Boolean(errors.fullName)}
+          aria-describedby={errors.fullName ? "fullName-error" : undefined}
+          autoComplete="name"
+          disabled={isSubmitting}
+        />
+
+        {errors.fullName && (
+          <p
+            id="fullName-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-600 text-xs"
+          >
+            {errors.fullName}
+          </p>
+        )}
+      </div>
+
+      {/* USERNAME */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="username">
+          Usuario
+        </label>
+
+        <input
+          id="username"
+          name="username"
+          value={form.username}
+          onChange={handleChange}
+          placeholder="Ej: estudiante_123"
+          className="w-full px-4 py-3 border rounded-lg"
+          aria-invalid={Boolean(errors.username)}
+          aria-describedby={errors.username ? "username-error" : undefined}
+          autoComplete="username"
+          disabled={isSubmitting}
+        />
+
+        {errors.username && (
+          <p
+            id="username-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-600 text-xs"
+          >
+            {errors.username}
+          </p>
+        )}
+      </div>
+
+      {/* EMAIL */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="email">
+          Correo institucional o personal
+        </label>
+
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={form.email}
+          onChange={handleChange}
+          placeholder="ejemplo@universidad.edu.co"
+          className="w-full px-4 py-3 border rounded-lg"
+          aria-invalid={Boolean(errors.email)}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          autoComplete="email"
+          disabled={isSubmitting}
+        />
+
+        {errors.email && (
+          <p
+            id="email-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-600 text-xs"
+          >
+            {errors.email}
+          </p>
+        )}
+      </div>
+
+      {/* PASSWORD */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="password">
+          Contraseña
+        </label>
+
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            value={form.password}
+            onChange={handleChange}
+            placeholder="Mínimo 8 caracteres"
+            className="w-full px-4 pr-12 py-3 border rounded-lg"
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </div>
+
+        {errors.password && (
+          <p
+            id="password-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-600 text-xs"
+          >
+            {errors.password}
+          </p>
+        )}
+      </div>
+
+      {/* CONFIRM PASSWORD */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="confirmPassword">
+          Confirmar contraseña
+        </label>
+
+        <div className="relative">
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type={showConfirm ? "text" : "password"}
+            value={form.confirmPassword}
+            onChange={handleChange}
+            placeholder="Repite tu contraseña"
+            className="w-full px-4 pr-12 py-3 border rounded-lg"
+            aria-invalid={Boolean(errors.confirmPassword)}
+            aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+            tabIndex={-1}
+          >
+            {showConfirm ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </div>
+
+        {errors.confirmPassword && (
+          <p
+            id="confirm-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-600 text-xs"
+          >
+            {errors.confirmPassword}
+          </p>
+        )}
+      </div>
+
+      {/* STATUS ANNOUNCER */}
+      <div
+        id="form-status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {loading && "Creando tu cuenta. Por favor espera."}
+        {googleLoading && "Procesando registro con Google. Por favor espera."}
+      </div>
+
+      <div className="space-y-2">
+        {/* SUBMIT */}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          aria-busy={loading}
+          aria-disabled={isSubmitting}
+          aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
+          className="w-full bg-primary-600 text-white py-3 rounded-lg flex justify-center gap-2"
+        >
+          {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+          {loading ? "Creando..." : "Crear cuenta"}
+        </button>
+
+        {/* GOOGLE */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={isSubmitting}
+          aria-busy={googleLoading}
+          aria-disabled={isSubmitting}
+          aria-label={
+            googleLoading
+              ? "Procesando registro con Google, por favor espera"
+              : "Continuar con Google"
+          }
+          className="w-full border py-3 rounded-lg flex justify-center gap-2"
+        >
+          {googleLoading ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              Procesando...
+            </>
+          ) : (
+            <>
+              <Chrome className="h-5 w-5" aria-hidden="true" />
+              Continuar con Google
+            </>
+          )}
+        </button>
+      </div>
+
+
+      {/* LOGIN */}
+      <p className="text-center text-sm">
+        ¿Ya tienes cuenta?{" "}
+        <button
+          type="button"
+        onClick={() => navigateWithTransition("/")}
+        className="text-primary-600 font-semibold"
+          disabled={isSubmitting}
+          aria-label="Ir a iniciar sesión"
+        >
+          Iniciar sesión
+        </button>
+      </p>
+
+    </form>
+    </>
   );
 }

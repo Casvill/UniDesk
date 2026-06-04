@@ -62,7 +62,7 @@ export function Dashboard() {
 
         <button
           onClick={() => navigate("/rooms/create")}
-          className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          className="w-full sm:w-auto bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           aria-label="Crear una nueva sala de estudio"
         >
           <Plus className="h-5 w-5" aria-hidden="true" />
@@ -90,7 +90,7 @@ export function Dashboard() {
               <div className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition">
                       {room.name}
                     </h3>
 
@@ -110,7 +110,7 @@ export function Dashboard() {
 
                 <button
                   onClick={() => navigate(`/rooms/${room.id}`)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
                   aria-label={`Unirse a la sala ${room.name}`}
                 >
                   Unirse a la sala
@@ -163,7 +163,7 @@ export function Dashboard() {
 
                 <button
                   onClick={() => navigate(`/rooms/${session.id}`)}
-                  className="w-full sm:w-auto bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  className="w-full sm:w-auto bg-primary-600 text-white py-2.5 px-6 rounded-lg font-semibold hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg"
                   aria-label={`Entrar a la sesión ${session.name}`}
                 >
                   Entrar a la sesión

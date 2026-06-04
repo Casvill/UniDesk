@@ -28,7 +28,7 @@ export function CreateRoom() {
             required
             aria-required="true"
             placeholder="e.g., Calculus Study Group"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
           />
         </div>
 
@@ -41,7 +41,7 @@ export function CreateRoom() {
             name="subject"
             required
             aria-required="true"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
           >
             <option value="">Select a subject</option>
             <option value="mathematics">Mathematics</option>
@@ -64,7 +64,7 @@ export function CreateRoom() {
             name="description"
             rows={4}
             placeholder="Brief description of what you'll be studying..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition resize-none"
           />
         </div>
 
@@ -81,7 +81,7 @@ export function CreateRoom() {
             defaultValue="10"
             required
             aria-required="true"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
           />
         </div>
 
@@ -94,12 +94,12 @@ export function CreateRoom() {
                 id="enable-chat"
                 name="enableChat"
                 defaultChecked
-                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
               />
               <div className="flex items-center gap-2 flex-1">
-                <MessageSquare className="h-5 w-5 text-indigo-600" />
+                <MessageSquare className="h-5 w-5 text-primary-600" />
                 <div>
-                  <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition">
+                  <span className="font-semibold text-gray-900 group-hover:text-primary-600 transition">
                     Enable Text Chat
                   </span>
                   <p className="text-sm text-gray-600">Allow participants to send messages</p>
@@ -112,12 +112,12 @@ export function CreateRoom() {
                 id="enable-video"
                 name="enableVideo"
                 defaultChecked
-                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
               />
               <div className="flex items-center gap-2 flex-1">
-                <Video className="h-5 w-5 text-indigo-600" />
+                <Video className="h-5 w-5 text-primary-600" />
                 <div>
-                  <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition">
+                  <span className="font-semibold text-gray-900 group-hover:text-primary-600 transition">
                     Enable Video/Audio
                   </span>
                   <p className="text-sm text-gray-600">Support video and audio calls</p>
@@ -130,12 +130,12 @@ export function CreateRoom() {
                 id="enable-screen-share"
                 name="enableScreenShare"
                 defaultChecked
-                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
               />
               <div className="flex items-center gap-2 flex-1">
-                <Monitor className="h-5 w-5 text-indigo-600" />
+                <Monitor className="h-5 w-5 text-primary-600" />
                 <div>
-                  <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition">
+                  <span className="font-semibold text-gray-900 group-hover:text-primary-600 transition">
                     Enable Screen Sharing
                   </span>
                   <p className="text-sm text-gray-600">Allow screen sharing for presentations</p>
@@ -147,12 +147,12 @@ export function CreateRoom() {
                 type="checkbox"
                 id="private-room"
                 name="privateRoom"
-                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-500"
               />
               <div className="flex items-center gap-2 flex-1">
-                <Lock className="h-5 w-5 text-indigo-600" />
+                <Lock className="h-5 w-5 text-primary-600" />
                 <div>
-                  <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition">
+                  <span className="font-semibold text-gray-900 group-hover:text-primary-600 transition">
                     Private Room (Invite Only)
                   </span>
                   <p className="text-sm text-gray-600">Require invitation to join</p>
@@ -165,7 +165,7 @@ export function CreateRoom() {
         <div className="flex flex-col sm:flex-row gap-4 pt-4">
           <button
             type="submit"
-            className="w-full sm:flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            className="w-full sm:flex-1 bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
             <Plus className="h-5 w-5" />
             Create Room

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { toast } from "sonner";
+import logo from "@/assets/logo/unified-logo-light.svg";
 
 type FeedbackType = "error" | "success" | "info";
 
@@ -18,7 +19,7 @@ function getFeedbackClasses(type: FeedbackType): string {
   }
 
   if (type === "info") {
-    return "rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700";
+    return "rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700";
   }
 
   return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
@@ -286,218 +287,205 @@ export function GooglePage() {
   if (status !== "needs-profile" || !user) return null;
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8"
-      aria-label="Completar perfil de usuario con Google"
-    >
-      <main className="w-full max-w-[440px]">
-        <section
-          className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8"
-          aria-label="Formulario de completado de perfil"
+    <>
+      <div className="text-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+          Completa tu perfil
+        </h1>
+        <p className="text-muted-foreground">
+          Solo falta tu nombre de usuario...
+        </p>
+      </div>
+
+      {feedback && (
+        <div
+          id="google-profile-feedback"
+          ref={feedbackRef}
+          tabIndex={-1}
+          role={feedback.type === "error" ? "alert" : "status"}
+          aria-live={feedback.type === "error" ? "assertive" : "polite"}
+          aria-atomic="true"
+          className={`${getFeedbackClasses(feedback.type)} mb-5`}
         >
+          {feedback.message}
+        </div>
+      )}
 
-          {/* HEADER */}
-          <header className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Completa tu perfil
-            </h1>
+      {/* AVATAR */}
+      <div className="flex flex-col items-center mb-6">
+        <div className="relative">
 
-            <p className="text-gray-500 text-sm">
-              Solo necesitamos algunos datos adicionales
-            </p>
-          </header>
-
-          {feedback && (
-            <div
-              id="google-profile-feedback"
-              ref={feedbackRef}
-              tabIndex={-1}
-              role={feedback.type === "error" ? "alert" : "status"}
-              aria-live={feedback.type === "error" ? "assertive" : "polite"}
-              aria-atomic="true"
-              className={`${getFeedbackClasses(feedback.type)} mb-5`}
-            >
-              {feedback.message}
-            </div>
-          )}
-
-          {/* AVATAR */}
-          <div className="flex flex-col items-center mb-6">
-            <div className="relative">
-
-              <div
-                className="w-24 h-24 rounded-full bg-gray-100 border overflow-hidden flex items-center justify-center"
-                aria-label="Vista previa del avatar"
-              >
-                {avatarPreview ? (
-                  <img
-                    src={avatarPreview}
-                    alt="Avatar de perfil"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
-                )}
-              </div>
-
-              <label
-                htmlFor="avatarInput"
-                className="absolute bottom-0 right-0 bg-indigo-600 text-white p-2 rounded-full cursor-pointer hover:bg-indigo-700"
-                aria-label="Cambiar imagen de perfil"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </label>
-
-              <input
-                id="avatarInput"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-                aria-label="Seleccionar imagen de avatar"
-                disabled={isSubmitting}
+          <div
+            className="w-24 h-24 rounded-full bg-gray-100 border overflow-hidden flex items-center justify-center"
+            aria-label="Vista previa del avatar"
+          >
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="Avatar de perfil"
+                className="w-full h-full object-cover"
               />
-
-            </div>
+            ) : (
+              <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
+            )}
           </div>
 
-          {/* FORM */}
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-4"
-            aria-describedby={feedback ? "google-profile-feedback" : "google-profile-status"}
-            noValidate
+          <label
+            htmlFor="avatarInput"
+            className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700"
+            aria-label="Cambiar imagen de perfil"
           >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
 
-            {/* FULL NAME */}
-            <div>
-              <label className="text-sm font-semibold text-gray-700" htmlFor="googleFullName">
-                Nombre completo
-              </label>
+          <input
+            id="avatarInput"
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            className="hidden"
+            aria-label="Seleccionar imagen de avatar"
+            disabled={isSubmitting}
+          />
 
-              <input
-                id="googleFullName"
-                value={user.displayName || ""}
-                disabled
-                className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
-                aria-label="Nombre completo del usuario no editable"
-              />
-            </div>
+        </div>
+      </div>
 
-            {/* USERNAME */}
-            <div>
-              <label className="text-sm font-semibold text-gray-700" htmlFor="googleUsername">
-                Nombre de usuario
-              </label>
+      {/* FORM */}
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        aria-describedby={feedback ? "google-profile-feedback" : "google-profile-status"}
+        noValidate
+      >
 
-              <input
-                id="googleUsername"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setUsernameAvailable(null);
-                  clearFeedback();
-                }}
-                onBlur={() => setUsernameTouched(true)}
-                placeholder="Ej: estudiante_123"
-                className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                aria-invalid={isUsernameError ? true : undefined}
-                aria-describedby={isUsernameError ? "username-error" : undefined}
-                autoComplete="username"
-                disabled={isSubmitting}
-              />
+        {/* FULL NAME */}
+        <div>
+          <label className="text-sm font-semibold text-gray-700" htmlFor="googleFullName">
+            Nombre completo
+          </label>
 
-              {usernameMessage && (
-                <p
-                  id={isUsernameError ? "username-error" : undefined}
-                  className={`mt-1 text-sm flex items-center gap-1 ${
-                    showUsernameAsError
-                      ? "text-red-500"
-                      : usernameAvailable === true
-                      ? "text-green-600"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {showUsernameAsError ? (
-                    <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  ) : usernameAvailable === true ? (
-                    <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  ) : null}
+          <input
+            id="googleFullName"
+            value={user.displayName || ""}
+            disabled
+            className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
+            aria-label="Nombre completo del usuario no editable"
+          />
+        </div>
 
-                  {usernameMessage}
-                </p>
-              )}
+        {/* USERNAME */}
+        <div>
+          <label className="text-sm font-semibold text-gray-700" htmlFor="googleUsername">
+            Nombre de usuario
+          </label>
 
-              <div
-                aria-live="polite"
-                aria-atomic="true"
-                className="sr-only"
-              >
-                {usernameTouched && usernameMessage}
-              </div>
-            </div>
+          <input
+            id="googleUsername"
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setUsernameAvailable(null);
+              clearFeedback();
+            }}
+            onBlur={() => setUsernameTouched(true)}
+            placeholder="Ej: estudiante_123"
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            aria-invalid={isUsernameError ? true : undefined}
+            aria-describedby={isUsernameError ? "username-error" : undefined}
+            autoComplete="username"
+            disabled={isSubmitting}
+          />
 
-            {/* EMAIL */}
-            <div>
-              <label className="text-sm font-semibold text-gray-700" htmlFor="googleEmail">
-                Correo institucional o personal
-              </label>
-
-              <input
-                id="googleEmail"
-                value={user.email || ""}
-                disabled
-                className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
-                aria-label="Correo del usuario no editable"
-              />
-            </div>
-
-            {/* STATUS ANNOUNCER */}
-            <div
-              id="google-profile-status"
-              aria-live="polite"
-              aria-atomic="true"
-              className="sr-only"
+          {usernameMessage && (
+            <p
+              id={isUsernameError ? "username-error" : undefined}
+              className={`mt-1 text-sm flex items-center gap-1 ${
+                showUsernameAsError
+                  ? "text-red-500"
+                  : usernameAvailable === true
+                  ? "text-green-600"
+                  : "text-gray-500"
+              }`}
             >
-              {loading && "Completando tu perfil. Por favor espera."}
-              {success && "Perfil completado exitosamente. Redirigiendo al dashboard."}
-            </div>
+              {showUsernameAsError ? (
+                <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : usernameAvailable === true ? (
+                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : null}
 
-            {/* BUTTON */}
-            <button
-              type="submit"
-              disabled={isButtonDisabled}
-              aria-busy={loading}
-              aria-disabled={isButtonDisabled}
-              aria-label={
-                loading
-                  ? "Creando cuenta, por favor espera"
-                  : success
-                  ? "Registro completado"
-                  : !isUsernameValid
-                  ? "Completa un nombre de usuario válido para continuar"
-                  : "Finalizar registro de usuario"
-              }
-              className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition
-                ${
-                  success
-                    ? "bg-green-600 text-white"
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                }`}
-            >
-              {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-              {success && <CheckCircle className="h-5 w-5" aria-hidden="true" />}
+              {usernameMessage}
+            </p>
+          )}
 
-              {loading
-                ? "Creando cuenta..."
-                : success
-                ? "¡Listo!"
-                : "Continuar"}
-            </button>
+          <div
+            aria-live="polite"
+            aria-atomic="true"
+            className="sr-only"
+          >
+            {usernameTouched && usernameMessage}
+          </div>
+        </div>
 
-          </form>
-        </section>
-      </main>
-    </div>
+        {/* EMAIL */}
+        <div>
+          <label className="text-sm font-semibold text-gray-700" htmlFor="googleEmail">
+            Correo institucional o personal
+          </label>
+
+          <input
+            id="googleEmail"
+            value={user.email || ""}
+            disabled
+            className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
+            aria-label="Correo del usuario no editable"
+          />
+        </div>
+
+        {/* STATUS ANNOUNCER */}
+        <div
+          id="google-profile-status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {loading && "Completando tu perfil. Por favor espera."}
+          {success && "Perfil completado exitosamente. Redirigiendo al dashboard."}
+        </div>
+
+        {/* BUTTON */}
+        <button
+          type="submit"
+          disabled={isButtonDisabled}
+          aria-busy={loading}
+          aria-disabled={isButtonDisabled}
+          aria-label={
+            loading
+              ? "Creando cuenta, por favor espera"
+              : success
+              ? "Registro completado"
+              : !isUsernameValid
+              ? "Completa un nombre de usuario válido para continuar"
+              : "Finalizar registro de usuario"
+          }
+          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition
+            ${
+              success
+                ? "bg-green-600 text-white"
+                : "bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            }`}
+        >
+          {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+          {success && <CheckCircle className="h-5 w-5" aria-hidden="true" />}
+
+          {loading
+            ? "Creando cuenta..."
+            : success
+            ? "¡Listo!"
+            : "Continuar"}
+        </button>
+
+      </form>
+    </>
   );
 }

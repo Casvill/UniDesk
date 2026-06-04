@@ -8,6 +8,7 @@ import GoogleprofilePage from "../modules/auth/pages/GooglePage";
 
 /* LAYOUT */
 import { TopbarLayout } from "./TopbarLayout";
+import AuthLayout from "@/modules/auth/AuthLayout";
 
 /* PROTECTED PAGES */
 import ProtectedRoute from "../shared/components/ProtectedRoute";
@@ -27,23 +28,28 @@ export const router = createBrowserRouter([
     element: <PublicRoute />,
     children: [
       {
-        path: "/",
-        Component: LoginPage,
-      },
-      {
-        path: "/register",
-        Component: RegisterPage,
-      },
-      {
-        path: "/forgot-password",
-        Component: Forgot,
-      },
-      {
-        path: "/google-profile",
-        Component: GoogleprofilePage,
+        element: <AuthLayout />,
+        children: [
+          {
+            path: "/",
+            Component: LoginPage,
+          },
+          {
+            path: "/register",
+            Component: RegisterPage,
+          },
+          {
+            path: "/forgot-password",
+            Component: Forgot,
+          },
+          {
+            path: "/google-profile",
+            Component: GoogleprofilePage,
+          },
+        ],
       },
     ],
-  },
+    },
   {
     element: <ProtectedRoute />,
     children: [
