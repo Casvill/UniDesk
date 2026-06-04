@@ -11,6 +11,19 @@ export interface UserProfile {
   updatedAt: string;
 }
 
+export interface Room {
+  id: string;
+  name: string;
+  subject?: string;
+  description?: string;
+  host?: string;
+  participants?: number;
+  capacity?: number;
+  ownerUid: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const api = {
   async getProfile(uid: string, token: string): Promise<UserProfile | null> {
     const response = await fetch(`${API_URL}/users/${uid}`, {
@@ -80,5 +93,18 @@ export const api = {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Error al eliminar la cuenta');
     }
+  },
+
+  async getRoom(id: string, token: string): Promise<Room | null> {
+    const response = await fetch(`${API_URL}/rooms/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error('Error al obtener la sala');
+    
+    return response.json();
   }
 };
