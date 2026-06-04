@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  User,
   Save,
   AlertTriangle,
   Shield,
@@ -9,10 +8,12 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  Pencil,
 } from "lucide-react";
 import { updateProfile as updateFirebaseProfile } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/services/api";
+import { storage } from "@/shared/services/firebase";
 
 type FeedbackType = "error" | "success" | "info";
 
@@ -25,6 +26,7 @@ type ProfileForm = {
   displayName: string;
   username: string;
   email: string;
+  photoURL: string;
   university: string;
 };
 
@@ -76,12 +78,24 @@ function getSettingsErrorMessage(error: unknown): string {
     case "backend/username-already-exists":
       return "Este nombre de usuario ya está en uso. Intenta con otro.";
 
+    case "backend/email-already-exists":
+      return "Este correo ya está registrado en otra cuenta. Intenta con otro.";
+
     case "backend/network-error":
       return "No pudimos conectar con el servidor. Verifica que el backend esté corriendo e inténtalo nuevamente.";
 
     case "backend/profile-update-failed":
     case "backend/request-failed":
       return "No pudimos guardar los cambios. Revisa la información e inténtalo nuevamente.";
+
+    case "storage/unauthorized":
+      return "No tienes permiso para subir imágenes. Revisa la configuración de Firebase Storage.";
+
+    case "storage/canceled":
+      return "La carga de la imagen fue cancelada.";
+
+    case "storage/unknown":
+      return "No pudimos subir la imagen. Inténtalo nuevamente.";
 
     case "auth/network-request-failed":
       return "No pudimos conectarnos con Firebase. Revisa tu conexión a internet.";
@@ -100,6 +114,10 @@ function getSettingsErrorMessage(error: unknown): string {
     return "Este nombre de usuario ya está en uso. Intenta con otro.";
   }
 
+  if (message.includes("email") || message.includes("correo")) {
+    return "Este correo ya está registrado en otra cuenta. Intenta con otro.";
+  }
+
   if (
     message.includes("failed to fetch") ||
     message.includes("networkerror") ||
@@ -112,8 +130,38 @@ function getSettingsErrorMessage(error: unknown): string {
   return "No pudimos guardar los cambios. Revisa la información e inténtalo nuevamente.";
 }
 
+function getInitials(name?: string | null, email?: string | null) {
+  if (name) {
+    const parts = name.trim().split(" ").filter(Boolean);
+
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+  }
+
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+
+  return "UD";
+}
+
+async function uploadAvatarToStorage(userId: string, file: File): Promise<string> {
+  const extension = file.name.split(".").pop() || "jpg";
+  const fileName = `avatar-${Date.now()}.${extension}`;
+  const avatarRef = ref(storage, `avatars/${userId}/${fileName}`);
+
+  await uploadBytes(avatarRef, file);
+
+  return getDownloadURL(avatarRef);
+}
+
 export function Settings() {
-  const { user, profile } = useAuth();
+  const { user, profile, updateProfileData } = useAuth();
 
   const feedbackRef = useRef<HTMLDivElement | null>(null);
 
@@ -121,6 +169,7 @@ export function Settings() {
     displayName: "",
     username: "",
     email: "",
+    photoURL: "",
     university: "",
   });
 
@@ -130,6 +179,9 @@ export function Settings() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameTouched, setUsernameTouched] = useState(false);
+
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -141,8 +193,10 @@ export function Settings() {
 
   const cleanDisplayName = form.displayName.trim();
   const cleanUsername = form.username.trim();
-  const currentUsername = profile?.username || "";
+  const cleanEmail = form.email.trim();
+  const cleanUniversity = form.university.trim();
 
+  const currentUsername = profile?.username || "";
   const isUsernameUnchanged = cleanUsername === currentUsername;
 
   const isUsernameFormatValid =
@@ -153,16 +207,26 @@ export function Settings() {
     !checkingUsername &&
     (isUsernameUnchanged || usernameAvailable === true);
 
-  const isFormValid = cleanDisplayName.length > 0 && isUsernameValid && !loading;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+
+  const isFormValid =
+    cleanDisplayName.length > 0 &&
+    isUsernameValid &&
+    isEmailValid &&
+    !loading;
 
   useEffect(() => {
+    const currentPhotoURL = profile?.photoURL || user?.photoURL || "";
+
     setForm({
       displayName: profile?.displayName || user?.displayName || "",
       username: profile?.username || "",
-      email: user?.email || "",
+      email: profile?.email || user?.email || "",
+      photoURL: currentPhotoURL,
       university: profile?.university || "",
     });
 
+    setAvatarPreview(currentPhotoURL);
     setUsernameAvailable(null);
   }, [profile, user]);
 
@@ -201,6 +265,7 @@ export function Settings() {
 
     const timer = setTimeout(async () => {
       try {
+        const { api } = await import("@/services/api");
         const available = await api.checkUsername(cleanUsername);
         setUsernameAvailable(available);
       } catch (error) {
@@ -267,6 +332,40 @@ export function Settings() {
     clearFeedback();
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setFeedback({
+        type: "error",
+        message: "Selecciona un archivo de imagen válido.",
+      });
+      return;
+    }
+
+    const maxSizeInMB = 2;
+    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+
+    if (file.size > maxSizeInBytes) {
+      setFeedback({
+        type: "error",
+        message: "La imagen es muy pesada. Usa una imagen de máximo 2 MB.",
+      });
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setSelectedAvatarFile(file);
+    setAvatarPreview(previewUrl);
+
+    setFeedback({
+      type: "success",
+      message: "Imagen de perfil seleccionada correctamente. Recuerda guardar los cambios.",
+    });
+  };
+
   const validateForm = () => {
     const newErrors: FormErrors = {};
 
@@ -282,6 +381,12 @@ export function Settings() {
       newErrors.username = "Solo puedes usar letras, números y guiones bajos.";
     } else if (!isUsernameValid) {
       newErrors.username = "Debes usar un nombre de usuario válido y disponible.";
+    }
+
+    if (!cleanEmail) {
+      newErrors.email = "El correo es obligatorio.";
+    } else if (!isEmailValid) {
+      newErrors.email = "Ingresa un correo válido.";
     }
 
     return newErrors;
@@ -322,23 +427,32 @@ export function Settings() {
     });
 
     try {
-      const token = await user.getIdToken();
+      let finalPhotoURL = form.photoURL;
+
+      if (selectedAvatarFile) {
+        finalPhotoURL = await uploadAvatarToStorage(user.uid, selectedAvatarFile);
+      }
 
       await updateFirebaseProfile(user, {
         displayName: cleanDisplayName,
-        photoURL: profile?.photoURL || user.photoURL || undefined,
+        photoURL: finalPhotoURL || undefined,
       });
 
-      await api.updateProfile(
-        user.uid,
-        {
-          username: cleanUsername,
-          displayName: cleanDisplayName,
-          university: form.university.trim(),
-          photoURL: profile?.photoURL || user.photoURL || "",
-        },
-        token
-      );
+      await updateProfileData({
+        username: cleanUsername,
+        displayName: cleanDisplayName,
+        email: cleanEmail,
+        photoURL: finalPhotoURL,
+        university: cleanUniversity,
+      });
+
+      setForm((prevForm) => ({
+        ...prevForm,
+        photoURL: finalPhotoURL,
+      }));
+
+      setAvatarPreview(finalPhotoURL);
+      setSelectedAvatarFile(null);
 
       setFeedback({
         type: "success",
@@ -354,6 +468,13 @@ export function Settings() {
         setUsernameTouched(true);
       }
 
+      if (message.includes("correo")) {
+        setErrors((prevErrors) => ({
+          ...prevErrors,
+          email: message,
+        }));
+      }
+
       setFeedback({
         type: "error",
         message,
@@ -363,6 +484,18 @@ export function Settings() {
     }
   };
 
+  const avatarContent = avatarPreview ? (
+    <img
+      src={avatarPreview}
+      alt="Vista previa del avatar"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span className="text-white text-5xl font-bold">
+      {getInitials(cleanDisplayName, cleanEmail)}
+    </span>
+  );
+
   return (
     <div>
       <div className="mb-8">
@@ -371,7 +504,7 @@ export function Settings() {
         </h2>
 
         <p className="text-gray-600">
-          Ajusta tu perfil y tus preferencias para estudiar más cómodo en UniDesk.
+          Actualiza tus datos personales y mantén tu perfil listo para estudiar en equipo.
         </p>
       </div>
 
@@ -400,14 +533,43 @@ export function Settings() {
             className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
             aria-labelledby="account-settings-heading"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <User className="h-5 w-5 text-indigo-600" aria-hidden="true" />
-              </div>
-
+            <div className="mb-6">
               <h3 id="account-settings-heading" className="text-xl font-bold text-gray-900">
                 Información de la cuenta
               </h3>
+            </div>
+
+            <div className="flex flex-col items-center mb-8">
+              <div className="relative">
+                <div
+                  className="w-32 h-32 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg overflow-hidden"
+                  aria-label="Vista previa del avatar"
+                >
+                  {avatarContent}
+                </div>
+
+                <label
+                  htmlFor="settings-avatar"
+                  className="absolute bottom-1 right-1 bg-indigo-600 text-white p-3 rounded-full cursor-pointer hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
+                  aria-label="Cambiar imagen de perfil"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </label>
+
+                <input
+                  id="settings-avatar"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  aria-label="Seleccionar imagen de perfil"
+                  disabled={loading}
+                />
+              </div>
+
+              <p className="text-sm text-gray-600 mt-3">
+                Cambia tu imagen de perfil
+              </p>
             </div>
 
             <div className="space-y-5">
@@ -501,17 +663,25 @@ export function Settings() {
                   id="settings-email"
                   name="email"
                   value={form.email}
+                  onChange={handleChange}
                   placeholder="ejemplo@universidad.edu.co"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                  aria-label="Correo electrónico del usuario no editable"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? "settings-email-error" : undefined}
                   autoComplete="email"
-                  disabled
-                  readOnly
+                  disabled={loading}
                 />
 
-                <p className="text-xs text-gray-500 mt-1">
-                  Para cambiar tu correo se requiere una verificación adicional de seguridad.
-                </p>
+                {errors.email && (
+                  <p
+                    id="settings-email-error"
+                    role="alert"
+                    aria-live="assertive"
+                    className="text-red-600 text-xs mt-1"
+                  >
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               <div>

@@ -42,18 +42,26 @@ async function getErrorMessage(response: Response, fallback: string): Promise<st
   }
 }
 
-function getUsernameErrorCode(message: string): string {
+function getConflictCode(message: string): string {
   const cleanMessage = message.toLowerCase();
 
   if (
     cleanMessage.includes('username') ||
     cleanMessage.includes('usuario') ||
-    cleanMessage.includes('already exists') ||
-    cleanMessage.includes('ya existe') ||
+    cleanMessage.includes('user name') ||
+    cleanMessage.includes('nombre de usuario') ||
     cleanMessage.includes('ocupado') ||
     cleanMessage.includes('taken')
   ) {
     return 'backend/username-already-exists';
+  }
+
+  if (
+    cleanMessage.includes('email') ||
+    cleanMessage.includes('correo') ||
+    cleanMessage.includes('mail')
+  ) {
+    return 'backend/email-already-exists';
   }
 
   return 'backend/request-failed';
@@ -120,8 +128,8 @@ export const api = {
 
         const code =
           response.status === 409
-            ? 'backend/username-already-exists'
-            : getUsernameErrorCode(message);
+            ? getConflictCode(message)
+            : 'backend/profile-create-failed';
 
         throw createApiError(message, code, response.status);
       }
@@ -155,6 +163,7 @@ export const api = {
     data: {
       username?: string;
       displayName?: string;
+      email?: string;
       photoURL?: string;
       university?: string;
     },
@@ -175,8 +184,8 @@ export const api = {
 
         const code =
           response.status === 409
-            ? 'backend/username-already-exists'
-            : getUsernameErrorCode(message);
+            ? getConflictCode(message)
+            : 'backend/profile-update-failed';
 
         throw createApiError(message, code, response.status);
       }
