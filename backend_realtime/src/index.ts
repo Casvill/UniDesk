@@ -3,6 +3,8 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
+import { db } from "./config/firebase";
+import { Timestamp } from "firebase-admin/firestore";
 
 dotenv.config();
 
@@ -79,14 +81,65 @@ io.on("connection", (socket) => {
     
     console.log(`Mensaje de ${username} en sala ${roomId}: ${content}`);
 
-    // Broadcast message to the room (including sender for confirmation if needed, 
-    // or use socket.to(roomId) to exclude sender)
-    io.to(roomId).emit("new-message", {
-      content: content.trim(),
+    // Persist message to Firestore
+    const messageRef = db.collection("messages").doc();
+    const now = Timestamp.now();
+    const messageData = {
+      id: messageRef.id,
+      roomId,
       senderUid: uid,
       senderUsername: username,
-      createdAt: new Date().toISOString()
+      content: content.trim(),
+      createdAt: now,
+    };
+
+    messageRef.set(messageData)
+      .then(() => console.log(`Mensaje ${messageRef.id} guardado en Firestore`))
+      .catch((err) => console.error("Error al guardar mensaje en Firestore:", err));
+
+    // Broadcast message to the room
+    io.to(roomId).emit("new-message", {
+      ...messageData,
+      createdAt: now.toDate().toISOString() // Send as ISO string for frontend
     });
+  });
+
+  socket.on("edit-message", (data: { messageId: string; newContent: string }) => {
+    const { messageId, newContent } = data;
+
+    if (!messageId || !newContent || newContent.trim().length === 0) {
+      return;
+    }
+
+    // Optional: verify sender info from socket session
+    // For now, we update it in Firestore and broadcast the update
+    db.collection("messages").doc(messageId).update({
+      content: newContent.trim(),
+      updatedAt: Timestamp.now()
+    })
+    .then(() => {
+      console.log(`Mensaje ${messageId} actualizado`);
+      // Broadcast update to the room
+      // We need to know which room the message belongs to. 
+      // For simplicity, we can just broadcast to all rooms or fetch the room first.
+      // Better: find the user's current room.
+      let roomId: string | undefined;
+      for (const users of rooms.values()) {
+        if (users.has(socket.id)) {
+          roomId = users.get(socket.id)?.roomId;
+          break;
+        }
+      }
+
+      if (roomId) {
+        io.to(roomId).emit("message-updated", {
+          id: messageId,
+          content: newContent.trim(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    })
+    .catch((err) => console.error("Error al actualizar mensaje:", err));
   });
 
   const handleLeaveRoom = (socketId: string) => {
