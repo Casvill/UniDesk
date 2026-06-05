@@ -123,6 +123,6 @@ export async function searchMessages(roomId: string, searchTerm: string): Promis
 
   const allMessages = snapshot.docs.map(doc => doc.data() as Message);
   return allMessages.filter(msg => 
-    msg.content.toLowerCase().includes(searchTerm.toLowerCase())
+    msg.content?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 }
