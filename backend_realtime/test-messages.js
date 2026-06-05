@@ -2,9 +2,11 @@ import { io } from "socket.io-client";
 
 const SERVER_URL = "http://localhost:3001";
 const ROOM_ID = "chat-test-room";
+const ALICE_TOKEN = "ALICE_TOKEN_HERE";
+const BOB_TOKEN = "BOB_TOKEN_HERE";
 
-const alice = io(SERVER_URL);
-const bob = io(SERVER_URL);
+const alice = io(SERVER_URL, { auth: { token: ALICE_TOKEN } });
+const bob = io(SERVER_URL, { auth: { token: BOB_TOKEN } });
 
 // Alice listens for messages
 alice.on("new-message", (msg) => {
@@ -17,11 +19,11 @@ bob.on("new-message", (msg) => {
 });
 
 alice.on("connect", () => {
-  alice.emit("join-room", { roomId: ROOM_ID, uid: "u1", username: "Alice" });
+  alice.emit("join-room", { roomId: ROOM_ID });
 });
 
 bob.on("connect", () => {
-  bob.emit("join-room", { roomId: ROOM_ID, uid: "u2", username: "Bob" });
+  bob.emit("join-room", { roomId: ROOM_ID });
 
   // Bob sends a message after joining
   setTimeout(() => {
