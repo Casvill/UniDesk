@@ -54,6 +54,29 @@ export async function getRoomsByOwner(ownerUid: string): Promise<Room[]> {
 }
 
 /**
+ * (R) Lista salas de forma paginada.
+ * 
+ * @param limit - Cantidad máxima de salas a retornar
+ * @param startAfter - ID de la sala desde la cual empezar (para paginación)
+ * @returns Lista de salas
+ */
+export async function listRooms(limit: number = 10, startAfter?: string): Promise<Room[]> {
+  let query = db.collection(ROOMS_COLLECTION)
+    .orderBy("createdAt", "desc")
+    .limit(limit);
+
+  if (startAfter) {
+    const lastDoc = await db.collection(ROOMS_COLLECTION).doc(startAfter).get();
+    if (lastDoc.exists) {
+      query = query.startAfter(lastDoc);
+    }
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map(doc => doc.data() as Room);
+}
+
+/**
  * (U) Actualiza el nombre de una sala de estudio.
  * 
  * @param id - ID de la sala
