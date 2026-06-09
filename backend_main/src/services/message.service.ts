@@ -43,6 +43,41 @@ export async function sendMessage(data: CreateMessageDTO): Promise<Message> {
 }
 
 /**
+ * (U) Actualiza el contenido de un mensaje existente.
+ * 
+ * @swagger
+ * /messages/{id}:
+ *   put:
+ *     summary: Editar un mensaje
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Mensaje actualizado
+ * 
+ * @param id - ID del mensaje
+ * @param content - Nuevo contenido
+ * @returns El mensaje actualizado
+ */
+export async function updateMessage(id: string, content: string): Promise<void> {
+  const messageRef = db.collection(MESSAGES_COLLECTION).doc(id);
+  await messageRef.update({ content });
+}
+
+/**
  * (R) Obtiene los mensajes de una sala ordenados por fecha de creación (de más antiguo a más nuevo).
  * 
  * @swagger

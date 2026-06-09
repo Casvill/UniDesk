@@ -1,4 +1,4 @@
-import { sendMessage, getMessagesByRoom } from "../services/message.service";
+import { sendMessage, getMessagesByRoom, updateMessage } from "../services/message.service";
 import { db } from "../config/firebase";
 
 // 1. Mock dependencies
@@ -49,6 +49,19 @@ describe("message.service", () => {
       expect(mockWhere).toHaveBeenCalledWith("roomId", "==", "r1");
       expect(mockOrderBy).toHaveBeenCalledWith("createdAt", "asc");
       expect(mockLimit).toHaveBeenCalledWith(50);
+    });
+  });
+
+  describe("updateMessage", () => {
+    it("should update an existing message", async () => {
+      const mockUpdate = jest.fn();
+      const mockDoc = jest.fn(() => ({ update: mockUpdate }));
+      (db.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
+
+      await updateMessage("msg_123", "new content");
+
+      expect(mockDoc).toHaveBeenCalledWith("msg_123");
+      expect(mockUpdate).toHaveBeenCalledWith({ content: "new content" });
     });
   });
 });
