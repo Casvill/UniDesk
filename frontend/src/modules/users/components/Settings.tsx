@@ -554,7 +554,7 @@ export function Settings() {
             <div className="flex flex-col items-center mb-8">
               <div className="relative">
                 <div
-                  className="w-32 h-32 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg overflow-hidden"
+                  className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
                   aria-label="Vista previa del avatar"
                 >
                   {avatarContent}
@@ -562,7 +562,7 @@ export function Settings() {
 
                 <label
                   htmlFor="settings-avatar"
-                  className="absolute bottom-1 right-1 bg-indigo-600 text-white p-3 rounded-full cursor-pointer hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
+                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
                   aria-label="Cambiar imagen de perfil"
                 >
                   <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -747,6 +747,32 @@ export function Settings() {
                   disabled={loading}
                 />
               </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={!isFormValid}
+                  aria-busy={loading}
+                  aria-disabled={!isFormValid}
+                  aria-label={
+                    loading
+                      ? "Guardando cambios, por favor espera"
+                      : "Guardar cambios del perfil"
+                  }
+                  className="w-full sm:w-auto bg-primary from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5" aria-hidden="true" />
+                      Guardar cambios
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -904,33 +930,6 @@ export function Settings() {
             className="sr-only"
           >
             {loading && "Guardando los cambios de tu perfil. Por favor espera."}
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!isFormValid}
-              aria-busy={loading}
-              aria-disabled={!isFormValid}
-              aria-label={
-                loading
-                  ? "Guardando cambios, por favor espera"
-                  : "Guardar cambios del perfil"
-              }
-              className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-5 w-5" aria-hidden="true" />
-                  Guardar cambios
-                </>
-              )}
-            </button>
           </div>
         </form>
       </div>
