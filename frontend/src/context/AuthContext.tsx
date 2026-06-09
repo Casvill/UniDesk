@@ -16,6 +16,14 @@ import { api, UserProfile } from '../services/api';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'needs-profile';
 
+type UpdateProfileData = {
+  username?: string;
+  displayName?: string;
+  email?: string;
+  photoURL?: string;
+  university?: string;
+};
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -31,6 +39,7 @@ interface AuthContextType {
   }>;
   completeProfile: (data: { username: string; displayName: string; photoURL?: string }) => Promise<UserProfile>;
   register: (email: string, pass: string, name: string, username: string) => Promise<void>;
+  updateProfileData: (data: UpdateProfileData) => Promise<UserProfile>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,6 +82,13 @@ function getBackendErrorCode(error: unknown): string {
     message.includes('ocupado')
   ) {
     return 'backend/username-already-exists';
+  }
+
+  if (
+    message.includes('email') ||
+    message.includes('correo')
+  ) {
+    return 'backend/email-already-exists';
   }
 
   return 'backend/profile-create-failed';
@@ -216,6 +232,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const updateProfileData = async (data: UpdateProfileData): Promise<UserProfile> => {
+    if (!user) throw new Error('Not authenticated');
+
+    const token = await user.getIdToken();
+
+    const updatedProfile = await api.updateProfile(
+      user.uid,
+      data,
+      token
+    );
+
+    setProfile(updatedProfile);
+    setStatus('authenticated');
+
+    return updatedProfile;
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -231,6 +264,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loginWithGoogle,
     completeProfile,
     register,
+    updateProfileData,
   };
 
   return (
@@ -242,8 +276,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
   }
+
   return context;
 };
