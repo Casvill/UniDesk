@@ -78,9 +78,26 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  * @swagger
  * /rooms:
  *   get:
- *     summary: Listar salas del usuario autenticado
- *     description: Retorna todas las salas donde el usuario es propietario.
+ *     summary: Listar salas de estudio
+ *     description: Retorna una lista de salas. Por defecto retorna las del usuario autenticado, pero permite listar todas con paginación.
  *     tags: [Rooms]
+ *     parameters:
+ *       - in: query
+ *         name: all
+ *         schema:
+ *           type: boolean
+ *         description: Si es true, retorna todas las salas. Si es false (por defecto), solo las del usuario.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Cantidad máxima de salas a retornar.
+ *       - in: query
+ *         name: startAfter
+ *         schema:
+ *           type: string
+ *         description: ID de la sala desde la cual empezar (para paginación).
  *     responses:
  *       200:
  *         description: Lista de salas
@@ -98,8 +115,17 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    const rooms = await getRoomsByOwner(req.user.uid);
-    res.json(rooms);
+    const all = req.query.all === "true";
+    const limit = parseInt(req.query.limit as string) || 10;
+    const startAfter = req.query.startAfter as string;
+
+    if (all) {
+      const rooms = await listRooms(limit, startAfter);
+      res.json(rooms);
+    } else {
+      const rooms = await getRoomsByOwner(req.user.uid);
+      res.json(rooms);
+    }
   } catch (error) {
     const handled = handleFirebaseError(error);
     res.status(handled.statusCode).json({ message: handled.message });
@@ -199,38 +225,6 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
  *         required: true
  *     responses:
  *       200:
- *         description: Sala eliminada
- *       403:
- *         description: No tienes permiso para eliminar esta sala
- */
-router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ message: "No autenticado" });
-      return;
-    }
-
-    const room = await getRoom(req.params.id);
-    if (!room) {
-      res.status(404).json({ message: "Sala no encontrada" });
-      return;
-    }
-
-    if (room.ownerUid !== req.user.uid) {
-      res.status(403).json({ message: "No tienes permiso para eliminar esta sala" });
-      return;
-    }
-
-    await deleteRoom(req.params.id);
-    res.json({ message: "Sala eliminada exitosamente" });
-  } catch (error) {
-    const handled = handleFirebaseError(error);
-    res.status(handled.statusCode).json({ message: handled.message });
-  }
-});
-
-export default router;
-     200:
  *         description: Sala eliminada
  *       403:
  *         description: No tienes permiso para eliminar esta sala
