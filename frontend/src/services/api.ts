@@ -143,6 +143,25 @@ export const api = {
     }
   },
 
+  async checkEmail(email: string, excludeUid?: string): Promise<boolean> {
+    try {
+      let url = `${API_URL}/users/email/${encodeURIComponent(email)}/available`;
+
+      if (excludeUid) {
+        url += `?excludeUid=${excludeUid}`;
+      }
+
+      const response = await fetch(url);
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      return Boolean(data.available);
+    } catch {
+      return false;
+    }
+  },
+
   async checkUsername(username: string): Promise<boolean> {
     try {
       const response = await fetch(

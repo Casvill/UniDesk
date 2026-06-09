@@ -7,6 +7,7 @@ import {
   deleteUserProfile,
 } from "../services/user.service";
 import { checkUsernameAvailability } from "../services/username.service";
+import { checkEmailAvailability } from "../services/email.service";
 import { handleFirebaseError } from "../utils/firebase-error.handler";
 
 const router = Router();
@@ -128,6 +129,52 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
 router.get("/username/:username/available", async (req: Request, res: Response) => {
   try {
     const available = await checkUsernameAvailability(String(req.params.username));
+    res.json({ available });
+  } catch (error) {
+    const handled = handleFirebaseError(error);
+    res.status(handled.statusCode).json({ message: handled.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/email/{email}/available:
+ *   get:
+ *     summary: Verificar disponibilidad de correo
+ *     description: Endpoint público. Retorna si un correo está disponible (no registrado por otro usuario).
+ *     tags: [Users]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         description: Correo electrónico a verificar
+ *         schema:
+ *           type: string
+ *           example: "juan@email.com"
+ *       - in: query
+ *         name: excludeUid
+ *         required: false
+ *         description: UID del usuario actual para excluirlo de la verificación
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Resultado de disponibilidad
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 available:
+ *                   type: boolean
+ *                   example: true
+ */
+router.get("/email/:email/available", async (req: Request, res: Response) => {
+  try {
+    const email = String(req.params.email);
+    const excludeUid = String(req.query.excludeUid || "");
+    const available = await checkEmailAvailability(email, excludeUid || undefined);
     res.json({ available });
   } catch (error) {
     const handled = handleFirebaseError(error);
@@ -331,6 +378,7 @@ router.delete("/:uid", verifyToken, async (req: Request, res: Response) => {
  *
  * - POST   /users                          → Crear perfil (auth)
  * - GET    /users/username/{username}/available → Verificar disponibilidad (público)
+ * - GET    /users/email/{email}/available  → Verificar disponibilidad de email (público)
  * - GET    /users/{uid}                     → Obtener perfil (auth)
  * - PUT    /users/{uid}                     → Actualizar perfil (auth, dueño)
  * - DELETE /users/{uid}                     → Eliminar cuenta (auth, dueño)
