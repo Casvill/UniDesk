@@ -1,29 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { User, Pencil, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
-import { toast } from "sonner";
-import logo from "@/assets/logo/unified-logo-light.svg";
-
-type FeedbackType = "error" | "success" | "info";
-
-type FeedbackState = {
-  type: FeedbackType;
-  message: string;
-} | null;
-
-function getFeedbackClasses(type: FeedbackType): string {
-  if (type === "success") {
-    return "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700";
-  }
-
-  if (type === "info") {
-    return "rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700";
-  }
-
-  return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
-}
+import { showToast } from "@/shared/components/ui/toast";
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -92,15 +72,12 @@ export function GooglePage() {
   const navigate = useNavigate();
   const { user, status, completeProfile } = useAuth();
 
-  const feedbackRef = useRef<HTMLDivElement | null>(null);
-
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const [usernameTouched, setUsernameTouched] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -125,12 +102,6 @@ export function GooglePage() {
       setAvatarPreview(user.photoURL);
     }
   }, [status, user, navigate]);
-
-  useEffect(() => {
-    if (feedback && feedbackRef.current) {
-      feedbackRef.current.focus();
-    }
-  }, [feedback]);
 
   useEffect(() => {
     if (!cleanUsername) {
@@ -203,17 +174,10 @@ export function GooglePage() {
   const showUsernameAsError =
     usernameAvailable === false || isUsernameError;
 
-  const clearFeedback = () => {
-    if (feedback) {
-      setFeedback(null);
-    }
-  };
-
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
     setUsernameTouched(true);
-    setFeedback(null);
 
     if (!isUsernameValid) {
       return;
@@ -221,11 +185,6 @@ export function GooglePage() {
 
     setLoading(true);
     setSuccess(false);
-
-    setFeedback({
-      type: "info",
-      message: "Completando tu perfil. Por favor espera.",
-    });
 
     try {
       await completeProfile({
@@ -236,14 +195,7 @@ export function GooglePage() {
 
       setSuccess(true);
 
-      const successMessage = "Perfil completado exitosamente. Redirigiendo al dashboard.";
-
-      setFeedback({
-        type: "success",
-        message: successMessage,
-      });
-
-      toast.success("Perfil completado exitosamente");
+      showToast.success("Perfil completado exitosamente");
 
       setTimeout(() => {
         navigate("/dashboard", { replace: true });
@@ -257,12 +209,7 @@ export function GooglePage() {
         setUsernameAvailable(false);
         setUsernameTouched(true);
       } else {
-        setFeedback({
-          type: "error",
-          message,
-        });
-
-        toast.error(message);
+        showToast.error(message);
       }
     } finally {
       setLoading(false);
@@ -276,12 +223,7 @@ export function GooglePage() {
     const imageUrl = URL.createObjectURL(file);
     setAvatarPreview(imageUrl);
 
-    setFeedback({
-      type: "success",
-      message: "Imagen de perfil seleccionada correctamente.",
-    });
-
-    toast.success("Imagen de perfil seleccionada correctamente");
+    showToast.success("Imagen de perfil seleccionada correctamente");
   };
 
   if (status !== "needs-profile" || !user) return null;
@@ -296,20 +238,6 @@ export function GooglePage() {
           Solo falta tu nombre de usuario...
         </p>
       </div>
-
-      {feedback && (
-        <div
-          id="google-profile-feedback"
-          ref={feedbackRef}
-          tabIndex={-1}
-          role={feedback.type === "error" ? "alert" : "status"}
-          aria-live={feedback.type === "error" ? "assertive" : "polite"}
-          aria-atomic="true"
-          className={`${getFeedbackClasses(feedback.type)} mb-5`}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       {/* AVATAR */}
       <div className="flex flex-col items-center mb-6">
@@ -355,7 +283,7 @@ export function GooglePage() {
       <form
         onSubmit={handleSubmit}
         className="space-y-4"
-        aria-describedby={feedback ? "google-profile-feedback" : "google-profile-status"}
+        aria-describedby="google-profile-status"
         noValidate
       >
 
@@ -386,7 +314,6 @@ export function GooglePage() {
             onChange={(e) => {
               setUsername(e.target.value);
               setUsernameAvailable(null);
-              clearFeedback();
             }}
             onBlur={() => setUsernameTouched(true)}
             placeholder="Ej: estudiante_123"

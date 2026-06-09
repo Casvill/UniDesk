@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Chrome, Pencil, Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCardTransition } from "@/context/CardTransitionContext";
-import { toast } from "sonner";
+import { showToast } from "@/shared/components/ui/toast";
 
 type FormState = {
   fullName: string;
@@ -14,25 +14,6 @@ type FormState = {
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
-
-type FeedbackType = "error" | "success" | "info";
-
-type FeedbackState = {
-  type: FeedbackType;
-  message: string;
-} | null;
-
-function getFeedbackClasses(type: FeedbackType): string {
-  if (type === "success") {
-    return "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700";
-  }
-
-  if (type === "info") {
-    return "rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700";
-  }
-
-  return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
-}
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -160,8 +141,6 @@ export function Register() {
   const { navigateWithTransition } = useCardTransition();
   const { register, loginWithGoogle } = useAuth();
 
-  const feedbackRef = useRef<HTMLDivElement | null>(null);
-
   const [form, setForm] = useState<FormState>({
     fullName: "",
     username: "",
@@ -172,7 +151,6 @@ export function Register() {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -180,12 +158,6 @@ export function Register() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const isSubmitting = loading || googleLoading;
-
-  useEffect(() => {
-    if (feedback && feedbackRef.current) {
-      feedbackRef.current.focus();
-    }
-  }, [feedback]);
 
   const validate = () => {
     const newErrors: FieldErrors = {};
@@ -233,38 +205,18 @@ export function Register() {
     });
   };
 
-  const clearFeedback = () => {
-    if (feedback) {
-      setFeedback(null);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    setFeedback(null);
 
     const validationErrors = validate();
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      const message = "Revisa los campos marcados antes de crear tu cuenta.";
-
-      setFeedback({
-        type: "error",
-        message,
-      });
-
-      toast.error(message);
+      showToast.error("Revisa los campos marcados antes de crear tu cuenta.");
       return;
     }
 
     setLoading(true);
-
-    setFeedback({
-      type: "info",
-      message: "Creando tu cuenta. Por favor espera.",
-    });
 
     try {
       await register(
@@ -274,14 +226,7 @@ export function Register() {
         form.username.trim()
       );
 
-      const successMessage = "Cuenta creada exitosamente. Redirigiendo al dashboard.";
-
-      setFeedback({
-        type: "success",
-        message: successMessage,
-      });
-
-      toast.success("Cuenta creada exitosamente");
+      showToast.success("Cuenta creada exitosamente");
 
       setTimeout(() => {
         navigate("/dashboard", { replace: true });
@@ -291,39 +236,21 @@ export function Register() {
 
       const message = getRegisterErrorMessage(error);
 
-      setFeedback({
-        type: "error",
-        message,
-      });
-
-      toast.error(message);
+      showToast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setFeedback(null);
     setGoogleLoading(true);
-
-    setFeedback({
-      type: "info",
-      message: "Abriendo registro con Google. Por favor espera.",
-    });
 
     try {
       const result = await loginWithGoogle();
 
-      const successMessage = result?.isNewUser
-        ? "Cuenta creada con Google. Completa tu perfil para continuar."
-        : "Sesión iniciada con Google. Redirigiendo al dashboard.";
-
-      setFeedback({
-        type: "success",
-        message: successMessage,
-      });
-
-      toast.success("Cuenta creada con Google");
+      showToast.success(result?.isNewUser
+        ? "Cuenta creada con Google"
+        : "Sesión iniciada con Google");
 
       setTimeout(() => {
         if (result?.isNewUser) {
@@ -337,12 +264,7 @@ export function Register() {
 
       const message = getGoogleRegisterErrorMessage(error);
 
-      setFeedback({
-        type: "error",
-        message,
-      });
-
-      toast.error(message);
+      showToast.error(message);
     } finally {
       setGoogleLoading(false);
     }
@@ -358,7 +280,6 @@ export function Register() {
     });
 
     clearFieldError(fieldName);
-    clearFeedback();
 
     if (fieldName === 'username') {
       const trimmedValue = value.trim();
@@ -382,10 +303,7 @@ export function Register() {
 
     setAvatarPreview(URL.createObjectURL(file));
 
-    setFeedback({
-      type: "success",
-      message: "Imagen de perfil seleccionada correctamente.",
-    });
+    showToast.success("Imagen de perfil seleccionada correctamente.");
   };
 
   return (
@@ -402,23 +320,9 @@ export function Register() {
       <form
         onSubmit={handleSubmit}
         className="space-y-4"
-        aria-describedby={feedback ? "form-feedback" : "form-status"}
+        aria-describedby="form-status"
         noValidate
       >
-
-      {feedback && (
-        <div
-          id="form-feedback"
-          ref={feedbackRef}
-          tabIndex={-1}
-          role={feedback.type === "error" ? "alert" : "status"}
-          aria-live={feedback.type === "error" ? "assertive" : "polite"}
-          aria-atomic="true"
-          className={getFeedbackClasses(feedback.type)}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       {/* AVATAR */}
       <div className="flex flex-col items-center mb-6">
