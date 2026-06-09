@@ -419,13 +419,11 @@ export function Settings() {
 
     if (!cleanEmail) {
       newErrors.email = "El correo es obligatorio.";
-    } else if (isGoogleUser) {
-      newErrors.email = "El correo de Google no se puede cambiar.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    } else if (!isGoogleUser && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       newErrors.email = "Ingresa un correo válido.";
-    } else if (checkingEmail) {
+    } else if (!isGoogleUser && checkingEmail) {
       newErrors.email = "Validando correo...";
-    } else if (!isEmailUnchanged && emailAvailable === false) {
+    } else if (!isGoogleUser && !isEmailUnchanged && emailAvailable === false) {
       newErrors.email = "Este correo ya está registrado.";
     }
 
