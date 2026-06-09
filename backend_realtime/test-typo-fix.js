@@ -2,12 +2,17 @@ import { io } from "socket.io-client";
 
 const SERVER_URL = "http://localhost:3001";
 const ROOM_ID = "typo-test-room";
+const TOKEN = "YOUR_FIREBASE_ID_TOKEN_HERE"; // Need a real token now
 
-const client = io(SERVER_URL);
+const client = io(SERVER_URL, {
+  auth: {
+    token: TOKEN
+  }
+});
 
 client.on("connect", () => {
   console.log("Connected to server");
-  client.emit("join-room", { roomId: ROOM_ID, uid: "test-user-1", username: "Tester" });
+  client.emit("join-room", { roomId: ROOM_ID });
 });
 
 client.on("new-message", (msg) => {

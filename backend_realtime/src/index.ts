@@ -3,8 +3,9 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
-import { db } from "./config/firebase";
+import { db, auth } from "./config/firebase";
 import { Timestamp } from "firebase-admin/firestore";
+import { socketAuthMiddleware, AuthenticatedSocket } from "./middleware/auth.middleware.js";
 
 dotenv.config();
 
@@ -18,6 +19,9 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Middleware de autenticación global para Socket.IO
+io.use(socketAuthMiddleware);
 
 const PORT = process.env.REALTIME_PORT || 3001;
 
@@ -36,11 +40,17 @@ function getParticipantsInRoom(roomId: string): UserInfo[] {
   return roomUsers ? Array.from(roomUsers.values()) : [];
 }
 
-io.on("connection", (socket) => {
-  console.log("Usuario conectado:", socket.id);
+io.on("connection", (socket: AuthenticatedSocket) => {
+  console.log("Usuario conectado:", socket.id, "UID:", socket.user?.uid);
 
-  socket.on("join-room", (data: { roomId: string; uid: string; username: string }) => {
-    const { roomId, uid, username } = data;
+  socket.on("join-room", (data: { roomId: string }) => {
+    if (!socket.user) {
+      return;
+    }
+
+    const { roomId } = data;
+    const { uid, name, email } = socket.user;
+    const username = name || email || "Anonymous";
     
     // Track user
     if (!rooms.has(roomId)) {
@@ -104,25 +114,32 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("edit-message", (data: { messageId: string; newContent: string }) => {
+  socket.on("edit-message", async (data: { messageId: string; newContent: string }) => {
     const { messageId, newContent } = data;
 
-    if (!messageId || !newContent || newContent.trim().length === 0) {
+    if (!messageId || !newContent || newContent.trim().length === 0 || !socket.user) {
       return;
     }
 
-    // Optional: verify sender info from socket session
-    // For now, we update it in Firestore and broadcast the update
-    db.collection("messages").doc(messageId).update({
-      content: newContent.trim(),
-      updatedAt: Timestamp.now()
-    })
-    .then(() => {
-      console.log(`Mensaje ${messageId} actualizado`);
-      // Broadcast update to the room
-      // We need to know which room the message belongs to. 
-      // For simplicity, we can just broadcast to all rooms or fetch the room first.
-      // Better: find the user's current room.
+    try {
+      // Verify ownership in Firestore
+      const messageDoc = await db.collection("messages").doc(messageId).get();
+      if (!messageDoc.exists) return;
+
+      if (messageDoc.data()?.senderUid !== socket.user.uid) {
+        console.error(`Socket ${socket.id}: Intento de editar mensaje de otro usuario`);
+        return;
+      }
+
+      // Update in Firestore
+      await db.collection("messages").doc(messageId).update({
+        content: newContent.trim(),
+        updatedAt: Timestamp.now()
+      });
+
+      console.log(`Mensaje ${messageId} actualizado por ${socket.user.uid}`);
+      
+      // Find room to broadcast
       let roomId: string | undefined;
       for (const users of rooms.values()) {
         if (users.has(socket.id)) {
@@ -138,8 +155,9 @@ io.on("connection", (socket) => {
           updatedAt: new Date().toISOString()
         });
       }
-    })
-    .catch((err) => console.error("Error al actualizar mensaje:", err));
+    } catch (err) {
+      console.error("Error al actualizar mensaje:", err);
+    }
   });
 
   const handleLeaveRoom = (socketId: string) => {
