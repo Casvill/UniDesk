@@ -94,10 +94,36 @@ export function Login() {
 
   const [rememberMe, setRememberMe] = useState(false);
 
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const isSubmitting = loading || googleLoading;
+
+  const validate = () => {
+    const newErrors: { email?: string; password?: string } = {};
+
+    if (!email.trim()) {
+      newErrors.email = "El correo es obligatorio";
+    }
+
+    if (!password.trim()) {
+      newErrors.password = "La contraseña es obligatoria";
+    }
+
+    return newErrors;
+  };
+
+  const clearFieldError = (field: "email" | "password") => {
+    if (!errors[field]) return;
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +131,10 @@ export function Login() {
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
 
-    if (!cleanEmail || !cleanPassword) {
+    const validationErrors = validate();
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
       showToast.error("Ingresa tu correo y contraseña para continuar.");
       return;
     }
@@ -195,14 +224,34 @@ export function Login() {
             id="email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              clearFieldError("email");
+            }}
             placeholder="ejemplo@universidad.edu.co"
-            className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none ${
+              errors.email
+                ? "border-red-400 focus:ring-red-500"
+                : "focus:ring-primary-500"
+            }`}
             disabled={isSubmitting}
             autoComplete="email"
             aria-label="Campo de correo electrónico"
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "email-error" : undefined}
           />
         </div>
+
+        {errors.email && (
+          <p
+            id="email-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
+          >
+            {errors.email}
+          </p>
+        )}
       </div>
 
       {/* PASSWORD */}
@@ -236,12 +285,21 @@ export function Login() {
             id="password"
             type={showPassword ? "text" : "password"}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              clearFieldError("password");
+            }}
             placeholder="Ingresa tu contraseña"
-            className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none ${
+              errors.password
+                ? "border-red-400 focus:ring-red-500"
+                : "focus:ring-primary-500"
+            }`}
             disabled={isSubmitting}
             autoComplete="current-password"
             aria-label="Campo de contraseña"
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? "password-error" : undefined}
           />
 
           <button
@@ -254,6 +312,17 @@ export function Login() {
             {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
           </button>
         </div>
+
+        {errors.password && (
+          <p
+            id="password-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
+          >
+            {errors.password}
+          </p>
+        )}
       </div>
 
       {/* OPTIONS */}

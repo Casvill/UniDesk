@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Pencil, Loader2, Eye, EyeOff } from "lucide-react";
+import { User, Pencil, Loader2, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCardTransition } from "@/context/CardTransitionContext";
+import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
 
@@ -155,24 +156,52 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const isSubmitting = loading || googleLoading;
+
+  const cleanUsername = form.username.trim();
+
+  useEffect(() => {
+    if (!cleanUsername) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+
+    if (cleanUsername.length < 3 || cleanUsername.length > 15 || !/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const available = await api.checkUsername(cleanUsername);
+        setUsernameAvailable(available);
+      } catch (err) {
+        console.warn("No se pudo validar el username:", err);
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [cleanUsername]);
 
   const validate = () => {
     const newErrors: FieldErrors = {};
 
     if (!form.fullName.trim()) {
       newErrors.fullName = "El nombre completo es obligatorio";
-    }
-
-    if (!form.username.trim()) {
-      newErrors.username = "El nombre de usuario es obligatorio";
-    } else if (form.username.trim().length < 3 || form.username.trim().length > 15) {
-      newErrors.username = "El nombre debe tener entre 3 y 15 caracteres";
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(form.username.trim())) {
-      newErrors.username = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
     }
 
     if (!form.email.trim()) {
@@ -209,12 +238,32 @@ export function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setUsernameTouched(true);
+
     const validationErrors = validate();
     setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length > 0) {
-      showToast.error("Revisa los campos marcados antes de crear tu cuenta.");
+    let usernameError = "";
+
+    if (Object.keys(validationErrors).length > 0 || usernameError) {
+      if (usernameError) {
+        showToast.error(usernameError);
+      } else {
+        showToast.error("Revisa los campos marcados antes de crear tu cuenta.");
+      }
       return;
+    }
+
+    if (!cleanUsername) {
+      usernameError = "El nombre de usuario es obligatorio";
+    } else if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+      usernameError = "El nombre debe tener entre 3 y 15 caracteres";
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      usernameError = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+    } else if (checkingUsername) {
+      usernameError = "Espera a que validemos la disponibilidad del nombre de usuario";
+    } else if (usernameAvailable !== true) {
+      usernameError = "Este nombre de usuario no está disponible";
     }
 
     setLoading(true);
@@ -237,6 +286,11 @@ export function Register() {
 
       const message = getRegisterErrorMessage(error);
 
+      if (message.includes("nombre de usuario") || message.includes("ya está en uso")) {
+        setUsernameAvailable(false);
+        setUsernameTouched(true);
+      }
+
       showToast.error(message);
     } finally {
       setLoading(false);
@@ -250,7 +304,7 @@ export function Register() {
       const result = await loginWithGoogle();
 
       showToast.success(result?.isNewUser
-        ? "Cuenta creada con Google"
+        ? "Cuenta creada con Google, ingresa tu nombre de usuario para completar tu perfil"
         : "Sesión iniciada con Google");
 
       setTimeout(() => {
@@ -281,21 +335,6 @@ export function Register() {
     });
 
     clearFieldError(fieldName);
-
-    if (fieldName === 'username') {
-      const trimmedValue = value.trim();
-      let error = "";
-      if (trimmedValue.length > 0 && (trimmedValue.length < 3 || trimmedValue.length > 15)) {
-        error = "El nombre debe tener entre 3 y 15 caracteres";
-      } else if (trimmedValue.length > 0 && !/^[a-zA-Z0-9_-]+$/.test(trimmedValue)) {
-        error = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
-      }
-      
-      setErrors(prev => ({
-        ...prev,
-        username: error
-      }));
-    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,6 +345,28 @@ export function Register() {
 
     showToast.success("Imagen de perfil seleccionada correctamente.");
   };
+
+  const getUsernameMessage = () => {
+    if (!usernameTouched && !cleanUsername) return "";
+
+    if (!cleanUsername) return "El nombre de usuario es obligatorio";
+    if (cleanUsername.length < 3 || cleanUsername.length > 15) return "El nombre debe tener entre 3 y 15 caracteres";
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) return "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+    if (checkingUsername) return "Validando disponibilidad...";
+    if (usernameAvailable === true) return "Nombre de usuario disponible";
+    if (usernameAvailable === false) return "Este nombre de usuario ya está en uso";
+    return "";
+  };
+
+  const usernameMessage = getUsernameMessage();
+
+  const isUsernameError =
+    usernameTouched &&
+    Boolean(usernameMessage) &&
+    usernameMessage !== "Nombre de usuario disponible" &&
+    usernameMessage !== "Validando disponibilidad...";
+
+  const showUsernameAsError = usernameAvailable === false || isUsernameError;
 
   return (
     <>
@@ -380,7 +441,7 @@ export function Register() {
           value={form.fullName}
           onChange={handleChange}
           placeholder="Ej: Juan Pérez"
-          className="w-full px-4 py-3 border rounded-lg"
+          className={`w-full px-4 py-3 border rounded-lg ${errors.fullName ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.fullName)}
           aria-describedby={errors.fullName ? "fullName-error" : undefined}
           autoComplete="name"
@@ -392,7 +453,7 @@ export function Register() {
             id="fullName-error"
             role="alert"
             aria-live="assertive"
-            className="text-red-600 text-xs"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
           >
             {errors.fullName}
           </p>
@@ -409,25 +470,47 @@ export function Register() {
           id="username"
           name="username"
           value={form.username}
-          onChange={handleChange}
+          onChange={(e) => {
+            handleChange(e);
+            setUsernameAvailable(null);
+          }}
+          onBlur={() => setUsernameTouched(true)}
           placeholder="Ej: estudiante_123"
-          className="w-full px-4 py-3 border rounded-lg"
-          aria-invalid={Boolean(errors.username)}
-          aria-describedby={errors.username ? "username-error" : undefined}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none ${showUsernameAsError ? "border-red-400" : ""}`}
+          aria-invalid={isUsernameError ? true : undefined}
+          aria-describedby={isUsernameError ? "username-error" : undefined}
           autoComplete="username"
           disabled={isSubmitting}
         />
 
-        {errors.username && (
+        {usernameMessage && (
           <p
-            id="username-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-600 text-xs"
+            id={isUsernameError ? "username-error" : undefined}
+            className={`mt-1 text-sm flex items-center gap-1 ${
+              showUsernameAsError
+                ? "text-red-500"
+                : usernameAvailable === true
+                ? "text-green-600"
+                : "text-gray-500"
+            }`}
           >
-            {errors.username}
+            {showUsernameAsError ? (
+              <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : usernameAvailable === true ? (
+              <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : null}
+
+            {usernameMessage}
           </p>
         )}
+
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {usernameTouched && usernameMessage}
+        </div>
       </div>
 
       {/* EMAIL */}
@@ -443,7 +526,7 @@ export function Register() {
           value={form.email}
           onChange={handleChange}
           placeholder="ejemplo@universidad.edu.co"
-          className="w-full px-4 py-3 border rounded-lg"
+          className={`w-full px-4 py-3 border rounded-lg ${errors.email ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
@@ -455,7 +538,7 @@ export function Register() {
             id="email-error"
             role="alert"
             aria-live="assertive"
-            className="text-red-600 text-xs"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
           >
             {errors.email}
           </p>
@@ -476,7 +559,7 @@ export function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Mínimo 8 caracteres"
-            className="w-full px-4 pr-12 py-3 border rounded-lg"
+            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.password ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.password)}
             aria-describedby={errors.password ? "password-error" : undefined}
             autoComplete="new-password"
@@ -499,7 +582,7 @@ export function Register() {
             id="password-error"
             role="alert"
             aria-live="assertive"
-            className="text-red-600 text-xs"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
           >
             {errors.password}
           </p>
@@ -520,7 +603,7 @@ export function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             placeholder="Repite tu contraseña"
-            className="w-full px-4 pr-12 py-3 border rounded-lg"
+            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.confirmPassword ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
             autoComplete="new-password"
@@ -543,7 +626,7 @@ export function Register() {
             id="confirm-error"
             role="alert"
             aria-live="assertive"
-            className="text-red-600 text-xs"
+            className="text-red-500 mt-1 text-sm flex items-center gap-1"
           >
             {errors.confirmPassword}
           </p>
