@@ -245,6 +245,18 @@ export function Register() {
 
     let usernameError = "";
 
+    // if (!cleanUsername) {
+    //   usernameError = "El nombre de usuario es obligatorio";
+    // } else if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+    //   usernameError = "El nombre debe tener entre 3 y 15 caracteres";
+    // } else if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+    //   usernameError = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+    // } else if (checkingUsername) {
+    //   usernameError = "Espera a que validemos la disponibilidad del nombre de usuario";
+    // } else if (usernameAvailable !== true) {
+    //   usernameError = "Este nombre de usuario no está disponible";
+    // }
+
     if (Object.keys(validationErrors).length > 0 || usernameError) {
       if (usernameError) {
         showToast.error(usernameError);
@@ -252,18 +264,6 @@ export function Register() {
         showToast.error("Revisa los campos marcados antes de crear tu cuenta.");
       }
       return;
-    }
-
-    if (!cleanUsername) {
-      usernameError = "El nombre de usuario es obligatorio";
-    } else if (cleanUsername.length < 3 || cleanUsername.length > 15) {
-      usernameError = "El nombre debe tener entre 3 y 15 caracteres";
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
-      usernameError = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
-    } else if (checkingUsername) {
-      usernameError = "Espera a que validemos la disponibilidad del nombre de usuario";
-    } else if (usernameAvailable !== true) {
-      usernameError = "Este nombre de usuario no está disponible";
     }
 
     setLoading(true);
@@ -448,16 +448,20 @@ export function Register() {
           disabled={isSubmitting}
         />
 
-        {errors.fullName && (
-          <p
-            id="fullName-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.fullName}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.fullName ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.fullName && (
+              <p
+                id="fullName-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.fullName}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* USERNAME */}
@@ -483,26 +487,30 @@ export function Register() {
           disabled={isSubmitting}
         />
 
-        {usernameMessage && (
-          <p
-            id={isUsernameError ? "username-error" : undefined}
-            className={`mt-1 text-sm flex items-center gap-1 ${
-              showUsernameAsError
-                ? "text-red-500"
-                : usernameAvailable === true
-                ? "text-green-600"
-                : "text-gray-500"
-            }`}
-          >
-            {showUsernameAsError ? (
-              <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-            ) : usernameAvailable === true ? (
-              <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-            ) : null}
+        <div className={`grid transition-all duration-300 ${usernameMessage ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {usernameMessage && (
+              <p
+                id={isUsernameError ? "username-error" : undefined}
+                className={`mt-1 text-sm flex items-center gap-1 ${
+                  showUsernameAsError
+                    ? "text-red-500"
+                    : usernameAvailable === true
+                    ? "text-green-600"
+                    : "text-gray-500"
+                }`}
+              >
+                {showUsernameAsError ? (
+                  <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : usernameAvailable === true ? (
+                  <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : null}
 
-            {usernameMessage}
-          </p>
-        )}
+                {usernameMessage}
+              </p>
+            )}
+          </div>
+        </div>
 
         <div
           aria-live="polite"
@@ -533,16 +541,20 @@ export function Register() {
           disabled={isSubmitting}
         />
 
-        {errors.email && (
-          <p
-            id="email-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.email}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.email ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.email && (
+              <p
+                id="email-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.email}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* PASSWORD */}
@@ -577,16 +589,20 @@ export function Register() {
           </button>
         </div>
 
-        {errors.password && (
-          <p
-            id="password-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.password}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.password ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.password && (
+              <p
+                id="password-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.password}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* CONFIRM PASSWORD */}
@@ -621,16 +637,20 @@ export function Register() {
           </button>
         </div>
 
-        {errors.confirmPassword && (
-          <p
-            id="confirm-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.confirmPassword}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.confirmPassword ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.confirmPassword && (
+              <p
+                id="confirm-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.confirmPassword}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* STATUS ANNOUNCER */}

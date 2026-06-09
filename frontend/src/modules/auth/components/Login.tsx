@@ -242,16 +242,20 @@ export function Login() {
           />
         </div>
 
-        {errors.email && (
-          <p
-            id="email-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.email}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.email ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.email && (
+              <p
+                id="email-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.email}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* PASSWORD */}
@@ -313,16 +317,20 @@ export function Login() {
           </button>
         </div>
 
-        {errors.password && (
-          <p
-            id="password-error"
-            role="alert"
-            aria-live="assertive"
-            className="text-red-500 mt-1 text-sm flex items-center gap-1"
-          >
-            {errors.password}
-          </p>
-        )}
+        <div className={`grid transition-all duration-300 ${errors.password ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.password && (
+              <p
+                id="password-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.password}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* OPTIONS */}
