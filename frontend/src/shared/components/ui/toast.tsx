@@ -26,9 +26,9 @@ export interface ToastData {
 function getTimeout(type: ToastType): number {
   switch (type) {
     case "error":
-      return 10000;
+      return 5000;
     case "warning":
-      return 8000;
+      return 5000;
     default:
       return 5000;
   }
