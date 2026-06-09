@@ -18,7 +18,7 @@ import { CreateRoom } from "../modules/room/components/CreateRoom";
 import { JoinRoom } from "../modules/room/components/JoinRoom";
 import { ActiveRoom } from "../modules/room/components/ActiveRoom";
 import { UserProfile } from "../modules/users/components/UserProfile";
-import { Settings } from "../modules/users/components/Settings";
+import { MyProfile } from "../modules/users/components/MyProfile";
 import { NotFound } from "../shared/components/NotFound";
 
 import PublicRoute from "../shared/components/PublicRoute";
@@ -78,8 +78,8 @@ export const router = createBrowserRouter([
             Component: UserProfile,
           },
           {
-            path: "settings",
-            Component: Settings,
+            path: "my-profile",
+            Component: MyProfile,
           },
         ],
       },

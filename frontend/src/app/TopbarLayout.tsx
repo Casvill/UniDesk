@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, User, Settings as SettingsIcon, LogOut, Menu, ChevronDown } from "lucide-react";
+import { Home, Search, User, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
@@ -74,9 +74,9 @@ export function TopbarLayout() {
           <User className="mr-2 h-4 w-4" aria-hidden="true" />
           Profile
         </DropdownMenuItem> */}
-        <DropdownMenuItem onClick={() => navigate("/settings")}>
-          <SettingsIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-          Settings
+        <DropdownMenuItem onClick={() => navigate("/my-profile")}>
+          <UserPen className="mr-2 h-4 w-4" aria-hidden="true" />
+          Mi perfil
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -143,13 +143,13 @@ export function TopbarLayout() {
                       <Button
                         variant="ghost"
                         onClick={() => {
-                          navigate("/settings");
+                          navigate("/my-profile");
                           setIsMobileMenuOpen(false);
                         }}
                         className="justify-start gap-2"
                       >
-                        <SettingsIcon className="h-4 w-4" aria-hidden="true" />
-                        Settings
+                        <UserPen className="h-4 w-4" aria-hidden="true" />
+                        Mi perfil
                       </Button>
                     </div>
                     <Button

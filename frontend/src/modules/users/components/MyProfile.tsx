@@ -144,7 +144,7 @@ async function uploadAvatarToStorage(userId: string, file: File): Promise<string
   return getDownloadURL(avatarRef);
 }
 
-export function Settings() {
+export function MyProfile() {
   const { user, profile, updateProfileData } = useAuth();
 
   const [form, setForm] = useState<ProfileForm>({
@@ -336,7 +336,7 @@ export function Settings() {
   const showUsernameMessageAsError = usernameAvailable === false || isUsernameError;
 
   const getEmailMessage = () => {
-    if (isGoogleUser) return "El correo de Google no se puede cambiar.";
+    if (isGoogleUser) return "Al ingresar por medio de google no puedes modificarlo";
     if (!emailTouched && !cleanEmail) return "";
     if (!cleanEmail) return "El correo es obligatorio.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return "Correo inválido.";
@@ -524,7 +524,7 @@ export function Settings() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Configuración
+          Mi perfil
         </h2>
 
         <p className="text-gray-600">
