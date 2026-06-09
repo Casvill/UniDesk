@@ -69,6 +69,10 @@ export async function updateUserProfile(uid: string, data: UpdateUserDTO): Promi
 
   const currentData = doc.data() as UserProfile;
 
+  if (data.email && data.email !== currentData.email) {
+    await auth.updateUser(uid, { email: data.email });
+  }
+
   if (data.username) {
     const normalized = normalizeUsername(data.username);
 
