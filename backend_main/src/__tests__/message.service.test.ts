@@ -1,4 +1,4 @@
-import { sendMessage, getMessagesByRoom, updateMessage } from "../services/message.service";
+import { sendMessage, getMessagesByRoom, updateMessage, searchMessages } from "../services/message.service";
 import { db } from "../config/firebase";
 
 // 1. Mock dependencies
@@ -16,6 +16,7 @@ const mockGet = jest.fn();
 const mockOrderBy = jest.fn().mockReturnThis();
 const mockWhere = jest.fn().mockReturnThis();
 const mockLimit = jest.fn().mockReturnThis();
+const mockStartAfter = jest.fn().mockReturnThis();
 const mockDocRef = { set: mockSet, id: "msg_123" };
 
 (db.collection as jest.Mock).mockReturnValue({
@@ -23,6 +24,7 @@ const mockDocRef = { set: mockSet, id: "msg_123" };
   where: mockWhere,
   orderBy: mockOrderBy,
   limit: mockLimit,
+  startAfter: mockStartAfter,
   get: mockGet,
 });
 
@@ -49,6 +51,48 @@ describe("message.service", () => {
       expect(mockWhere).toHaveBeenCalledWith("roomId", "==", "r1");
       expect(mockOrderBy).toHaveBeenCalledWith("createdAt", "asc");
       expect(mockLimit).toHaveBeenCalledWith(50);
+    });
+
+    it("should support pagination with startAfter", async () => {
+      const mockDocGet = jest.fn().mockResolvedValue({ exists: true });
+      (db.collection as jest.Mock).mockImplementation((col) => {
+        if (col === "messages") {
+          return {
+            doc: jest.fn(() => ({ get: mockDocGet })),
+            where: mockWhere,
+            orderBy: mockOrderBy,
+            limit: mockLimit,
+            startAfter: mockStartAfter,
+            get: mockGet,
+          };
+        }
+        return {};
+      });
+      
+      mockGet.mockResolvedValue({ docs: [] });
+      await getMessagesByRoom("r1", 20, "last_msg_id");
+
+      expect(mockStartAfter).toHaveBeenCalled();
+      expect(mockLimit).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe("searchMessages", () => {
+    it("should filter messages by search term in memory", async () => {
+      const messages = [
+        { id: "1", content: "apple pie", roomId: "r1" },
+        { id: "2", content: "banana bread", roomId: "r1" },
+        { id: "3", content: "apple cake", roomId: "r1" },
+      ];
+      mockGet.mockResolvedValue({
+        docs: messages.map(m => ({ data: () => m }))
+      });
+
+      const result = await searchMessages("r1", "apple");
+
+      expect(result).toHaveLength(2);
+      expect(result[0].content).toBe("apple pie");
+      expect(result[1].content).toBe("apple cake");
     });
   });
 
