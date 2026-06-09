@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Chrome, Pencil, Loader2, Eye, EyeOff } from "lucide-react";
+import { User, Pencil, Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCardTransition } from "@/context/CardTransitionContext";
 import { showToast } from "@/shared/components/ui/toast";
+import { GoogleIcon } from "@/shared/components/ui/google-icon"
 
 type FormState = {
   fullName: string;
@@ -586,7 +587,7 @@ export function Register() {
               ? "Procesando registro con Google, por favor espera"
               : "Continuar con Google"
           }
-          className="w-full border py-3 rounded-lg flex justify-center gap-2"
+          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal"
         >
           {googleLoading ? (
             <>
@@ -595,7 +596,7 @@ export function Register() {
             </>
           ) : (
             <>
-              <Chrome className="h-5 w-5" aria-hidden="true" />
+              <GoogleIcon/>
               Continuar con Google
             </>
           )}

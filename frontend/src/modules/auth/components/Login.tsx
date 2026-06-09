@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Chrome, Loader2, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import { useAuth } from "@/context/AuthContext";
 import { useCardTransition } from "@/context/CardTransitionContext";
 import { auth } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
+import { GoogleIcon } from "@/shared/components/ui/google-icon"
 
 async function getManualLoginErrorMessage(
   error: unknown,
@@ -214,7 +215,7 @@ export function Login() {
             Contraseña
           </label>
 
-          <button
+          {/* <button
             type="button"
             onClick={() => navigateWithTransition("/forgot-password")}
             className="text-sm font-semibold text-primary-600 hover:underline"
@@ -222,7 +223,7 @@ export function Login() {
             disabled={isSubmitting}
           >
             ¿Olvidaste tu contraseña?
-          </button>
+          </button> */}
         </div>
 
         <div className="relative">
@@ -309,7 +310,7 @@ export function Login() {
             </>
           ) : (
             <>
-              <Chrome className="h-5 w-5" aria-hidden="true" />
+              <GoogleIcon/>
               Continuar con Google
             </>
           )}
