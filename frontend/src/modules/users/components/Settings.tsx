@@ -562,7 +562,7 @@ export function Settings() {
 
                 <label
                   htmlFor="settings-avatar"
-                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
+                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
                   aria-label="Cambiar imagen de perfil"
                 >
                   <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -758,7 +758,7 @@ export function Settings() {
                       ? "Guardando cambios, por favor espera"
                       : "Guardar cambios del perfil"
                   }
-                  className="w-full sm:w-auto bg-primary from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
