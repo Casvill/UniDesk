@@ -53,6 +53,42 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("room-participants-update", getParticipantsInRoom(roomId));
   });
 
+  socket.on("send-message", (data: { content: string }) => {
+    const { content } = data;
+    
+    // Find sender info
+    let userInfo: UserInfo | undefined;
+    for (const users of rooms.values()) {
+      if (users.has(socket.id)) {
+        userInfo = users.get(socket.id);
+        break;
+      }
+    }
+
+    if (!userInfo) {
+      console.error(`Error: Socket ${socket.id} intentó enviar un mensaje sin estar en una sala`);
+      return;
+    }
+
+    // Basic validation
+    if (!content || content.trim().length === 0) {
+      return;
+    }
+
+    const { roomId, uid, username } = userInfo;
+    
+    console.log(`Mensaje de ${username} en sala ${roomId}: ${content}`);
+
+    // Broadcast message to the room (including sender for confirmation if needed, 
+    // or use socket.to(roomId) to exclude sender)
+    io.to(roomId).emit("new-message", {
+      content: content.trim(),
+      senderUid: uid,
+      senderUsername: username,
+      createdAt: new Date().toISOString()
+    });
+  });
+
   const handleLeaveRoom = (socketId: string) => {
     let roomIdToNotify: string | null = null;
     let userLeaving: string | null = null;
