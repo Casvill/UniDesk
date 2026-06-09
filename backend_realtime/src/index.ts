@@ -19,65 +19,73 @@ const io = new Server(server, {
 
 const PORT = process.env.REALTIME_PORT || 3001;
 
-// Map socket.id to user info (for tracking)
 interface UserInfo {
   uid: string;
   username: string;
   roomId: string;
 }
-const connectedUsers = new Map<string, UserInfo>();
+
+// Map<roomId, Map<socketId, UserInfo>>
+const rooms = new Map<string, Map<string, UserInfo>>();
+
+// Helper to get array of users in a room
+function getParticipantsInRoom(roomId: string): UserInfo[] {
+  const roomUsers = rooms.get(roomId);
+  return roomUsers ? Array.from(roomUsers.values()) : [];
+}
 
 io.on("connection", (socket) => {
   console.log("Usuario conectado:", socket.id);
 
   socket.on("join-room", (data: { roomId: string; uid: string; username: string }) => {
     const { roomId, uid, username } = data;
+    
+    // Track user
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new Map());
+    }
+    rooms.get(roomId)!.set(socket.id, { uid, username, roomId });
+    
     socket.join(roomId);
-    connectedUsers.set(socket.id, { uid, username, roomId });
-
     console.log(`Usuario ${username} (${uid}) se unió a la sala ${roomId}`);
 
-    // Notify others in the room
-    io.to(roomId).emit("presence-change", {
-      type: "user-joined",
-      user: { uid, username },
-      roomId
-    });
+    // Broadcast full updated list
+    io.to(roomId).emit("room-participants-update", getParticipantsInRoom(roomId));
   });
 
-  socket.on("leave-room", () => {
-    const userInfo = connectedUsers.get(socket.id);
-    if (userInfo) {
-      const { roomId, uid, username } = userInfo;
-      socket.leave(roomId);
-      connectedUsers.delete(socket.id);
+  const handleLeaveRoom = (socketId: string) => {
+    let roomIdToNotify: string | null = null;
+    let userLeaving: string | null = null;
 
-      console.log(`Usuario ${username} (${uid}) salió de la sala ${roomId}`);
-
-      // Notify others in the room
-      io.to(roomId).emit("presence-change", {
-        type: "user-left",
-        user: { uid, username },
-        roomId
-      });
+    for (const [roomId, users] of rooms.entries()) {
+      if (users.has(socketId)) {
+        userLeaving = users.get(socketId)!.username;
+        users.delete(socketId);
+        roomIdToNotify = roomId;
+        
+        // Clean up empty rooms
+        if (users.size === 0) {
+          rooms.delete(roomId);
+        }
+        break;
+      }
     }
+
+    if (roomIdToNotify && userLeaving) {
+      console.log(`Usuario ${userLeaving} salió de la sala ${roomIdToNotify}`);
+      // Broadcast full updated list
+      io.to(roomIdToNotify).emit("room-participants-update", getParticipantsInRoom(roomIdToNotify));
+    }
+  };
+
+  socket.on("leave-room", () => {
+    socket.leaveAll(); // Ensure they leave all socket rooms
+    handleLeaveRoom(socket.id);
   });
 
   socket.on("disconnect", () => {
     console.log("Usuario desconectado:", socket.id);
-    
-    // Auto-leave if connected
-    const userInfo = connectedUsers.get(socket.id);
-    if (userInfo) {
-      const { roomId, uid, username } = userInfo;
-      connectedUsers.delete(socket.id);
-      
-      io.to(roomId).emit("presence-change", {
-        type: "user-left",
-        user: { uid, username },
-        roomId
-      });
-    }
+    handleLeaveRoom(socket.id);
   });
 });
 
