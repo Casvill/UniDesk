@@ -10,12 +10,12 @@ import {
   Text,
 } from "react-aria-components";
 import type { ToastProps } from "react-aria-components";
-import { XIcon } from "lucide-react";
+import { XIcon, Loader2 } from "lucide-react";
 import { cn } from "./utils";
 import { flushSync } from "react-dom";
 import type { CSSProperties } from "react";
 
-export type ToastType = "success" | "error" | "info" | "warning";
+export type ToastType = "success" | "error" | "info" | "warning" | "loading";
 
 export interface ToastData {
   title?: string;
@@ -29,6 +29,8 @@ function getTimeout(type: ToastType): number {
       return 5000;
     case "warning":
       return 5000;
+    case "loading":
+      return 86400000;
     default:
       return 5000;
   }
@@ -48,6 +50,8 @@ function getToastStyles(type: ToastType): string {
       return "bg-yellow-500 text-white";
     case "info":
       return "bg-primary-600 text-white";
+    case "loading":
+      return "bg-indigo-600 text-white";
   }
 }
 
@@ -99,6 +103,13 @@ export const showToast = {
     );
   },
 
+  loading(description: string, title?: string) {
+    return queue.add(
+      { title, description, type: "loading" },
+      { timeout: getTimeout("loading") },
+    );
+  },
+
   close(key: string) {
     queue.close(key);
   },
@@ -132,6 +143,7 @@ function ToastItem({ toast }: ToastProps<ToastData>) {
       <span className="sr-only" aria-live={getAriaRole(type) === "alert" ? "assertive" : "polite"}>
         {getAriaLabel(type, title, description)}
       </span>
+      {type === "loading" && <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden="true" />}
       <ToastContent className="flex min-w-0 flex-1 flex-col">
         {title && (
           <Text slot="title" className="text-sm font-semibold">
@@ -145,13 +157,15 @@ function ToastItem({ toast }: ToastProps<ToastData>) {
           {description}
         </Text>
       </ToastContent>
-      <Button
-        slot="close"
-        aria-label="Cerrar notificación"
-        className="[-webkit-tap-highlight-color:transparent] flex h-8 w-8 flex-none cursor-pointer appearance-none items-center justify-center rounded-sm border-none bg-transparent p-0 text-white/80 outline-none hover:bg-white/10 hover:text-white pressed:bg-white/15 focus-visible:ring-2 focus-visible:ring-white"
-      >
-        <XIcon className="h-4 w-4" />
-      </Button>
+      {type !== "loading" && (
+        <Button
+          slot="close"
+          aria-label="Cerrar notificación"
+          className="[-webkit-tap-highlight-color:transparent] flex h-8 w-8 flex-none cursor-pointer appearance-none items-center justify-center rounded-sm border-none bg-transparent p-0 text-white/80 outline-none hover:bg-white/10 hover:text-white pressed:bg-white/15 focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <XIcon className="h-4 w-4" />
+        </Button>
+      )}
     </Toast>
   );
 }

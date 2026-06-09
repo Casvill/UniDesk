@@ -70,10 +70,10 @@ export function TopbarLayout() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/profile")}>
+        {/* <DropdownMenuItem onClick={() => navigate("/profile")}>
           <User className="mr-2 h-4 w-4" aria-hidden="true" />
           Profile
-        </DropdownMenuItem>
+        </DropdownMenuItem> */}
         <DropdownMenuItem onClick={() => navigate("/settings")}>
           <SettingsIcon className="mr-2 h-4 w-4" aria-hidden="true" />
           Settings

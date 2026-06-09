@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Save,
   AlertTriangle,
@@ -9,18 +9,14 @@ import {
   CheckCircle,
   XCircle,
   Pencil,
+  Lock,
 } from "lucide-react";
 import { updateProfile as updateFirebaseProfile } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { storage } from "@/shared/services/firebase";
-
-type FeedbackType = "error" | "success" | "info";
-
-type FeedbackState = {
-  type: FeedbackType;
-  message: string;
-} | null;
+import { showToast } from "@/shared/components/ui/toast";
+import { api } from "@/services/api";
 
 type ProfileForm = {
   displayName: string;
@@ -31,18 +27,6 @@ type ProfileForm = {
 };
 
 type FormErrors = Partial<Record<keyof ProfileForm, string>>;
-
-function getFeedbackClasses(type: FeedbackType): string {
-  if (type === "success") {
-    return "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700";
-  }
-
-  if (type === "info") {
-    return "rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700";
-  }
-
-  return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
-}
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -163,8 +147,6 @@ async function uploadAvatarToStorage(userId: string, file: File): Promise<string
 export function Settings() {
   const { user, profile, updateProfileData } = useAuth();
 
-  const feedbackRef = useRef<HTMLDivElement | null>(null);
-
   const [form, setForm] = useState<ProfileForm>({
     displayName: "",
     username: "",
@@ -174,11 +156,14 @@ export function Settings() {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameTouched, setUsernameTouched] = useState(false);
+
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
 
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
@@ -207,7 +192,14 @@ export function Settings() {
     !checkingUsername &&
     (isUsernameUnchanged || usernameAvailable === true);
 
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+  const currentEmail = profile?.email || "";
+  const isEmailUnchanged = cleanEmail === currentEmail;
+
+  const isGoogleUser = profile?.provider === "google.com";
+
+  const isEmailValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) &&
+    (isGoogleUser || (!checkingEmail && (isEmailUnchanged || emailAvailable === true)));
 
   const isFormValid =
     cleanDisplayName.length > 0 &&
@@ -229,12 +221,6 @@ export function Settings() {
     setAvatarPreview(currentPhotoURL);
     setUsernameAvailable(null);
   }, [profile, user]);
-
-  useEffect(() => {
-    if (feedback && feedbackRef.current) {
-      feedbackRef.current.focus();
-    }
-  }, [feedback]);
 
   useEffect(() => {
     if (!cleanUsername) {
@@ -279,6 +265,48 @@ export function Settings() {
     return () => clearTimeout(timer);
   }, [cleanUsername, isUsernameUnchanged]);
 
+  useEffect(() => {
+    if (isGoogleUser) {
+      setEmailAvailable(null);
+      setCheckingEmail(false);
+      return;
+    }
+
+    if (!cleanEmail) {
+      setEmailAvailable(null);
+      setCheckingEmail(false);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setEmailAvailable(null);
+      setCheckingEmail(false);
+      return;
+    }
+
+    if (isEmailUnchanged) {
+      setEmailAvailable(true);
+      setCheckingEmail(false);
+      return;
+    }
+
+    setCheckingEmail(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const available = await api.checkEmail(cleanEmail, user?.uid);
+        setEmailAvailable(available);
+      } catch (error) {
+        console.warn("No se pudo validar el email:", error);
+        setEmailAvailable(null);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [cleanEmail, isEmailUnchanged, isGoogleUser, user?.uid]);
+
   const getUsernameMessage = () => {
     if (!usernameTouched && !cleanUsername) return "";
 
@@ -307,11 +335,28 @@ export function Settings() {
 
   const showUsernameMessageAsError = usernameAvailable === false || isUsernameError;
 
-  const clearFeedback = () => {
-    if (feedback) {
-      setFeedback(null);
-    }
+  const getEmailMessage = () => {
+    if (isGoogleUser) return "El correo de Google no se puede cambiar.";
+    if (!emailTouched && !cleanEmail) return "";
+    if (!cleanEmail) return "El correo es obligatorio.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return "Correo inválido.";
+    if (checkingEmail) return "Validando correo...";
+    if (isEmailUnchanged) return "Este es tu correo actual.";
+    if (emailAvailable === true) return "Correo disponible.";
+    if (emailAvailable === false) return "Este correo ya está registrado.";
+    return "";
   };
+
+  const emailMessage = getEmailMessage();
+
+  const isEmailError =
+    emailTouched &&
+    Boolean(emailMessage) &&
+    emailMessage !== "Correo disponible." &&
+    emailMessage !== "Validando correo..." &&
+    emailMessage !== "Este es tu correo actual.";
+
+  const showEmailAsError = emailAvailable === false || isEmailError;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fieldName = e.target.name as keyof ProfileForm;
@@ -328,8 +373,6 @@ export function Settings() {
       delete updatedErrors[fieldName];
       return updatedErrors;
     });
-
-    clearFeedback();
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,10 +380,7 @@ export function Settings() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setFeedback({
-        type: "error",
-        message: "Selecciona un archivo de imagen válido.",
-      });
+      showToast.error("Selecciona un archivo de imagen válido.");
       return;
     }
 
@@ -348,10 +388,7 @@ export function Settings() {
     const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
 
     if (file.size > maxSizeInBytes) {
-      setFeedback({
-        type: "error",
-        message: "La imagen es muy pesada. Usa una imagen de máximo 2 MB.",
-      });
+      showToast.error("La imagen es muy pesada. Usa una imagen de máximo 2 MB.");
       return;
     }
 
@@ -360,10 +397,7 @@ export function Settings() {
     setSelectedAvatarFile(file);
     setAvatarPreview(previewUrl);
 
-    setFeedback({
-      type: "success",
-      message: "Imagen de perfil seleccionada correctamente. Recuerda guardar los cambios.",
-    });
+    showToast.success("Imagen de perfil seleccionada correctamente. Recuerda guardar los cambios.");
   };
 
   const validateForm = () => {
@@ -385,8 +419,14 @@ export function Settings() {
 
     if (!cleanEmail) {
       newErrors.email = "El correo es obligatorio.";
-    } else if (!isEmailValid) {
+    } else if (isGoogleUser) {
+      newErrors.email = "El correo de Google no se puede cambiar.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       newErrors.email = "Ingresa un correo válido.";
+    } else if (checkingEmail) {
+      newErrors.email = "Validando correo...";
+    } else if (!isEmailUnchanged && emailAvailable === false) {
+      newErrors.email = "Este correo ya está registrado.";
     }
 
     return newErrors;
@@ -396,35 +436,23 @@ export function Settings() {
     e.preventDefault();
 
     setUsernameTouched(true);
-    setFeedback(null);
 
     const validationErrors = validateForm();
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      setFeedback({
-        type: "error",
-        message: "Revisa los campos marcados antes de guardar los cambios.",
-      });
-
+      showToast.error("Revisa los campos marcados antes de guardar los cambios.");
       return;
     }
 
     if (!user) {
-      setFeedback({
-        type: "error",
-        message: "No encontramos una sesión activa. Inicia sesión nuevamente.",
-      });
-
+      showToast.error("No encontramos una sesión activa. Inicia sesión nuevamente.");
       return;
     }
 
     setLoading(true);
 
-    setFeedback({
-      type: "info",
-      message: "Guardando los cambios de tu perfil. Por favor espera.",
-    });
+    const loadingKey = showToast.loading("Guardando los cambios de tu perfil. Por favor espera.");
 
     try {
       let finalPhotoURL = form.photoURL;
@@ -454,10 +482,8 @@ export function Settings() {
       setAvatarPreview(finalPhotoURL);
       setSelectedAvatarFile(null);
 
-      setFeedback({
-        type: "success",
-        message: "Tu perfil fue actualizado correctamente.",
-      });
+      showToast.close(loadingKey);
+      showToast.success("Tu perfil fue actualizado correctamente.");
     } catch (error: unknown) {
       console.error("Settings save error:", error);
 
@@ -469,16 +495,16 @@ export function Settings() {
       }
 
       if (message.includes("correo")) {
+        setEmailAvailable(false);
+        setEmailTouched(true);
         setErrors((prevErrors) => ({
           ...prevErrors,
           email: message,
         }));
       }
 
-      setFeedback({
-        type: "error",
-        message,
-      });
+      showToast.close(loadingKey);
+      showToast.error(message);
     } finally {
       setLoading(false);
     }
@@ -512,23 +538,9 @@ export function Settings() {
         <form
           onSubmit={handleSave}
           className="space-y-6"
-          aria-describedby={feedback ? "settings-feedback" : "settings-status"}
+          aria-describedby="settings-status"
           noValidate
         >
-          {feedback && (
-            <div
-              id="settings-feedback"
-              ref={feedbackRef}
-              tabIndex={-1}
-              role={feedback.type === "error" ? "alert" : "status"}
-              aria-live={feedback.type === "error" ? "assertive" : "polite"}
-              aria-atomic="true"
-              className={getFeedbackClasses(feedback.type)}
-            >
-              {feedback.message}
-            </div>
-          )}
-
           <section
             className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
             aria-labelledby="account-settings-heading"
@@ -658,30 +670,64 @@ export function Settings() {
                   Correo electrónico
                 </label>
 
-                <input
-                  type="email"
-                  id="settings-email"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="ejemplo@universidad.edu.co"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? "settings-email-error" : undefined}
-                  autoComplete="email"
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <input
+                    type="email"
+                    id="settings-email"
+                    name="email"
+                    value={form.email}
+                    onChange={(e) => {
+                      handleChange(e);
+                      setEmailAvailable(null);
+                    }}
+                    onBlur={() => setEmailTouched(true)}
+                    placeholder="ejemplo@universidad.edu.co"
+                    className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition ${
+                      isGoogleUser ? "bg-gray-100 text-gray-500 cursor-not-allowed" : showEmailAsError ? "border-red-400" : ""
+                    }`}
+                    aria-invalid={isEmailError ? true : undefined}
+                    aria-describedby={isEmailError ? "settings-email-error" : undefined}
+                    autoComplete="email"
+                    disabled={loading || isGoogleUser}
+                    title={isGoogleUser ? "No puedes cambiar el correo de una cuenta de Google" : undefined}
+                  />
 
-                {errors.email && (
+                  {isGoogleUser && (
+                    <Lock
+                      className="absolute right-4 top-3.5 h-5 w-5 text-gray-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+
+                {emailMessage ? (
                   <p
-                    id="settings-email-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs mt-1"
+                    id={isEmailError ? "settings-email-error" : undefined}
+                    className={`mt-1 text-sm flex items-center gap-1 ${
+                      showEmailAsError
+                        ? "text-red-500"
+                        : emailAvailable === true || isEmailUnchanged
+                        ? "text-green-600"
+                        : "text-gray-500"
+                    }`}
                   >
-                    {errors.email}
+                    {showEmailAsError ? (
+                      <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : emailAvailable === true || isEmailUnchanged ? (
+                      <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : null}
+
+                    {emailMessage}
                   </p>
+                ) : (
+                  <div className="grid grid-rows-[0fr] transition-all duration-300">
+                    <div className="overflow-hidden" />
+                  </div>
                 )}
+
+                <div aria-live="polite" aria-atomic="true" className="sr-only">
+                  {emailTouched && emailMessage}
+                </div>
               </div>
 
               <div>
@@ -704,7 +750,7 @@ export function Settings() {
             </div>
           </section>
 
-          <section
+          {/* <section
             className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
             aria-labelledby="notification-settings-heading"
           >
@@ -791,9 +837,9 @@ export function Settings() {
                 </div>
               </label>
             </div>
-          </section>
+          </section> */}
 
-          <section
+          {/* <section
             className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
             aria-labelledby="privacy-settings-heading"
           >
@@ -822,7 +868,7 @@ export function Settings() {
                 </div>
               </div>
             </div>
-          </section>
+          </section> */}
 
           <section
             className="bg-white rounded-2xl shadow-md border border-red-100 p-6 sm:p-8"
