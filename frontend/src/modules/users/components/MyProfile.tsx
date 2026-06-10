@@ -13,6 +13,16 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { storage } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/shared/components/ui/alert-dialog";
 import { api } from "@/services/api";
 
 type ProfileForm = {
@@ -166,6 +176,7 @@ export function MyProfile() {
   const [avatarPreview, setAvatarPreview] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const cleanDisplayName = form.displayName.trim();
   const cleanUsername = form.username.trim();
@@ -792,6 +803,7 @@ export function MyProfile() {
 
           <button
             type="button"
+            onClick={() => setShowDeleteConfirm(true)}
             className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
             disabled={loading}
           >
@@ -861,6 +873,7 @@ export function MyProfile() {
 
             <button
               type="button"
+              onClick={() => setShowDeleteConfirm(true)}
               className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
               disabled={loading}
             >
@@ -873,6 +886,21 @@ export function MyProfile() {
           {renderForm()}
         </div>
       </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar cuenta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es irreversible. Se perderá tu perfil, salas y toda la información asociada a tu cuenta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700">Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div
         id="settings-status"
