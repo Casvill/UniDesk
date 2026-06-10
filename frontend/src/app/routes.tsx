@@ -17,7 +17,6 @@ import { RoomList } from "../modules/room/components/RoomList";
 import { CreateRoom } from "../modules/room/components/CreateRoom";
 import { JoinRoom } from "../modules/room/components/JoinRoom";
 import { ActiveRoom } from "../modules/room/components/ActiveRoom";
-import { UserProfile } from "../modules/users/components/UserProfile";
 import { MyProfile } from "../modules/users/components/MyProfile";
 import { NotFound } from "../shared/components/NotFound";
 
@@ -72,10 +71,6 @@ export const router = createBrowserRouter([
           {
             path: "rooms/join/:roomId",
             Component: JoinRoom,
-          },
-          {
-            path: "profile",
-            Component: UserProfile,
           },
           {
             path: "my-profile",

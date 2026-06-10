@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, User, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
+import { Home, Search, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
@@ -70,10 +70,6 @@ export function TopbarLayout() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* <DropdownMenuItem onClick={() => navigate("/profile")}>
-          <User className="mr-2 h-4 w-4" aria-hidden="true" />
-          Profile
-        </DropdownMenuItem> */}
         <DropdownMenuItem onClick={() => navigate("/my-profile")}>
           <UserPen className="mr-2 h-4 w-4" aria-hidden="true" />
           Mi perfil
@@ -129,17 +125,6 @@ export function TopbarLayout() {
                           {item.label}
                         </Button>
                       ))}
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          navigate("/profile");
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="justify-start gap-2"
-                      >
-                        <User className="h-4 w-4" aria-hidden="true" />
-                        Profile
-                      </Button>
                       <Button
                         variant="ghost"
                         onClick={() => {
