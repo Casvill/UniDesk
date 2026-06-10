@@ -9,7 +9,7 @@ import { CreateRoomDialog } from "./CreateRoomDialog";
 
 export function Dashboard() {
   const { profile, user } = useAuth();
-  const { activeRooms, isLoadingRooms } = useRooms(user);
+  const { activeRooms, isLoadingRooms, roomsError, refetchRooms } = useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -40,7 +40,24 @@ export function Dashboard() {
         )}
       </div>
 
-      {isLoadingRooms && activeRooms.length === 0 ? (
+      {roomsError ? (
+        <section
+          className="flex flex-col items-center justify-center py-20 text-center"
+          role="alert"
+        >
+          <p className="text-red-600 font-semibold">
+            {roomsError}
+          </p>
+
+          <button
+            type="button"
+            onClick={refetchRooms}
+            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition"
+          >
+            Reintentar
+          </button>
+        </section>
+      ) : isLoadingRooms && activeRooms.length === 0 ? (
         <section className="flex flex-col items-center justify-center py-20" role="status">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
           <p className="text-gray-500 mt-4">Cargando tus salas...</p>
