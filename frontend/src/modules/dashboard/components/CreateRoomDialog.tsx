@@ -45,20 +45,49 @@ const validateRoomName = (name: string): string => {
   return "";
 };
 
-export function CreateRoomDialog({ open, onOpenChange, user }: CreateRoomDialogProps) {
+export function CreateRoomDialog({
+  open,
+  onOpenChange,
+  user,
+}: CreateRoomDialogProps) {
   const navigate = useNavigate();
 
   const [roomName, setRoomName] = useState("");
   const [hasTouchedRoomName, setHasTouchedRoomName] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [createRoomError, setCreateRoomError] = useState("");
 
   const roomNameError = validateRoomName(roomName);
   const isFormInvalid = Boolean(roomNameError);
+  const showRoomNameError = hasTouchedRoomName && roomNameError;
+
+  const resetForm = () => {
+    setRoomName("");
+    setHasTouchedRoomName(false);
+    setCreateRoomError("");
+    setIsCreating(false);
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+
+    if (!nextOpen) {
+      resetForm();
+    }
+  };
 
   const handleCreate = async () => {
     setHasTouchedRoomName(true);
+    setCreateRoomError("");
 
-    if (!user || isFormInvalid || isCreating) return;
+    if (isFormInvalid || isCreating) return;
+
+    if (!user) {
+      setCreateRoomError(
+        "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
+      );
+      return;
+    }
 
     try {
       setIsCreating(true);
@@ -66,22 +95,35 @@ export function CreateRoomDialog({ open, onOpenChange, user }: CreateRoomDialogP
       const token = await user.getIdToken();
       const newRoom = await api.createRoom(roomName.trim(), token);
 
-      onOpenChange(false);
-      setRoomName("");
-      setHasTouchedRoomName(false);
+      if (!newRoom.id) {
+        throw new Error("El servidor no devolvió el ID de la sala creada.");
+      }
 
+      handleOpenChange(false);
       navigate(`/rooms/${newRoom.id}`);
     } catch (err) {
       console.error("Error al crear la sala:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "No pudimos crear la sala. Inténtalo nuevamente.";
+
+      setCreateRoomError(message);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const showRoomNameError = hasTouchedRoomName && roomNameError;
+  const inputDescriptionIds = [
+    showRoomNameError ? "room-name-error" : null,
+    createRoomError ? "create-room-error" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Crear sala de estudio</DialogTitle>
@@ -102,14 +144,17 @@ export function CreateRoomDialog({ open, onOpenChange, user }: CreateRoomDialogP
             type="text"
             id="new-room-name"
             value={roomName}
-            onChange={(e) => setRoomName(e.target.value)}
+            onChange={(e) => {
+              setRoomName(e.target.value);
+              setCreateRoomError("");
+            }}
             onBlur={() => setHasTouchedRoomName(true)}
             placeholder="Ej: Grupo de estudio de cálculo"
             maxLength={ROOM_NAME_MAX_LENGTH}
-            aria-invalid={Boolean(showRoomNameError)}
-            aria-describedby={showRoomNameError ? "room-name-error" : undefined}
+            aria-invalid={Boolean(showRoomNameError || createRoomError)}
+            aria-describedby={inputDescriptionIds || undefined}
             className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition ${
-              showRoomNameError
+              showRoomNameError || createRoomError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-indigo-500"
             }`}
@@ -128,13 +173,25 @@ export function CreateRoomDialog({ open, onOpenChange, user }: CreateRoomDialogP
               {roomName.trim().length}/{ROOM_NAME_MAX_LENGTH}
             </span>
           </div>
+
+          {createRoomError && (
+            <p
+              id="create-room-error"
+              className="mt-3 text-sm text-red-600"
+              role="alert"
+              aria-live="assertive"
+            >
+              {createRoomError}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
           <DialogClose asChild>
             <button
               type="button"
-              className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+              disabled={isCreating}
+              className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
