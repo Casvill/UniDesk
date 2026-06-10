@@ -11,8 +11,17 @@ import {
   LogOut,
   Send,
   Users,
-  MoreVertical,
+  Copy,
+  Check,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+  DialogDescription,
+} from "@/shared/components/ui/dialog";
 
 export function ActiveRoom() {
   const navigate = useNavigate();
@@ -21,18 +30,28 @@ export function ActiveRoom() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = async () => {
+    if (roomId) {
+      await navigator.clipboard.writeText(roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const participants = [
     { id: "1", name: "Sarah Johnson", isSpeaking: false, initials: "SJ", color: "from-blue-500 to-cyan-500" },
     { id: "2", name: "Mike Chen", isSpeaking: true, initials: "MC", color: "from-purple-500 to-pink-500" },
     { id: "3", name: "Emma Davis", isSpeaking: false, initials: "ED", color: "from-green-500 to-emerald-500" },
-    { id: "4", name: "You", isSpeaking: false, initials: "YO", color: "from-primary-500 to-purple-500" },
+    { id: "4", name: "Tú", isSpeaking: false, initials: "TU", color: "from-primary-500 to-purple-500" },
   ];
 
   const chatMessages = [
-    { id: "1", sender: "Sarah Johnson", message: "Hey everyone! Ready to start?", time: "2:30 PM", initials: "SJ" },
-    { id: "2", sender: "Mike Chen", message: "Yes! Let's begin with problem 3", time: "2:31 PM", initials: "MC" },
-    { id: "3", sender: "Emma Davis", message: "Sounds good to me", time: "2:31 PM", initials: "ED" },
+    { id: "1", sender: "Sarah Johnson", message: "¡Hola a todos! ¿Listos para empezar?", time: "2:30 PM", initials: "SJ" },
+    { id: "2", sender: "Mike Chen", message: "¡Sí! Empecemos con el problema 3", time: "2:31 PM", initials: "MC" },
+    { id: "3", sender: "Emma Davis", message: "Me parece bien", time: "2:31 PM", initials: "ED" },
   ];
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -43,7 +62,7 @@ export function ActiveRoom() {
   };
 
   const handleLeaveRoom = () => {
-    if (confirm("Are you sure you want to leave this study room?")) {
+    if (confirm("¿Estás seguro de que quieres salir de esta sala de estudio?")) {
       navigate("/dashboard");
     }
   };
@@ -55,26 +74,26 @@ export function ActiveRoom() {
           <div>
             <h1 className="text-xl font-bold text-white">Calculus Study Group</h1>
             <div className="flex items-center gap-4 mt-1">
-              <p className="text-sm text-gray-400">Room ID: {roomId}</p>
+              <p className="text-sm text-gray-400">ID: {roomId}</p>
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <Users className="h-4 w-4" />
-                <span>{participants.length} participants</span>
+                <span>{participants.length} participantes</span>
               </div>
             </div>
           </div>
           <button
             onClick={handleLeaveRoom}
             className="w-full sm:w-auto bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-            aria-label="Leave room"
+            aria-label="Salir de la sala"
           >
             <LogOut className="h-4 w-4" />
-            Leave Room
+            Salir
           </button>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <main className="flex-1 flex flex-col p-4 sm:p-6 gap-6" aria-label="Video area">
+        <main className="flex-1 flex flex-col p-4 sm:p-6 gap-6" aria-label="Área de video">
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {participants.map((participant) => (
               <div
@@ -84,7 +103,7 @@ export function ActiveRoom() {
                     ? "ring-4 ring-green-500 shadow-green-500/50"
                     : "ring-2 ring-gray-700"
                 }`}
-                aria-label={`${participant.name}${participant.isSpeaking ? " - speaking" : ""}`}
+                aria-label={`${participant.name}${participant.isSpeaking ? " - hablando" : ""}`}
               >
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
@@ -97,12 +116,12 @@ export function ActiveRoom() {
                     {participant.isSpeaking && (
                       <div className="mt-2 flex items-center justify-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm text-green-400 font-medium">Speaking</span>
+                        <span className="text-sm text-green-400 font-medium">Hablando</span>
                       </div>
                     )}
                   </div>
                 </div>
-                {participant.name === "You" && (
+                {participant.name === "Tú" && (
                   <div className="absolute top-4 right-4 flex gap-2">
                     <span
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg shadow-lg ${
@@ -138,8 +157,8 @@ export function ActiveRoom() {
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900`}
                 aria-pressed={isCameraOn}
-                aria-label="Toggle camera"
-                title={isCameraOn ? "Turn camera off" : "Turn camera on"}
+                aria-label="Alternar cámara"
+                title={isCameraOn ? "Apagar cámara" : "Encender cámara"}
               >
                 {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
               </button>
@@ -152,8 +171,8 @@ export function ActiveRoom() {
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900`}
                 aria-pressed={isMicOn}
-                aria-label="Toggle microphone"
-                title={isMicOn ? "Mute microphone" : "Unmute microphone"}
+                aria-label="Alternar micrófono"
+                title={isMicOn ? "Silenciar micrófono" : "Activar micrófono"}
               >
                 {isMicOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
               </button>
@@ -166,16 +185,16 @@ export function ActiveRoom() {
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900`}
                 aria-pressed={isScreenSharing}
-                aria-label="Toggle screen sharing"
-                title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                aria-label="Alternar compartir pantalla"
+                title={isScreenSharing ? "Dejar de compartir" : "Compartir pantalla"}
               >
                 {isScreenSharing ? <Monitor className="h-6 w-6" /> : <MonitorOff className="h-6 w-6" />}
               </button>
 
               <button
                 className="p-3 sm:p-4 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-gray-900 transition shadow-lg hover:shadow-xl"
-                aria-label="Settings"
-                title="Settings"
+                aria-label="Configuración"
+                title="Configuración"
               >
                 <SettingsIcon className="h-6 w-6" />
               </button>
@@ -183,10 +202,10 @@ export function ActiveRoom() {
           </div>
         </main>
 
-        <aside className="w-full lg:w-96 bg-white flex flex-col shadow-2xl" aria-label="Chat panel">
+        <aside className="w-full lg:w-96 bg-white flex flex-col shadow-2xl" aria-label="Panel de chat">
           <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
             <h2 className="text-xl font-bold text-white mb-1">Chat</h2>
-            <p className="text-sm text-primary-100">{participants.length} participants</p>
+            <p className="text-sm text-primary-100">{participants.length} participantes</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50">
@@ -210,7 +229,7 @@ export function ActiveRoom() {
 
           <form onSubmit={handleSendMessage} className="border-t border-gray-200 p-4 flex-shrink-0 bg-white">
             <label htmlFor="chat-message" className="sr-only">
-              Type a message
+              Escribe un mensaje
             </label>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
@@ -218,7 +237,7 @@ export function ActiveRoom() {
                 id="chat-message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
+                placeholder="Escribe un mensaje..."
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
               />
               <button
@@ -231,6 +250,56 @@ export function ActiveRoom() {
           </form>
         </aside>
       </div>
+
+      <Dialog open={showWelcome} onOpenChange={setShowWelcome}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Tu sala está lista para compartir</DialogTitle>
+            <DialogDescription>
+              Copia el código y compártelo con quienes quieras invitar
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            onClick={handleCopyId}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleCopyId(); }}
+            className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-dashed border-indigo-200 p-6 text-center cursor-pointer hover:bg-indigo-100/80 active:bg-indigo-200/80 transition group select-none"
+            role="button"
+            tabIndex={0}
+            aria-label="Copiar código de la sala"
+          >
+            <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-1">
+              ID de sala
+            </p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 font-mono tracking-wider whitespace-nowrap overflow-hidden mb-4">
+              {roomId}
+            </p>
+            <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-4 py-1.5 rounded-full transition-all duration-200 ${
+              copied
+                ? "bg-green-100 text-green-700 scale-105"
+                : "bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 group-active:scale-95"
+            }`}>
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  ¡Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copiar ID
+                </>
+              )}
+            </span>
+          </div>
+
+          <DialogClose asChild>
+            <button className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition mt-2">
+              Cerrar
+            </button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

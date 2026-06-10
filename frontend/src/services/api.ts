@@ -12,6 +12,14 @@ export interface UserProfile {
   university?: string;
 }
 
+export interface Room {
+  id: string;
+  name: string;
+  ownerUid: string;
+  createdAt: { seconds: number; nanoseconds: number };
+  updatedAt: { seconds: number; nanoseconds: number };
+}
+
 type ApiError = Error & {
   code?: string;
   status?: number;
@@ -266,6 +274,63 @@ export const api = {
       handleNetworkError(
         error,
         'No pudimos conectar con el servidor para eliminar la cuenta'
+      );
+    }
+  },
+
+  async listRooms(token: string): Promise<Room[]> {
+    try {
+      const response = await fetch(`${API_URL}/rooms`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, 'Error al obtener las salas');
+
+        throw createApiError(
+          message,
+          'backend/rooms-fetch-failed',
+          response.status
+        );
+      }
+
+      return response.json();
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para obtener las salas'
+      );
+    }
+  },
+
+  async createRoom(name: string, token: string): Promise<Room> {
+    try {
+      const response = await fetch(`${API_URL}/rooms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, 'Error al crear la sala');
+
+        throw createApiError(
+          message,
+          'backend/room-create-failed',
+          response.status
+        );
+      }
+
+      return response.json();
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para crear la sala'
       );
     }
   },

@@ -13,8 +13,6 @@ import AuthLayout from "@/modules/auth/AuthLayout";
 /* PROTECTED PAGES */
 import ProtectedRoute from "../shared/components/ProtectedRoute";
 import { Dashboard } from "../modules/dashboard/components/Dashboard";
-import { RoomList } from "../modules/room/components/RoomList";
-import { CreateRoom } from "../modules/room/components/CreateRoom";
 import { JoinRoom } from "../modules/room/components/JoinRoom";
 import { ActiveRoom } from "../modules/room/components/ActiveRoom";
 import { MyProfile } from "../modules/users/components/MyProfile";
@@ -59,14 +57,6 @@ export const router = createBrowserRouter([
           {
             path: "dashboard",
             Component: Dashboard,
-          },
-          {
-            path: "rooms",
-            Component: RoomList,
-          },
-          {
-            path: "rooms/create",
-            Component: CreateRoom,
           },
           {
             path: "rooms/join/:roomId",
