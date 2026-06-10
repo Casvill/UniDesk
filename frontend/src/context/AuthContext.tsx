@@ -40,6 +40,7 @@ interface AuthContextType {
   completeProfile: (data: { username: string; displayName: string; photoURL?: string }) => Promise<UserProfile>;
   register: (email: string, pass: string, name: string, username: string) => Promise<void>;
   updateProfileData: (data: UpdateProfileData) => Promise<UserProfile>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -105,7 +106,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(currentUser);
 
       if (currentUser) {
-        // Si estamos procesando un login/registro manualmente, dejamos que esa función maneje el estado
         if (isProcessing) return;
 
         try {
@@ -121,9 +121,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (error) {
           console.error('Error fetching profile in listener:', error);
-          // Si hay un error de red o similar, no podemos asegurar que esté autenticado.
-          // Es mejor mostrar un estado que obligue a re-intentar o muestre el error.
-          // No seteamos 'authenticated' si no tenemos el perfil.
           setProfile(null);
           setStatus('unauthenticated');
         }
@@ -137,12 +134,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isProcessing]);
 
   const login = async (email: string, pass: string) => {
-    // No usamos isProcessing aquí para que onAuthStateChanged cargue el perfil automáticamente
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const loginWithGoogle = async () => {
     setIsProcessing(true);
+
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -159,16 +156,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           isNewUser: false,
           profile: existingProfile
         };
-      } else {
-        setProfile(null);
-        setStatus('needs-profile');
-
-        return {
-          user: result.user,
-          isNewUser: true,
-          profile: null
-        };
       }
+
+      setProfile(null);
+      setStatus('needs-profile');
+
+      return {
+        user: result.user,
+        isNewUser: true,
+        profile: null
+      };
     } finally {
       setIsProcessing(false);
     }
@@ -178,6 +175,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user) throw new Error('Not authenticated');
 
     setIsProcessing(true);
+
     try {
       const token = await user.getIdToken();
       const newProfile = await api.createProfile(data, token);
@@ -194,7 +192,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (email: string, pass: string, name: string, username: string) => {
     setIsProcessing(true);
     let userCredential;
-    
+
     try {
       userCredential = await createUserWithEmailAndPassword(auth, email, pass);
 
@@ -249,6 +247,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return updatedProfile;
   };
 
+  const deleteAccount = async () => {
+    if (!user) throw new Error('Not authenticated');
+
+    setIsProcessing(true);
+
+    try {
+      const token = await user.getIdToken();
+
+      await api.deleteProfile(user.uid, token);
+
+      setUser(null);
+      setProfile(null);
+      setStatus('unauthenticated');
+
+      await signOut(auth);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -265,6 +283,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     completeProfile,
     register,
     updateProfileData,
+    deleteAccount,
   };
 
   return (
