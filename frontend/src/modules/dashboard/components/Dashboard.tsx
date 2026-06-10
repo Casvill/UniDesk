@@ -1,185 +1,21 @@
-import { useNavigate } from "react-router-dom";
-import { Plus, ChevronLeft, ChevronRight, Copy, Calendar, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/shared/components/ui/dialog";
-import { api, Room } from "@/services/api";
-import emptyState from "@/assets/empty/empty-state.svg";
+import { useRooms } from "../hooks/useRooms";
+import { useFloatingAnimation } from "../hooks/useFloatingAnimation";
+import { RoomCarousel } from "./RoomCarousel";
+import { EmptyRoomsState } from "./EmptyRoomsState";
+import { CreateRoomDialog } from "./CreateRoomDialog";
 
 export function Dashboard() {
-  const navigate = useNavigate();
   const { profile, user } = useAuth();
+  const { activeRooms, isLoadingRooms } = useRooms(user);
+  const { animNames, animDurs } = useFloatingAnimation();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const username = profile?.username
     ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1)
     : "estudiante";
-
-  const [page, setPage] = useState(0);
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
-  const [containerHovered, setContainerHovered] = useState(false);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [roomName, setRoomName] = useState("");
-  const [activeRooms, setActiveRooms] = useState<Room[]>([]);
-  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
-
-  const colors = [
-    "from-blue-500 to-cyan-500",
-    "from-purple-500 to-pink-500",
-    "from-green-500 to-emerald-500",
-    "from-orange-500 to-red-500",
-    "from-teal-500 to-cyan-500",
-  ];
-
-  const formatDate = (ts: unknown) => {
-    if (!ts) return "";
-    let seconds: number;
-    if (typeof ts === "object" && ts !== null && "seconds" in ts) {
-      seconds = (ts as { seconds: number }).seconds;
-    } else if (typeof ts === "object" && ts !== null && "_seconds" in ts) {
-      seconds = (ts as { _seconds: number })._seconds;
-    } else if (typeof ts === "string") {
-      seconds = new Date(ts).getTime() / 1000;
-    } else {
-      return "";
-    }
-    const date = new Date(seconds * 1000);
-    if (isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("es-ES", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const [cardsPerPage, setCardsPerPage] = useState(() => {
-    if (typeof window !== "undefined") {
-      if (window.innerWidth < 640) return 1;
-      if (window.innerWidth < 1024) return 2;
-    }
-    return 3;
-  });
-
-  const totalPages = Math.ceil(activeRooms.length / cardsPerPage);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [cardWidth, setCardWidth] = useState(0);
-  const [translateX, setTranslateX] = useState(0);
-
-  useEffect(() => {
-    const sm = window.matchMedia("(max-width: 639px)");
-    const md = window.matchMedia("(min-width: 640px) and (max-width: 1023px)");
-    const lg = window.matchMedia("(min-width: 1024px)");
-
-    const update = () => {
-      if (sm.matches) setCardsPerPage(1);
-      else if (md.matches) setCardsPerPage(2);
-      else setCardsPerPage(3);
-    };
-
-    update();
-    sm.addEventListener("change", update);
-    md.addEventListener("change", update);
-    lg.addEventListener("change", update);
-    return () => {
-      sm.removeEventListener("change", update);
-      md.removeEventListener("change", update);
-      lg.removeEventListener("change", update);
-    };
-  }, []);
-
-  useEffect(() => {
-    const newTotal = Math.ceil(activeRooms.length / cardsPerPage);
-    setPage((p) => Math.min(p, Math.max(0, newTotal - 1)));
-  }, [cardsPerPage, activeRooms.length]);
-
-  useEffect(() => {
-    if (!user) return;
-    const fetchRooms = async () => {
-      setIsLoadingRooms(true);
-      try {
-        const token = await user.getIdToken();
-        const rooms = await api.listRooms(token);
-        setActiveRooms(rooms);
-      } catch (err) {
-        console.error("Error al cargar salas:", err);
-      } finally {
-        setIsLoadingRooms(false);
-      }
-    };
-    fetchRooms();
-  }, [user]);
-
-  const updateDimensions = useCallback(() => {
-    if (containerRef.current) {
-      const w = containerRef.current.offsetWidth;
-      const gapTotal = 24 * (cardsPerPage - 1);
-      setCardWidth(Math.floor((w - gapTotal) / cardsPerPage));
-      setTranslateX(page * w);
-    }
-  }, [page, cardsPerPage]);
-
-  useLayoutEffect(() => {
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, [updateDimensions, activeRooms.length]);
-
-  const goNext = useCallback(() => {
-    setPage((p) => Math.min(p + 1, totalPages - 1));
-  }, [totalPages]);
-
-  const goPrev = useCallback(() => {
-    setPage((p) => Math.max(p - 1, 0));
-  }, []);
-
-  const handleCreateRoom = async () => {
-    if (!user || !roomName.trim()) return;
-
-    try {
-      const token = await user.getIdToken();
-      const newRoom = await api.createRoom(roomName.trim(), token);
-      setShowCreateDialog(false);
-      setRoomName("");
-      navigate(`/rooms/${newRoom.id}`);
-    } catch (err) {
-      console.error("Error al crear la sala:", err);
-    }
-  };
-
-  useEffect(() => {
-    const styleId = "ud-float";
-    if (document.getElementById(styleId)) return;
-    const s = document.createElement("style");
-    s.id = styleId;
-    s.textContent = `
-      @keyframes uf0 { 0%,100% { transform:translateY(0) rotate(-1.5deg) } 50% { transform:translateY(-16px) rotate(1.5deg) } }
-      @keyframes uf1 { 0%,100% { transform:translateY(0) rotate(1deg) } 50% { transform:translateY(-14px) rotate(-1deg) } }
-      @keyframes uf2 { 0%,100% { transform:translateY(0) rotate(-0.5deg) } 50% { transform:translateY(-18px) rotate(0.5deg) } }
-      @keyframes uf3 { 0%,100% { transform:translateY(0) rotate(1.5deg) } 50% { transform:translateY(-12px) rotate(-1.5deg) } }
-      @keyframes uf4 { 0%,100% { transform:translateY(0) rotate(-1deg) } 50% { transform:translateY(-15px) rotate(1deg) } }
-    `;
-    document.head.appendChild(s);
-    return () => {
-      document.getElementById(styleId)?.remove();
-    };
-  }, []);
-
-  const animNames = ["uf0", "uf1", "uf2", "uf3", "uf4"];
-  const animDurs = ["5.5s", "6.5s", "7s", "5.8s", "6.2s"];
-
-  const containerHeight = cardsPerPage === 1 ? 280 : cardsPerPage === 2 ? 300 : 320;
-
-  const edgeGradient =
-    cardsPerPage <= 2
-      ? "to right, #f6f7f9 0%, transparent 2%, transparent 98%, #f6f7f9 100%"
-      : "to right, #f6f7f9 0%, transparent 2%, transparent 98%, #f6f7f9 100%";
 
   return (
     <div>
@@ -205,235 +41,25 @@ export function Dashboard() {
       </div>
 
       {isLoadingRooms && activeRooms.length === 0 ? (
-        <section className="flex flex-col items-center justify-center py-20" aria-labelledby="loading-rooms-heading" role="status">
+        <section className="flex flex-col items-center justify-center py-20" role="status">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
-          <p id="loading-rooms-heading" className="text-gray-500 mt-4">
-            Cargando tus salas...
-          </p>
+          <p className="text-gray-500 mt-4">Cargando tus salas...</p>
         </section>
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
-        <section className="text-center py-12" aria-labelledby="empty-rooms-heading">
-          <img
-            src={emptyState}
-            alt=""
-            className="w-[432px] mx-auto mb-8 opacity-75"
-            style={{
-              animation: `${animNames[0]} ${animDurs[0]} ease-in-out infinite`,
-            }}
-            aria-hidden="true"
-          />
-          <h2 id="empty-rooms-heading" className="text-2xl font-bold text-gray-900 mb-2">
-            Mucho silencio por estos pasillos virtuales...
-          </h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Todavía no has creado ninguna sala de estudio.
-            Crea tu primera sala y empieza a colaborar con tus compañeros.
-          </p>
-          <button
-            onClick={() => setShowCreateDialog(true)}
-            className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto"
-          >
-            <Plus className="h-5 w-5" />
-            Crear primera sala
-          </button>
-        </section>
+        <EmptyRoomsState
+          onCreateRoom={() => setShowCreateDialog(true)}
+          animName={animNames[0]}
+          animDur={animDurs[0]}
+        />
       ) : (
-        <section className="mb-8" aria-labelledby="active-rooms-heading">
-          <h2
-            id="active-rooms-heading"
-            className="text-2xl font-bold text-gray-900 mb-4"
-          >
-            Estas son tus salas de estudio:
-          </h2>
-          <div className="relative">
-            {totalPages > 1 && (
-              <>
-                <button
-                  onClick={goPrev}
-                  disabled={page === 0}
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-                  aria-label="Anterior"
-                >
-                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
-                </button>
-                <button
-                  onClick={goNext}
-                  disabled={page >= totalPages - 1}
-                  className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page >= totalPages - 1 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-                  aria-label="Siguiente"
-                >
-                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
-                </button>
-              </>
-            )}
-            <div
-              className="relative"
-              style={{ clipPath: "inset(-40px -20px -40px -20px)", overflowX: "hidden" }}
-              onMouseEnter={() => setContainerHovered(true)}
-              onMouseLeave={() => {
-                setContainerHovered(false);
-                setHoveredCard(null);
-              }}
-            >
-              <div className="relative" style={{ height: containerHeight, paddingTop: 32, paddingBottom: 32 }}>
-                {totalPages > 1 && (
-                  <div
-                    className="absolute inset-0 pointer-events-none z-10"
-                    style={{ background: `linear-gradient(${edgeGradient})` }}
-                  />
-                )}
-
-                  <div
-                    ref={containerRef}
-                    className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
-                    style={{
-                      transform: `translateX(-${translateX}px)`,
-                      justifyContent: activeRooms.length < cardsPerPage ? "center" : "flex-start",
-                    }}
-                  >
-                  {cardWidth > 0 && activeRooms.map((room, index) => {
-                    const aIdx = index % 5;
-                    const isHovered = hoveredCard === room.id;
-                    const isDimmed =
-                      containerHovered && hoveredCard !== null && !isHovered;
-
-                    return (
-                      <article
-                        key={room.id}
-                        className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0 flex flex-col h-auto"
-                        style={{
-                          width: cardWidth > 0 ? cardWidth : "auto",
-                          flex: cardWidth > 0 ? "0 0 auto" : "1 1 0%",
-                          animation: `${animNames[aIdx]} ${animDurs[aIdx]} ease-in-out infinite`,
-                          animationPlayState: isHovered ? "paused" : "running",
-                          scale: isHovered ? "1.07" : isDimmed ? "0.94" : "1",
-                          translate: isHovered ? "0 -8px" : "0 0",
-                          rotate: isHovered ? "0deg" : undefined,
-                          opacity: isDimmed ? "0.45" : 1,
-                          transition: isHovered
-                            ? "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
-                            : "all 0.3s ease-out",
-                        }}
-                        aria-label={`Sala de estudio ${room.name}`}
-                        onMouseEnter={() => setHoveredCard(room.id)}
-                        onMouseLeave={() => setHoveredCard(null)}
-                      >
-                        {/* Franja de color superior */}
-                        <div className={`h-2 bg-gradient-to-r ${colors[index % colors.length]}`} />
-
-                        {/* Header: nombre + fecha */}
-                        <div className="px-6 pt-4 pb-4 border-b border-gray-100">
-                          <h3 className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition">
-                            {room.name}
-                          </h3>
-                          <div className="flex items-center gap-1 text-xs text-gray-400">
-                            <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span className="text-[15px]" >{formatDate(room.createdAt)}</span>
-                          </div>
-                        </div>
-
-                        {/* Body: ID + botón */}
-                        <div className="px-5 pt-3 pb-5 flex flex-col justify-between gap-4 flex-1">
-                          {/* Bloque ID */}
-                          <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                            <div>
-                              <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
-                                ID de sala
-                              </p>
-                              <p className="font-mono text-sm font-medium text-gray-600">
-                                {room.id}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(room.id)}
-                              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition"
-                              aria-label="Copiar ID de sala"
-                            >
-                              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                              Copiar
-                            </button>
-                          </div>
-
-                          {/* Botón entrar */}
-                          <button
-                              onClick={() => navigate(`/rooms/${room.id}`)}
-                              className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500"
-                              aria-label={`Unirse a la sala ${room.name}`}
-                            >
-                              Entrar
-                              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                            </button>
-                          </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none ${
-                      i === page
-                        ? "bg-primary-600 w-6"
-                        : "bg-gray-300 hover:bg-gray-400"
-                    }`}
-                    aria-label={`Ir a página ${i + 1}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+        <RoomCarousel rooms={activeRooms} />
       )}
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear sala de estudio</DialogTitle>
-            <DialogDescription>
-              Dale un nombre a tu sala para empezar a estudiar en equipo.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div>
-            <label htmlFor="new-room-name" className="block mb-2 text-sm font-semibold text-gray-700">
-              Nombre de la sala
-            </label>
-            <input
-              type="text"
-              id="new-room-name"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              placeholder="Ej: Grupo de estudio de cálculo"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            />
-          </div>
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <button
-                type="button"
-                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
-              >
-                Cancelar
-              </button>
-            </DialogClose>
-            <button
-              type="button"
-              onClick={handleCreateRoom}
-              className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Crear sala
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateRoomDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        user={user}
+      />
     </div>
   );
 }
