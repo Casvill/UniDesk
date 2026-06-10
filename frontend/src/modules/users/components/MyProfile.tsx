@@ -734,6 +734,8 @@ export function MyProfile() {
             aria-label={
               loading
                 ? "Guardando cambios, por favor espera"
+                : !isFormValid
+                ? "Completa todos los campos correctamente para guardar"
                 : "Guardar cambios del perfil"
             }
             className="w-full sm:w-auto bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -831,6 +833,8 @@ export function MyProfile() {
             onClick={() => setShowDeleteConfirm(true)}
             className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
             disabled={loading || deletingAccount}
+            aria-label="Eliminar cuenta permanentemente"
+            aria-busy={deletingAccount}
           >
             {deletingAccount ? "Eliminando..." : "Eliminar cuenta"}
           </button>
@@ -900,6 +904,8 @@ export function MyProfile() {
               onClick={() => setShowDeleteConfirm(true)}
               className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
               disabled={loading || deletingAccount}
+              aria-label="Eliminar cuenta permanentemente"
+              aria-busy={deletingAccount}
             >
               {deletingAccount ? "Eliminando..." : "Eliminar cuenta"}
             </button>
@@ -930,6 +936,7 @@ export function MyProfile() {
                 type="button"
                 disabled={deletingAccount}
                 className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Cancelar eliminación de cuenta"
               >
                 Cancelar
               </button>
@@ -943,6 +950,7 @@ export function MyProfile() {
               }}
               disabled={deletingAccount}
               className="bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label={deletingAccount ? "Eliminando cuenta, por favor espera" : "Confirmar eliminación de cuenta"}
             >
               {deletingAccount ? "Eliminando..." : "Confirmar"}
             </button>
