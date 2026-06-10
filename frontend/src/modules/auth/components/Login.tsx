@@ -172,7 +172,7 @@ export function Login() {
     try {
       const result = await loginWithGoogle();
 
-      showToast.success("Sesión iniciada con Google");
+      showToast.success("Ingresaste con Google de forma exitosa");
 
       setTimeout(() => {
         if (result?.isNewUser) {

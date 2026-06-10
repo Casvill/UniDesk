@@ -2,9 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Save,
   AlertTriangle,
-  Shield,
-  Bell,
-  Video as VideoIcon,
   Loader2,
   CheckCircle,
   XCircle,
@@ -144,7 +141,7 @@ async function uploadAvatarToStorage(userId: string, file: File): Promise<string
   return getDownloadURL(avatarRef);
 }
 
-export function Settings() {
+export function MyProfile() {
   const { user, profile, updateProfileData } = useAuth();
 
   const [form, setForm] = useState<ProfileForm>({
@@ -169,12 +166,6 @@ export function Settings() {
   const [avatarPreview, setAvatarPreview] = useState("");
 
   const [loading, setLoading] = useState(false);
-
-  const [notifications, setNotifications] = useState({
-    email: true,
-    roomInvites: true,
-    sessionReminders: false,
-  });
 
   const cleanDisplayName = form.displayName.trim();
   const cleanUsername = form.username.trim();
@@ -336,7 +327,7 @@ export function Settings() {
   const showUsernameMessageAsError = usernameAvailable === false || isUsernameError;
 
   const getEmailMessage = () => {
-    if (isGoogleUser) return "El correo de Google no se puede cambiar.";
+    if (isGoogleUser) return "Al ingresar por medio de google no puedes modificarlo";
     if (!emailTouched && !cleanEmail) return "";
     if (!cleanEmail) return "El correo es obligatorio.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return "Correo inválido.";
@@ -419,13 +410,11 @@ export function Settings() {
 
     if (!cleanEmail) {
       newErrors.email = "El correo es obligatorio.";
-    } else if (isGoogleUser) {
-      newErrors.email = "El correo de Google no se puede cambiar.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    } else if (!isGoogleUser && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       newErrors.email = "Ingresa un correo válido.";
-    } else if (checkingEmail) {
+    } else if (!isGoogleUser && checkingEmail) {
       newErrors.email = "Validando correo...";
-    } else if (!isEmailUnchanged && emailAvailable === false) {
+    } else if (!isGoogleUser && !isEmailUnchanged && emailAvailable === false) {
       newErrors.email = "Este correo ya está registrado.";
     }
 
@@ -522,11 +511,218 @@ export function Settings() {
     </span>
   );
 
+  const renderForm = () => (
+    <form
+      onSubmit={handleSave}
+      className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
+      aria-describedby="settings-status"
+      noValidate
+    >
+      <div className="mb-6">
+        <h3 className="text-xl font-bold text-gray-900">
+          Información de la cuenta
+        </h3>
+      </div>
+
+      <div className="space-y-5">
+        <div>
+          <label htmlFor="display-name" className="block mb-2 text-sm font-semibold text-gray-700">
+            Nombre para mostrar
+          </label>
+
+          <input
+            type="text"
+            id="display-name"
+            name="displayName"
+            value={form.displayName}
+            onChange={handleChange}
+            placeholder="Ej: Valentina Gómez"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            aria-invalid={Boolean(errors.displayName)}
+            aria-describedby={errors.displayName ? "display-name-error" : undefined}
+            autoComplete="name"
+            disabled={loading}
+          />
+
+          {errors.displayName && (
+            <p
+              id="display-name-error"
+              role="alert"
+              aria-live="assertive"
+              className="text-red-600 text-xs mt-1"
+            >
+              {errors.displayName}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="settings-username" className="block mb-2 text-sm font-semibold text-gray-700">
+            Nombre de usuario
+          </label>
+
+          <input
+            type="text"
+            id="settings-username"
+            name="username"
+            value={form.username}
+            onChange={(e) => {
+              handleChange(e);
+              setUsernameAvailable(null);
+            }}
+            onBlur={() => setUsernameTouched(true)}
+            placeholder="Ej: estudiante_123"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            aria-invalid={isUsernameError ? true : undefined}
+            aria-describedby={isUsernameError ? "settings-username-error" : undefined}
+            autoComplete="username"
+            disabled={loading}
+          />
+
+          {usernameMessage && (
+            <p
+              id={isUsernameError ? "settings-username-error" : undefined}
+              className={`mt-1 text-sm flex items-center gap-1 ${
+                showUsernameMessageAsError
+                  ? "text-red-500"
+                  : usernameAvailable === true
+                  ? "text-green-600"
+                  : "text-gray-500"
+              }`}
+            >
+              {showUsernameMessageAsError ? (
+                <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : usernameAvailable === true ? (
+                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : null}
+
+              {usernameMessage}
+            </p>
+          )}
+
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {usernameTouched && usernameMessage}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="settings-email" className="block mb-2 text-sm font-semibold text-gray-700">
+            Correo electrónico
+          </label>
+
+          <div className="relative">
+            <input
+              type="email"
+              id="settings-email"
+              name="email"
+              value={form.email}
+              onChange={(e) => {
+                handleChange(e);
+                setEmailAvailable(null);
+              }}
+              onBlur={() => setEmailTouched(true)}
+              placeholder="ejemplo@universidad.edu.co"
+              className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition ${
+                isGoogleUser ? "bg-gray-100 text-gray-500 cursor-not-allowed" : showEmailAsError ? "border-red-400" : ""
+              }`}
+              aria-invalid={isEmailError ? true : undefined}
+              aria-describedby={isEmailError ? "settings-email-error" : undefined}
+              autoComplete="email"
+              disabled={loading || isGoogleUser}
+              title={isGoogleUser ? "No puedes cambiar el correo de una cuenta de Google" : undefined}
+            />
+
+            {isGoogleUser && (
+              <Lock
+                className="absolute right-4 top-3.5 h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
+            )}
+          </div>
+
+          {emailMessage ? (
+            <p
+              id={isEmailError ? "settings-email-error" : undefined}
+              className={`mt-1 text-sm flex items-center gap-1 ${
+                showEmailAsError
+                  ? "text-red-500"
+                  : emailAvailable === true || isEmailUnchanged
+                  ? "text-green-600"
+                  : "text-gray-500"
+              }`}
+            >
+              {showEmailAsError ? (
+                <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : emailAvailable === true || isEmailUnchanged ? (
+                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : null}
+
+              {emailMessage}
+            </p>
+          ) : (
+            <div className="grid grid-rows-[0fr] transition-all duration-300">
+              <div className="overflow-hidden" />
+            </div>
+          )}
+
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {emailTouched && emailMessage}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="settings-university" className="block mb-2 text-sm font-semibold text-gray-700">
+            Universidad
+          </label>
+
+          <input
+            type="text"
+            id="settings-university"
+            name="university"
+            value={form.university}
+            onChange={handleChange}
+            placeholder="Ej: Universidad Distrital"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            autoComplete="organization"
+            disabled={loading}
+          />
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="submit"
+            disabled={!isFormValid}
+            aria-busy={loading}
+            aria-disabled={!isFormValid}
+            aria-label={
+              loading
+                ? "Guardando cambios, por favor espera"
+                : "Guardar cambios del perfil"
+            }
+            className="w-full sm:w-auto bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" aria-hidden="true" />
+                Guardar cambios
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+
   return (
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Configuración
+          Mi perfil
         </h2>
 
         <p className="text-gray-600">
@@ -534,24 +730,84 @@ export function Settings() {
         </p>
       </div>
 
-      <div className="max-w-[900px]">
-        <form
-          onSubmit={handleSave}
-          className="space-y-6"
-          aria-describedby="settings-status"
-          noValidate
+      {/* Mobile layout: avatar → form → danger */}
+      <div className="flex flex-col gap-6 lg:hidden">
+        <section
+          className="bg-white rounded-2xl shadow-md border border-gray-100 p-6"
+          aria-label="Foto de perfil"
         >
-          <section
-            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
-            aria-labelledby="account-settings-heading"
-          >
-            <div className="mb-6">
-              <h3 id="account-settings-heading" className="text-xl font-bold text-gray-900">
-                Información de la cuenta
-              </h3>
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              <div
+                className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
+                aria-label="Vista previa del avatar"
+              >
+                {avatarContent}
+              </div>
+
+              <label
+                htmlFor="settings-avatar"
+                className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
+                aria-label="Cambiar imagen de perfil"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+              </label>
+
+              <input
+                id="settings-avatar"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+                aria-label="Seleccionar imagen de perfil"
+                disabled={loading}
+              />
             </div>
 
-            <div className="flex flex-col items-center mb-8">
+            <p className="text-sm text-gray-600 mt-3">
+              Cambia tu imagen de perfil
+            </p>
+          </div>
+        </section>
+
+        {renderForm()}
+
+        <section
+          className="bg-white rounded-2xl shadow-md border border-red-200 p-6"
+          aria-labelledby="danger-zone-heading"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden="true" />
+            </div>
+
+            <h3 id="danger-zone-heading" className="text-lg font-bold text-gray-900">
+              Zona peligrosa
+            </h3>
+          </div>
+
+          <p className="text-sm text-gray-600 mb-4">
+            Si decides eliminar tu cuenta, se perderá tu perfil y la información asociada a tu actividad.
+          </p>
+
+          <button
+            type="button"
+            className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
+            disabled={loading}
+          >
+            Eliminar cuenta
+          </button>
+        </section>
+      </div>
+
+      {/* Desktop layout: left sticky (avatar + danger) | right (form) */}
+      <div className="hidden lg:grid lg:grid-cols-[300px_1fr] lg:gap-8">
+        <div className="space-y-6 lg:sticky lg:top-24 self-start">
+          <section
+            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6"
+            aria-label="Foto de perfil"
+          >
+            <div className="flex flex-col items-center">
               <div className="relative">
                 <div
                   className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
@@ -561,7 +817,7 @@ export function Settings() {
                 </div>
 
                 <label
-                  htmlFor="settings-avatar"
+                  htmlFor="settings-avatar-desktop"
                   className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
                   aria-label="Cambiar imagen de perfil"
                 >
@@ -569,7 +825,7 @@ export function Settings() {
                 </label>
 
                 <input
-                  id="settings-avatar"
+                  id="settings-avatar-desktop"
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
@@ -583,321 +839,10 @@ export function Settings() {
                 Cambia tu imagen de perfil
               </p>
             </div>
-
-            <div className="space-y-5">
-              <div>
-                <label htmlFor="display-name" className="block mb-2 text-sm font-semibold text-gray-700">
-                  Nombre para mostrar
-                </label>
-
-                <input
-                  type="text"
-                  id="display-name"
-                  name="displayName"
-                  value={form.displayName}
-                  onChange={handleChange}
-                  placeholder="Ej: Valentina Gómez"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                  aria-invalid={Boolean(errors.displayName)}
-                  aria-describedby={errors.displayName ? "display-name-error" : undefined}
-                  autoComplete="name"
-                  disabled={loading}
-                />
-
-                {errors.displayName && (
-                  <p
-                    id="display-name-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs mt-1"
-                  >
-                    {errors.displayName}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="settings-username" className="block mb-2 text-sm font-semibold text-gray-700">
-                  Nombre de usuario
-                </label>
-
-                <input
-                  type="text"
-                  id="settings-username"
-                  name="username"
-                  value={form.username}
-                  onChange={(e) => {
-                    handleChange(e);
-                    setUsernameAvailable(null);
-                  }}
-                  onBlur={() => setUsernameTouched(true)}
-                  placeholder="Ej: estudiante_123"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                  aria-invalid={isUsernameError ? true : undefined}
-                  aria-describedby={isUsernameError ? "settings-username-error" : undefined}
-                  autoComplete="username"
-                  disabled={loading}
-                />
-
-                {usernameMessage && (
-                  <p
-                    id={isUsernameError ? "settings-username-error" : undefined}
-                    className={`mt-1 text-sm flex items-center gap-1 ${
-                      showUsernameMessageAsError
-                        ? "text-red-500"
-                        : usernameAvailable === true
-                        ? "text-green-600"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {showUsernameMessageAsError ? (
-                      <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : usernameAvailable === true ? (
-                      <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : null}
-
-                    {usernameMessage}
-                  </p>
-                )}
-
-                <div aria-live="polite" aria-atomic="true" className="sr-only">
-                  {usernameTouched && usernameMessage}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="settings-email" className="block mb-2 text-sm font-semibold text-gray-700">
-                  Correo electrónico
-                </label>
-
-                <div className="relative">
-                  <input
-                    type="email"
-                    id="settings-email"
-                    name="email"
-                    value={form.email}
-                    onChange={(e) => {
-                      handleChange(e);
-                      setEmailAvailable(null);
-                    }}
-                    onBlur={() => setEmailTouched(true)}
-                    placeholder="ejemplo@universidad.edu.co"
-                    className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition ${
-                      isGoogleUser ? "bg-gray-100 text-gray-500 cursor-not-allowed" : showEmailAsError ? "border-red-400" : ""
-                    }`}
-                    aria-invalid={isEmailError ? true : undefined}
-                    aria-describedby={isEmailError ? "settings-email-error" : undefined}
-                    autoComplete="email"
-                    disabled={loading || isGoogleUser}
-                    title={isGoogleUser ? "No puedes cambiar el correo de una cuenta de Google" : undefined}
-                  />
-
-                  {isGoogleUser && (
-                    <Lock
-                      className="absolute right-4 top-3.5 h-5 w-5 text-gray-400"
-                      aria-hidden="true"
-                    />
-                  )}
-                </div>
-
-                {emailMessage ? (
-                  <p
-                    id={isEmailError ? "settings-email-error" : undefined}
-                    className={`mt-1 text-sm flex items-center gap-1 ${
-                      showEmailAsError
-                        ? "text-red-500"
-                        : emailAvailable === true || isEmailUnchanged
-                        ? "text-green-600"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {showEmailAsError ? (
-                      <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : emailAvailable === true || isEmailUnchanged ? (
-                      <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                    ) : null}
-
-                    {emailMessage}
-                  </p>
-                ) : (
-                  <div className="grid grid-rows-[0fr] transition-all duration-300">
-                    <div className="overflow-hidden" />
-                  </div>
-                )}
-
-                <div aria-live="polite" aria-atomic="true" className="sr-only">
-                  {emailTouched && emailMessage}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="settings-university" className="block mb-2 text-sm font-semibold text-gray-700">
-                  Universidad
-                </label>
-
-                <input
-                  type="text"
-                  id="settings-university"
-                  name="university"
-                  value={form.university}
-                  onChange={handleChange}
-                  placeholder="Ej: Universidad Distrital"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                  autoComplete="organization"
-                  disabled={loading}
-                />
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={!isFormValid}
-                  aria-busy={loading}
-                  aria-disabled={!isFormValid}
-                  aria-label={
-                    loading
-                      ? "Guardando cambios, por favor espera"
-                      : "Guardar cambios del perfil"
-                  }
-                  className="w-full sm:w-auto bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-5 w-5" aria-hidden="true" />
-                      Guardar cambios
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
           </section>
 
-          {/* <section
-            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
-            aria-labelledby="notification-settings-heading"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Bell className="h-5 w-5 text-purple-600" aria-hidden="true" />
-              </div>
-
-              <h3 id="notification-settings-heading" className="text-xl font-bold text-gray-900">
-                Preferencias de notificación
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 transition">
-                <input
-                  type="checkbox"
-                  id="email-notifications"
-                  name="emailNotifications"
-                  checked={notifications.email}
-                  onChange={(e) =>
-                    setNotifications({ ...notifications, email: e.target.checked })
-                  }
-                  className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                  disabled={loading}
-                />
-
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block">
-                    Notificaciones por correo
-                  </span>
-
-                  <span className="text-sm text-gray-600">
-                    Recibe novedades importantes sobre tu actividad en UniDesk.
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 transition">
-                <input
-                  type="checkbox"
-                  id="room-invites"
-                  name="roomInvites"
-                  checked={notifications.roomInvites}
-                  onChange={(e) =>
-                    setNotifications({ ...notifications, roomInvites: e.target.checked })
-                  }
-                  className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                  disabled={loading}
-                />
-
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block">
-                    Invitaciones a salas
-                  </span>
-
-                  <span className="text-sm text-gray-600">
-                    Avísame cuando un compañero me invite a una sala de estudio.
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 transition">
-                <input
-                  type="checkbox"
-                  id="session-reminders"
-                  name="sessionReminders"
-                  checked={notifications.sessionReminders}
-                  onChange={(e) =>
-                    setNotifications({ ...notifications, sessionReminders: e.target.checked })
-                  }
-                  className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                  disabled={loading}
-                />
-
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block">
-                    Recordatorios de sesiones
-                  </span>
-
-                  <span className="text-sm text-gray-600">
-                    Recibe recordatorios antes de tus sesiones de estudio.
-                  </span>
-                </div>
-              </label>
-            </div>
-          </section> */}
-
-          {/* <section
-            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
-            aria-labelledby="privacy-settings-heading"
-          >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Shield className="h-5 w-5 text-green-600" aria-hidden="true" />
-              </div>
-
-              <h3 id="privacy-settings-heading" className="text-xl font-bold text-gray-900">
-                Privacidad y permisos
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-gray-50">
-                <VideoIcon className="h-5 w-5 text-gray-500 mt-0.5" aria-hidden="true" />
-
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    Cámara, micrófono y pantalla
-                  </p>
-
-                  <p className="text-sm text-gray-600">
-                    Estos permisos se solicitarán únicamente cuando entres a una sala y decidas activar audio, video o compartir pantalla.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section> */}
-
           <section
-            className="bg-white rounded-2xl shadow-md border border-red-100 p-6 sm:p-8"
+            className="bg-white rounded-2xl shadow-md border border-red-200 p-6"
             aria-labelledby="danger-zone-heading"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -905,8 +850,8 @@ export function Settings() {
                 <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden="true" />
               </div>
 
-              <h3 id="danger-zone-heading" className="text-xl font-bold text-gray-900">
-                Zona de cuidado
+              <h3 id="danger-zone-heading-desktop" className="text-lg font-bold text-gray-900">
+                Zona peligrosa
               </h3>
             </div>
 
@@ -916,22 +861,26 @@ export function Settings() {
 
             <button
               type="button"
-              className="border border-red-300 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-50 transition"
+              className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
               disabled={loading}
             >
               Eliminar cuenta
             </button>
           </section>
+        </div>
 
-          <div
-            id="settings-status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="sr-only"
-          >
-            {loading && "Guardando los cambios de tu perfil. Por favor espera."}
-          </div>
-        </form>
+        <div>
+          {renderForm()}
+        </div>
+      </div>
+
+      <div
+        id="settings-status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {loading && "Guardando los cambios de tu perfil. Por favor espera."}
       </div>
     </div>
   );

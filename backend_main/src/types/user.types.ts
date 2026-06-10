@@ -120,4 +120,4 @@ export type CreateUserDTO = Omit<UserProfile, "createdAt" | "updatedAt">;
  *           type: string
  *           format: uri
  */
-export type UpdateUserDTO = Partial<Pick<UserProfile, "username" | "displayName" | "photoURL">>;
+export type UpdateUserDTO = Partial<Pick<UserProfile, "username" | "displayName" | "photoURL" | "email">>;
