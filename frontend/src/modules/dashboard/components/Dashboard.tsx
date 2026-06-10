@@ -126,10 +126,18 @@ export function Dashboard() {
     setPage((p) => Math.max(p - 1, 0));
   }, []);
 
-  const handleCreateRoom = () => {
-    setShowCreateDialog(false);
-    setRoomName("");
-    navigate("/rooms/1");
+  const handleCreateRoom = async () => {
+    if (!user || !roomName.trim()) return;
+
+    try {
+      const token = await user.getIdToken();
+      const newRoom = await api.createRoom(roomName.trim(), token);
+      setShowCreateDialog(false);
+      setRoomName("");
+      navigate(`/rooms/${newRoom.id}`);
+    } catch (err) {
+      console.error("Error al crear la sala:", err);
+    }
   };
 
   useEffect(() => {
@@ -181,142 +189,198 @@ export function Dashboard() {
         </button>
       </div>
 
-      <section className="mb-8" aria-labelledby="active-rooms-heading">
-        <h2
-          id="active-rooms-heading"
-          className="text-2xl font-bold text-gray-900 mb-4"
-        >
-          Estas son tus salas de estudio:
-        </h2>
-        <div className="relative">
-          {totalPages > 1 && (
-            <>
-              <button
-                onClick={goPrev}
-                disabled={page === 0}
-                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-                aria-label="Anterior"
+      {isLoadingRooms && activeRooms.length === 0 ? (
+        <section className="mb-8" aria-labelledby="loading-rooms-heading" role="status">
+          <h2 id="loading-rooms-heading" className="text-2xl font-bold text-gray-900 mb-4">
+            Cargando tus salas...
+          </h2>
+          <div className="flex gap-6 overflow-hidden">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden flex-shrink-0 animate-pulse"
+                style={{ width: 300, height: 250 }}
+                aria-hidden="true"
               >
-                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
-              </button>
-              <button
-                onClick={goNext}
-                disabled={page >= totalPages - 1}
-                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page >= totalPages - 1 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-                aria-label="Siguiente"
-              >
-                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
-              </button>
-            </>
-          )}
+                <div className="h-2 bg-gray-200" />
+                <div className="p-6 space-y-4">
+                  <div className="h-5 bg-gray-200 rounded w-3/4" />
+                  <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  <div className="h-4 bg-gray-200 rounded w-2/3" />
+                  <div className="h-10 bg-gray-200 rounded w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : !isLoadingRooms && activeRooms.length === 0 ? (
+        <section className="text-center py-12" aria-labelledby="empty-rooms-heading">
           <div
-            className="relative"
-            style={{ clipPath: "inset(-40px -20px -40px -20px)", overflowX: "hidden" }}
-            onMouseEnter={() => setContainerHovered(true)}
-            onMouseLeave={() => {
-              setContainerHovered(false);
-              setHoveredCard(null);
+            className="inline-flex items-center justify-center w-72 h-72 mb-8 bg-white rounded-2xl shadow-md border border-gray-100"
+            style={{
+              animation: `${animNames[0]} ${animDurs[0]} ease-in-out infinite`,
             }}
           >
-            <div className="relative" style={{ height: containerHeight, paddingTop: 32, paddingBottom: 32 }}>
-              {totalPages > 1 && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-10"
-                  style={{ background: `linear-gradient(${edgeGradient})` }}
-                />
-              )}
-
-                <div
-                  ref={containerRef}
-                  className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
-                  style={{
-                    transform: `translateX(-${translateX}px)`,
-                    justifyContent: activeRooms.length < cardsPerPage ? "center" : "flex-start",
-                  }}
-                >
-                {cardWidth > 0 && activeRooms.map((room, index) => {
-                  const aIdx = index % 5;
-                  const isHovered = hoveredCard === room.id;
-                  const isDimmed =
-                    containerHovered && hoveredCard !== null && !isHovered;
-
-                  return (
-                    <article
-                      key={room.id}
-                      className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0"
-                      style={{
-                        width: cardWidth > 0 ? cardWidth : "auto",
-                        flex: cardWidth > 0 ? "0 0 auto" : "1 1 0%",
-                        animation: `${animNames[aIdx]} ${animDurs[aIdx]} ease-in-out infinite`,
-                        animationPlayState: isHovered ? "paused" : "running",
-                        scale: isHovered ? "1.07" : isDimmed ? "0.94" : "1",
-                        translate: isHovered ? "0 -8px" : "0 0",
-                        rotate: isHovered ? "0deg" : undefined,
-                        opacity: isDimmed ? "0.45" : 1,
-                        transition: isHovered
-                          ? "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
-                          : "all 0.3s ease-out",
-                      }}
-                      aria-label={`Sala de estudio ${room.name}`}
-                      onMouseEnter={() => setHoveredCard(room.id)}
-                      onMouseLeave={() => setHoveredCard(null)}
-                    >
-                      <div className={`h-2 bg-gradient-to-r ${colors[index % colors.length]}`} />
-
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition">
-                              {room.name}
-                            </h3>
-
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Copy className="h-4 w-4" aria-hidden="true" />
-                              <span className="font-mono text-xs">ID: {room.id}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                          <Calendar className="h-4 w-4" aria-hidden="true" />
-                          <span>
-                            Creada el {formatDate(room.createdAt)}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => navigate(`/rooms/${room.id}`)}
-                          className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
-                          aria-label={`Unirse a la sala ${room.name}`}
-                        >
-                          Unirse a la sala
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+            <div className="text-center p-6">
+              <span className="text-6xl block mb-4" aria-hidden="true">🏫</span>
+              <p className="text-gray-300 text-lg font-semibold">
+                Pasillos vacíos...
+              </p>
             </div>
           </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              {Array.from({ length: totalPages }).map((_, i) => (
+          <h2 id="empty-rooms-heading" className="text-2xl font-bold text-gray-900 mb-2">
+            Mucho silencio por estos pasillos virtuales...
+          </h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            Todavía no has creado ninguna sala de estudio.
+            Crea tu primera sala y empieza a colaborar con tus compañeros.
+          </p>
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto"
+          >
+            <Plus className="h-5 w-5" />
+            Crear primera sala
+          </button>
+        </section>
+      ) : (
+        <section className="mb-8" aria-labelledby="active-rooms-heading">
+          <h2
+            id="active-rooms-heading"
+            className="text-2xl font-bold text-gray-900 mb-4"
+          >
+            Estas son tus salas de estudio:
+          </h2>
+          <div className="relative">
+            {totalPages > 1 && (
+              <>
                 <button
-                  key={i}
-                  onClick={() => setPage(i)}
-                  className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none ${
-                    i === page
-                      ? "bg-primary-600 w-6"
-                      : "bg-gray-300 hover:bg-gray-400"
-                  }`}
-                  aria-label={`Ir a página ${i + 1}`}
-                />
-              ))}
+                  onClick={goPrev}
+                  disabled={page === 0}
+                  className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+                  aria-label="Anterior"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
+                </button>
+                <button
+                  onClick={goNext}
+                  disabled={page >= totalPages - 1}
+                  className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 ${page >= totalPages - 1 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+                  aria-label="Siguiente"
+                >
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" />
+                </button>
+              </>
+            )}
+            <div
+              className="relative"
+              style={{ clipPath: "inset(-40px -20px -40px -20px)", overflowX: "hidden" }}
+              onMouseEnter={() => setContainerHovered(true)}
+              onMouseLeave={() => {
+                setContainerHovered(false);
+                setHoveredCard(null);
+              }}
+            >
+              <div className="relative" style={{ height: containerHeight, paddingTop: 32, paddingBottom: 32 }}>
+                {totalPages > 1 && (
+                  <div
+                    className="absolute inset-0 pointer-events-none z-10"
+                    style={{ background: `linear-gradient(${edgeGradient})` }}
+                  />
+                )}
+
+                  <div
+                    ref={containerRef}
+                    className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
+                    style={{
+                      transform: `translateX(-${translateX}px)`,
+                      justifyContent: activeRooms.length < cardsPerPage ? "center" : "flex-start",
+                    }}
+                  >
+                  {cardWidth > 0 && activeRooms.map((room, index) => {
+                    const aIdx = index % 5;
+                    const isHovered = hoveredCard === room.id;
+                    const isDimmed =
+                      containerHovered && hoveredCard !== null && !isHovered;
+
+                    return (
+                      <article
+                        key={room.id}
+                        className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0"
+                        style={{
+                          width: cardWidth > 0 ? cardWidth : "auto",
+                          flex: cardWidth > 0 ? "0 0 auto" : "1 1 0%",
+                          animation: `${animNames[aIdx]} ${animDurs[aIdx]} ease-in-out infinite`,
+                          animationPlayState: isHovered ? "paused" : "running",
+                          scale: isHovered ? "1.07" : isDimmed ? "0.94" : "1",
+                          translate: isHovered ? "0 -8px" : "0 0",
+                          rotate: isHovered ? "0deg" : undefined,
+                          opacity: isDimmed ? "0.45" : 1,
+                          transition: isHovered
+                            ? "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
+                            : "all 0.3s ease-out",
+                        }}
+                        aria-label={`Sala de estudio ${room.name}`}
+                        onMouseEnter={() => setHoveredCard(room.id)}
+                        onMouseLeave={() => setHoveredCard(null)}
+                      >
+                        <div className={`h-2 bg-gradient-to-r ${colors[index % colors.length]}`} />
+
+                        <div className="p-6">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition">
+                                {room.name}
+                              </h3>
+
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Copy className="h-4 w-4" aria-hidden="true" />
+                                <span className="font-mono text-xs">ID: {room.id}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                            <Calendar className="h-4 w-4" aria-hidden="true" />
+                            <span>
+                              Creada el {formatDate(room.createdAt)}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => navigate(`/rooms/${room.id}`)}
+                            className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
+                            aria-label={`Unirse a la sala ${room.name}`}
+                          >
+                            Unirse a la sala
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      </section>
+
+            {totalPages > 1 && (
+              <div className="flex justify-center gap-2 mt-4">
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i)}
+                    className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none ${
+                      i === page
+                        ? "bg-primary-600 w-6"
+                        : "bg-gray-300 hover:bg-gray-400"
+                    }`}
+                    aria-label={`Ir a página ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
