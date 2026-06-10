@@ -1,11 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Book, Search, Filter } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/shared/components/ui/dialog";
 
 export function RoomList() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [roomName, setRoomName] = useState("");
 
   const rooms = [
     { id: "1", name: "Calculus Study Group", subject: "Mathematics", participants: 4, capacity: 10, status: "active", color: "from-blue-500 to-cyan-500" },
@@ -24,29 +35,35 @@ export function RoomList() {
     return matchesSearch && matchesSubject;
   });
 
+  const handleCreateRoom = () => {
+    setShowCreateDialog(false);
+    setRoomName("");
+    navigate("/rooms/1");
+  };
+
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Browse Study Rooms</h2>
-        <p className="text-gray-600 mb-6">Find the perfect study group for your needs</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Explorar salas</h2>
+        <p className="text-gray-600 mb-6">Encuentra el grupo de estudio perfecto para tus necesidades</p>
         <button
-          onClick={() => navigate("/rooms/create")}
-          className="w-full sm:w-auto bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          onClick={() => setShowCreateDialog(true)}
+          className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
         >
           <Plus className="h-5 w-5" />
-          Create New Room
+          Crear sala
         </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 mb-8">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-bold text-gray-900">Search & Filter</h3>
+          <h3 className="text-lg font-bold text-gray-900">Buscar y filtrar</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="search" className="block mb-2 text-sm font-semibold text-gray-700">
-              Search Rooms
+              Buscar salas
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -57,24 +74,24 @@ export function RoomList() {
                 id="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter room name..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                placeholder="Nombre de la sala..."
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
             </div>
           </div>
           <div>
             <label htmlFor="subject-filter" className="block mb-2 text-sm font-semibold text-gray-700">
-              Filter by Subject
+              Filtrar por materia
             </label>
             <select
               id="subject-filter"
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
             >
               {subjects.map((subject) => (
                 <option key={subject} value={subject}>
-                  {subject === "all" ? "All Subjects" : subject}
+                  {subject === "all" ? "Todas las materias" : subject}
                 </option>
               ))}
             </select>
@@ -85,10 +102,10 @@ export function RoomList() {
       <section aria-labelledby="available-rooms-heading">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h2 id="available-rooms-heading" className="text-2xl font-bold text-gray-900">
-            Available Rooms
+            Salas disponibles
           </h2>
           <span className="text-sm font-semibold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full">
-            {filteredRooms.length} {filteredRooms.length === 1 ? "room" : "rooms"}
+            {filteredRooms.length} {filteredRooms.length === 1 ? "sala" : "salas"}
           </span>
         </div>
         <div className="space-y-4">
@@ -112,7 +129,7 @@ export function RoomList() {
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Users className="h-4 w-4" />
                         <span>
-                          {room.participants}/{room.capacity} participants
+                          {room.participants}/{room.capacity} participantes
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -123,9 +140,9 @@ export function RoomList() {
                   </div>
                   <button
                     onClick={() => navigate(`/rooms/join/${room.id}`)}
-                    className="w-full sm:w-auto bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg"
+                    className="w-full sm:w-auto bg-primary text-white px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md hover:shadow-lg"
                   >
-                    Join Room
+                    Unirse
                   </button>
                 </div>
               </div>
@@ -134,12 +151,56 @@ export function RoomList() {
           {filteredRooms.length === 0 && (
             <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-12 text-center">
               <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-gray-900 mb-2">No rooms found</p>
-              <p className="text-gray-600">Try adjusting your search or filters</p>
+              <p className="text-lg font-semibold text-gray-900 mb-2">No se encontraron salas</p>
+              <p className="text-gray-600">Ajusta tu búsqueda o filtros</p>
             </div>
           )}
         </div>
       </section>
+
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear sala de estudio</DialogTitle>
+            <DialogDescription>
+              Dale un nombre a tu sala para empezar a estudiar en equipo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div>
+            <label htmlFor="new-room-name" className="block mb-2 text-sm font-semibold text-gray-700">
+              Nombre de la sala
+            </label>
+            <input
+              type="text"
+              id="new-room-name"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Ej: Grupo de estudio de cálculo"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            />
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+              >
+                Cancelar
+              </button>
+            </DialogClose>
+            <button
+              type="button"
+              onClick={handleCreateRoom}
+              className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Crear sala
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

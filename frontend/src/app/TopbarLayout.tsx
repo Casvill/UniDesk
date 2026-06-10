@@ -24,13 +24,13 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    label: "Dashboard",
+    label: "Principal",
     path: "/dashboard",
     isActive: (pathname) => pathname === "/dashboard",
     Icon: Home,
   },
   {
-    label: "Browse Rooms",
+    label: "Explorar salas",
     path: "/rooms",
     isActive: (pathname) => pathname.startsWith("/rooms"),
     Icon: Search,

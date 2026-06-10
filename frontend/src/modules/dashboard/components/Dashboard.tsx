@@ -61,8 +61,8 @@ export function Dashboard() {
         </p>
 
         <button
-          onClick={() => navigate("/rooms/create")}
-          className="w-full sm:w-auto bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          onClick={() => navigate("/rooms")}
+          className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           aria-label="Crear una nueva sala de estudio"
         >
           <Plus className="h-5 w-5" aria-hidden="true" />
