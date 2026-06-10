@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Book, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Copy, Calendar } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
@@ -11,27 +11,11 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/shared/components/ui/dialog";
+import { api, Room } from "@/services/api";
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-
-  const activeRooms = [
-    {
-      id: "1",
-      name: "Grupo de estudio de Cálculo",
-      participants: 4,
-      subject: "Matemáticas",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      id: "2",
-      name: "Grupo de estudio de Cálculo",
-      participants: 4,
-      subject: "Matemáticas",
-      color: "from-blue-500 to-cyan-500",
-    },
-  ];
+  const { profile, user } = useAuth();
 
   const username = profile?.username
     ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1)
@@ -42,6 +26,25 @@ export function Dashboard() {
   const [containerHovered, setContainerHovered] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [roomName, setRoomName] = useState("");
+  const [activeRooms, setActiveRooms] = useState<Room[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+
+  const colors = [
+    "from-blue-500 to-cyan-500",
+    "from-purple-500 to-pink-500",
+    "from-green-500 to-emerald-500",
+    "from-orange-500 to-red-500",
+    "from-teal-500 to-cyan-500",
+  ];
+
+  const formatDate = (ts: { seconds: number; nanoseconds: number }) => {
+    const date = new Date(ts.seconds * 1000);
+    return date.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   const [cardsPerPage, setCardsPerPage] = useState(() => {
     if (typeof window !== "undefined") {
@@ -82,6 +85,23 @@ export function Dashboard() {
     const newTotal = Math.ceil(activeRooms.length / cardsPerPage);
     setPage((p) => Math.min(p, Math.max(0, newTotal - 1)));
   }, [cardsPerPage, activeRooms.length]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchRooms = async () => {
+      setIsLoadingRooms(true);
+      try {
+        const token = await user.getIdToken();
+        const rooms = await api.listRooms(token);
+        setActiveRooms(rooms);
+      } catch (err) {
+        console.error("Error al cargar salas:", err);
+      } finally {
+        setIsLoadingRooms(false);
+      }
+    };
+    fetchRooms();
+  }, [user]);
 
   const updateDimensions = useCallback(() => {
     if (containerRef.current) {
@@ -241,7 +261,7 @@ export function Dashboard() {
                       onMouseEnter={() => setHoveredCard(room.id)}
                       onMouseLeave={() => setHoveredCard(null)}
                     >
-                      <div className={`h-2 bg-gradient-to-r ${room.color}`} />
+                      <div className={`h-2 bg-gradient-to-r ${colors[index % colors.length]}`} />
 
                       <div className="p-6">
                         <div className="flex items-start justify-between mb-3">
@@ -251,16 +271,16 @@ export function Dashboard() {
                             </h3>
 
                             <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Book className="h-4 w-4" aria-hidden="true" />
-                              <span>{room.subject}</span>
+                              <Copy className="h-4 w-4" aria-hidden="true" />
+                              <span className="font-mono text-xs">ID: {room.id}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                          <Users className="h-4 w-4" aria-hidden="true" />
+                          <Calendar className="h-4 w-4" aria-hidden="true" />
                           <span>
-                            {room.participants} participantes en línea
+                            Creada el {formatDate(room.createdAt)}
                           </span>
                         </div>
 
