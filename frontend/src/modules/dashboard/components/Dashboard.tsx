@@ -2,6 +2,15 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Users, Book, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/shared/components/ui/dialog";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -67,6 +76,8 @@ export function Dashboard() {
   const [page, setPage] = useState(0);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [containerHovered, setContainerHovered] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [roomName, setRoomName] = useState("");
 
   const [cardsPerPage, setCardsPerPage] = useState(() => {
     if (typeof window !== "undefined") {
@@ -131,6 +142,12 @@ export function Dashboard() {
     setPage((p) => Math.max(p - 1, 0));
   }, []);
 
+  const handleCreateRoom = () => {
+    setShowCreateDialog(false);
+    setRoomName("");
+    navigate("/rooms/1");
+  };
+
   useEffect(() => {
     const styleId = "ud-float";
     if (document.getElementById(styleId)) return;
@@ -171,7 +188,7 @@ export function Dashboard() {
         </p>
 
         <button
-          onClick={() => navigate("/rooms")}
+          onClick={() => setShowCreateDialog(true)}
           className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           aria-label="Crear una nueva sala de estudio"
         >
@@ -313,6 +330,50 @@ export function Dashboard() {
           )}
         </div>
       </section>
+
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear sala de estudio</DialogTitle>
+            <DialogDescription>
+              Dale un nombre a tu sala para empezar a estudiar en equipo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div>
+            <label htmlFor="new-room-name" className="block mb-2 text-sm font-semibold text-gray-700">
+              Nombre de la sala
+            </label>
+            <input
+              type="text"
+              id="new-room-name"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Ej: Grupo de estudio de cálculo"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            />
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+              >
+                Cancelar
+              </button>
+            </DialogClose>
+            <button
+              type="button"
+              onClick={handleCreateRoom}
+              className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Crear sala
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

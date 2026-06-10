@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
+import { Home, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
 import { Button } from "@/shared/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
@@ -28,12 +28,6 @@ const navItems: NavItem[] = [
     path: "/dashboard",
     isActive: (pathname) => pathname === "/dashboard",
     Icon: Home,
-  },
-  {
-    label: "Explorar salas",
-    path: "/rooms",
-    isActive: (pathname) => pathname.startsWith("/rooms"),
-    Icon: Search,
   },
 ];
 
