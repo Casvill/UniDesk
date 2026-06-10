@@ -151,7 +151,7 @@ async function uploadAvatarToStorage(userId: string, file: File): Promise<string
 }
 
 export function MyProfile() {
-  const { user, profile, updateProfileData } = useAuth();
+  const { user, profile, updateProfileData, deleteAccount } = useAuth();
 
   const [form, setForm] = useState<ProfileForm>({
     displayName: "",
@@ -176,6 +176,7 @@ export function MyProfile() {
 
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const cleanDisplayName = form.displayName.trim();
   const cleanUsername = form.username.trim();
@@ -206,7 +207,8 @@ export function MyProfile() {
     cleanDisplayName.length > 0 &&
     isUsernameValid &&
     isEmailValid &&
-    !loading;
+    !loading &&
+    !deletingAccount;
 
   useEffect(() => {
     const currentPhotoURL = profile?.photoURL || user?.photoURL || "";
@@ -509,6 +511,31 @@ export function MyProfile() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deletingAccount) return;
+
+    setDeletingAccount(true);
+
+    const loadingKey = showToast.loading("Eliminando tu cuenta. Por favor espera.");
+
+    try {
+      await deleteAccount();
+
+      showToast.close(loadingKey);
+      showToast.success("Tu cuenta fue eliminada correctamente.");
+
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Delete account error:", error);
+
+      showToast.close(loadingKey);
+      showToast.error("No pudimos eliminar tu cuenta. Inténtalo nuevamente o vuelve a iniciar sesión.");
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const avatarContent = avatarPreview ? (
     <img
       src={avatarPreview}
@@ -551,7 +578,7 @@ export function MyProfile() {
             aria-invalid={Boolean(errors.displayName)}
             aria-describedby={errors.displayName ? "display-name-error" : undefined}
             autoComplete="name"
-            disabled={loading}
+            disabled={loading || deletingAccount}
           />
 
           {errors.displayName && (
@@ -586,7 +613,7 @@ export function MyProfile() {
             aria-invalid={isUsernameError ? true : undefined}
             aria-describedby={isUsernameError ? "settings-username-error" : undefined}
             autoComplete="username"
-            disabled={loading}
+            disabled={loading || deletingAccount}
           />
 
           {usernameMessage && (
@@ -638,7 +665,7 @@ export function MyProfile() {
               aria-invalid={isEmailError ? true : undefined}
               aria-describedby={isEmailError ? "settings-email-error" : undefined}
               autoComplete="email"
-              disabled={loading || isGoogleUser}
+              disabled={loading || deletingAccount || isGoogleUser}
               title={isGoogleUser ? "No puedes cambiar el correo de una cuenta de Google" : undefined}
             />
 
@@ -694,7 +721,7 @@ export function MyProfile() {
             placeholder="Ej: Universidad Distrital"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
             autoComplete="organization"
-            disabled={loading}
+            disabled={loading || deletingAccount}
           />
         </div>
 
@@ -740,7 +767,6 @@ export function MyProfile() {
         </p>
       </div>
 
-      {/* Mobile layout: avatar → form → danger */}
       <div className="flex flex-col gap-6 lg:hidden">
         <section
           className="bg-white rounded-2xl shadow-md border border-gray-100 p-6"
@@ -770,7 +796,7 @@ export function MyProfile() {
                 onChange={handleAvatarChange}
                 className="hidden"
                 aria-label="Seleccionar imagen de perfil"
-                disabled={loading}
+                disabled={loading || deletingAccount}
               />
             </div>
 
@@ -804,14 +830,13 @@ export function MyProfile() {
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
-            disabled={loading}
+            disabled={loading || deletingAccount}
           >
-            Eliminar cuenta
+            {deletingAccount ? "Eliminando..." : "Eliminar cuenta"}
           </button>
         </section>
       </div>
 
-      {/* Desktop layout: left sticky (avatar + danger) | right (form) */}
       <div className="hidden lg:grid lg:grid-cols-[300px_1fr] lg:gap-8">
         <div className="space-y-6 lg:sticky lg:top-24 self-start">
           <section
@@ -842,7 +867,7 @@ export function MyProfile() {
                   onChange={handleAvatarChange}
                   className="hidden"
                   aria-label="Seleccionar imagen de perfil"
-                  disabled={loading}
+                  disabled={loading || deletingAccount}
                 />
               </div>
 
@@ -854,7 +879,7 @@ export function MyProfile() {
 
           <section
             className="bg-white rounded-2xl shadow-md border border-red-200 p-6"
-            aria-labelledby="danger-zone-heading"
+            aria-labelledby="danger-zone-heading-desktop"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
@@ -874,9 +899,9 @@ export function MyProfile() {
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
               className="w-full border border-red-300 text-red-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-red-50 transition"
-              disabled={loading}
+              disabled={loading || deletingAccount}
             >
-              Eliminar cuenta
+              {deletingAccount ? "Eliminando..." : "Eliminar cuenta"}
             </button>
           </section>
         </div>
@@ -898,21 +923,28 @@ export function MyProfile() {
               Esta acción es irreversible. Se perderá tu perfil, salas y toda la información asociada a tu cuenta.
             </DialogDescription>
           </DialogHeader>
+
           <DialogFooter>
             <DialogClose asChild>
               <button
                 type="button"
-                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+                disabled={deletingAccount}
+                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
             </DialogClose>
+
             <button
               type="button"
-              onClick={() => setShowDeleteConfirm(false)}
-              className="bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-lg"
+              onClick={(event) => {
+                event.preventDefault();
+                handleDeleteAccount();
+              }}
+              disabled={deletingAccount}
+              className="bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Confirmar
+              {deletingAccount ? "Eliminando..." : "Confirmar"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -925,6 +957,7 @@ export function MyProfile() {
         className="sr-only"
       >
         {loading && "Guardando los cambios de tu perfil. Por favor espera."}
+        {deletingAccount && "Eliminando tu cuenta. Por favor espera."}
       </div>
     </div>
   );

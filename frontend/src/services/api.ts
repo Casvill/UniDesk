@@ -87,8 +87,10 @@ export const api = {
   async getProfile(uid: string, token: string): Promise<UserProfile | null> {
     try {
       const response = await fetch(`${API_URL}/users/${uid}`, {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
       });
 
@@ -127,6 +129,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -156,10 +159,15 @@ export const api = {
       let url = `${API_URL}/users/email/${encodeURIComponent(email)}/available`;
 
       if (excludeUid) {
-        url += `?excludeUid=${excludeUid}`;
+        url += `?excludeUid=${encodeURIComponent(excludeUid)}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
 
       if (!response.ok) return false;
 
@@ -173,7 +181,13 @@ export const api = {
   async checkUsername(username: string): Promise<boolean> {
     try {
       const response = await fetch(
-        `${API_URL}/users/username/${username}/available`
+        `${API_URL}/users/username/${encodeURIComponent(username)}/available`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
       );
 
       if (!response.ok) return false;
@@ -202,6 +216,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -232,17 +247,28 @@ export const api = {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
       });
 
       if (!response.ok) {
         const message = await getErrorMessage(response, 'Error al eliminar la cuenta');
 
-        throw createApiError(
-          message,
-          'backend/profile-delete-failed',
-          response.status
-        );
+        let code = 'backend/profile-delete-failed';
+
+        if (response.status === 401) {
+          code = 'backend/unauthorized';
+        }
+
+        if (response.status === 403) {
+          code = 'backend/forbidden';
+        }
+
+        if (response.status === 404) {
+          code = 'backend/profile-not-found';
+        }
+
+        throw createApiError(message, code, response.status);
       }
     } catch (error) {
       handleNetworkError(
