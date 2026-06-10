@@ -12,6 +12,7 @@ import {
   DialogClose,
 } from "@/shared/components/ui/dialog";
 import { api, Room } from "@/services/api";
+import emptyState from "@/assets/empty/empty-state.svg";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -116,7 +117,7 @@ export function Dashboard() {
     updateDimensions();
     window.addEventListener("resize", updateDimensions);
     return () => window.removeEventListener("resize", updateDimensions);
-  }, [updateDimensions]);
+  }, [updateDimensions, activeRooms.length]);
 
   const goNext = useCallback(() => {
     setPage((p) => Math.min(p + 1, totalPages - 1));
@@ -179,55 +180,36 @@ export function Dashboard() {
           Organiza tus salas, únete a tus compañeros y continúa estudiando en equipo.
         </p>
 
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-          aria-label="Crear una nueva sala de estudio"
-        >
-          <Plus className="h-5 w-5" aria-hidden="true" />
-          Crear nueva sala
-        </button>
+        {activeRooms.length > 0 && (
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            aria-label="Crear una nueva sala de estudio"
+          >
+            <Plus className="h-5 w-5" aria-hidden="true" />
+            Crear nueva sala
+          </button>
+        )}
       </div>
 
       {isLoadingRooms && activeRooms.length === 0 ? (
-        <section className="mb-8" aria-labelledby="loading-rooms-heading" role="status">
-          <h2 id="loading-rooms-heading" className="text-2xl font-bold text-gray-900 mb-4">
+        <section className="flex flex-col items-center justify-center py-20" aria-labelledby="loading-rooms-heading" role="status">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
+          <p id="loading-rooms-heading" className="text-gray-500 mt-4">
             Cargando tus salas...
-          </h2>
-          <div className="flex gap-6 overflow-hidden">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden flex-shrink-0 animate-pulse"
-                style={{ width: 300, height: 250 }}
-                aria-hidden="true"
-              >
-                <div className="h-2 bg-gray-200" />
-                <div className="p-6 space-y-4">
-                  <div className="h-5 bg-gray-200 rounded w-3/4" />
-                  <div className="h-4 bg-gray-200 rounded w-1/2" />
-                  <div className="h-4 bg-gray-200 rounded w-2/3" />
-                  <div className="h-10 bg-gray-200 rounded w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
+          </p>
         </section>
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
         <section className="text-center py-12" aria-labelledby="empty-rooms-heading">
-          <div
-            className="inline-flex items-center justify-center w-72 h-72 mb-8 bg-white rounded-2xl shadow-md border border-gray-100"
+          <img
+            src={emptyState}
+            alt=""
+            className="w-[432px] mx-auto mb-8 opacity-75"
             style={{
               animation: `${animNames[0]} ${animDurs[0]} ease-in-out infinite`,
             }}
-          >
-            <div className="text-center p-6">
-              <span className="text-6xl block mb-4" aria-hidden="true">🏫</span>
-              <p className="text-gray-300 text-lg font-semibold">
-                Pasillos vacíos...
-              </p>
-            </div>
-          </div>
+            aria-hidden="true"
+          />
           <h2 id="empty-rooms-heading" className="text-2xl font-bold text-gray-900 mb-2">
             Mucho silencio por estos pasillos virtuales...
           </h2>
