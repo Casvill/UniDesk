@@ -51,11 +51,13 @@ export function TopbarLayout() {
   const UserMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-auto p-1 rounded-full" aria-label="User account menu">
-          <Avatar className="h-9 w-9">
+        <Button variant="ghost" className="h-auto px-2 py-1.5 rounded-full flex items-center gap-2" aria-label="User account menu">
+          <ChevronDown className="h-4 w-4 text-gray-400 hidden lg:block" />
+          <Avatar className="h-10 w-10">
             <AvatarImage src={profile?.photoURL} alt={profile?.displayName || "User profile"} />
             <AvatarFallback>{profile?.username?.slice(0, 2).toUpperCase() || "UN"}</AvatarFallback>
           </Avatar>
+          
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -81,7 +83,7 @@ export function TopbarLayout() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-7">
           <div className="flex items-center justify-between">
             {/* Left: Mobile Menu & Logo Container */}
             <div className="flex items-center flex-1 md:flex-none">
@@ -152,7 +154,7 @@ export function TopbarLayout() {
 
               {/* Logo - Centered on Mobile, Left on Desktop */}
               <div className="flex-1 flex justify-center md:justify-start md:flex-none">
-                <img src={logo} alt="UniDesk" className="h-9 w-auto" />
+                <img src={logo} alt="UniDesk" className="h-12 w-auto" />
               </div>
               
               <nav className="hidden md:flex items-center gap-2 ml-6">
@@ -185,7 +187,7 @@ export function TopbarLayout() {
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2"
                   >
                     <LogOut className="h-4 w-4" />
-                    Logout
+                    Salir
                   </Button>
                 </>
               )}
