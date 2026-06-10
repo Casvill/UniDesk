@@ -62,7 +62,7 @@ export function TopbarLayout() {
         <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
           {profile ? (
             <>
-              Logged in as<br />
+              Sesión activa como<br />
               <span className="font-medium text-foreground text-sm">@{profile.username}</span>
             </>
           ) : (
