@@ -49,16 +49,25 @@ export function Dashboard() {
             {roomsError}
           </p>
 
+          <p className="text-gray-500 mt-2">
+            Verifica tu conexión o intenta nuevamente.
+          </p>
+
           <button
             type="button"
             onClick={refetchRooms}
-            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition"
+            disabled={isLoadingRooms}
+            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reintentar
+            {isLoadingRooms ? "Reintentando..." : "Reintentar"}
           </button>
         </section>
       ) : isLoadingRooms && activeRooms.length === 0 ? (
-        <section className="flex flex-col items-center justify-center py-20" role="status">
+        <section
+          className="flex flex-col items-center justify-center py-20"
+          role="status"
+          aria-live="polite"
+        >
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary" />
           <p className="text-gray-500 mt-4">Cargando tus salas...</p>
         </section>
