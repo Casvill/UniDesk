@@ -26,46 +26,10 @@ export function Dashboard() {
     },
     {
       id: "2",
-      name: "Preparación para finales de Programación",
-      participants: 8,
-      subject: "Ciencias de la Computación",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      id: "3",
-      name: "Repaso de laboratorio de Biología",
-      participants: 3,
-      subject: "Biología",
-      color: "from-green-500 to-emerald-500",
-    },
-    {
-      id: "4",
-      name: "Repaso de laboratorio de Biología",
-      participants: 3,
-      subject: "Biología",
-      color: "from-green-500 to-emerald-500",
-    },
-    {
-      id: "5",
-      name: "Repaso de laboratorio de Biología",
-      participants: 3,
-      subject: "Biología",
-      color: "from-green-500 to-emerald-500",
-    },
-  ];
-
-  const upcomingSessions = [
-    {
-      id: "1",
-      name: "Sesión de estudio de Química",
-      time: "Hoy, 3:00 p. m.",
-      participants: 5,
-    },
-    {
-      id: "2",
-      name: "Repaso para examen de Historia",
-      time: "Mañana, 10:00 a. m.",
-      participants: 6,
+      name: "Grupo de estudio de Cálculo",
+      participants: 4,
+      subject: "Matemáticas",
+      color: "from-blue-500 to-cyan-500",
     },
   ];
 
@@ -242,11 +206,14 @@ export function Dashboard() {
                 />
               )}
 
-              <div
-                ref={containerRef}
-                className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
-                style={{ transform: `translateX(-${translateX}px)` }}
-              >
+                <div
+                  ref={containerRef}
+                  className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
+                  style={{
+                    transform: `translateX(-${translateX}px)`,
+                    justifyContent: activeRooms.length < cardsPerPage ? "center" : "flex-start",
+                  }}
+                >
                 {cardWidth > 0 && activeRooms.map((room, index) => {
                   const aIdx = index % 5;
                   const isHovered = hoveredCard === room.id;
