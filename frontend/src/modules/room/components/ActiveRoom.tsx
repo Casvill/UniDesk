@@ -15,13 +15,13 @@ import {
   Check,
 } from "lucide-react";
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogCancel,
-  AlertDialogDescription,
-} from "@/shared/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+  DialogDescription,
+} from "@/shared/components/ui/dialog";
 
 export function ActiveRoom() {
   const navigate = useNavigate();
@@ -251,14 +251,14 @@ export function ActiveRoom() {
         </aside>
       </div>
 
-      <AlertDialog open={showWelcome} onOpenChange={setShowWelcome}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Tu sala está lista para compartir</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={showWelcome} onOpenChange={setShowWelcome}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Tu sala está lista para compartir</DialogTitle>
+            <DialogDescription>
               Copia el código y compártelo con quienes quieras invitar
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <div
             onClick={handleCopyId}
@@ -271,7 +271,7 @@ export function ActiveRoom() {
             <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-1">
               ID de sala
             </p>
-            <p className="text-3xl sm:text-4xl font-bold text-gray-900 font-mono tracking-wider mb-4">
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 font-mono tracking-wider whitespace-nowrap overflow-hidden mb-4">
               {roomId}
             </p>
             <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-4 py-1.5 rounded-full transition-all duration-200 ${
@@ -293,11 +293,13 @@ export function ActiveRoom() {
             </span>
           </div>
 
-          <AlertDialogCancel className="w-full sm:w-full mt-2">
-            Cerrar
-          </AlertDialogCancel>
-        </AlertDialogContent>
-      </AlertDialog>
+          <DialogClose asChild>
+            <button className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition mt-2">
+              Cerrar
+            </button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

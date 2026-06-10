@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Plus, ChevronLeft, ChevronRight, Copy, Calendar } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Copy, Calendar, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
@@ -38,8 +38,20 @@ export function Dashboard() {
     "from-teal-500 to-cyan-500",
   ];
 
-  const formatDate = (ts: { seconds: number; nanoseconds: number }) => {
-    const date = new Date(ts.seconds * 1000);
+  const formatDate = (ts: unknown) => {
+    if (!ts) return "";
+    let seconds: number;
+    if (typeof ts === "object" && ts !== null && "seconds" in ts) {
+      seconds = (ts as { seconds: number }).seconds;
+    } else if (typeof ts === "object" && ts !== null && "_seconds" in ts) {
+      seconds = (ts as { _seconds: number })._seconds;
+    } else if (typeof ts === "string") {
+      seconds = new Date(ts).getTime() / 1000;
+    } else {
+      return "";
+    }
+    const date = new Date(seconds * 1000);
+    if (isNaN(date.getTime())) return "";
     return date.toLocaleDateString("es-ES", {
       day: "numeric",
       month: "short",
@@ -173,7 +185,7 @@ export function Dashboard() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          ¡Qué bueno verte de nuevo, {username}!
+          ¡Qué bueno verte por aquí, {username}!
         </h2>
 
         <p className="text-gray-600 mb-6">
@@ -288,7 +300,7 @@ export function Dashboard() {
                     return (
                       <article
                         key={room.id}
-                        className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0"
+                        className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0 flex flex-col h-auto"
                         style={{
                           width: cardWidth > 0 ? cardWidth : "auto",
                           flex: cardWidth > 0 ? "0 0 auto" : "1 1 0%",
@@ -306,37 +318,52 @@ export function Dashboard() {
                         onMouseEnter={() => setHoveredCard(room.id)}
                         onMouseLeave={() => setHoveredCard(null)}
                       >
+                        {/* Franja de color superior */}
                         <div className={`h-2 bg-gradient-to-r ${colors[index % colors.length]}`} />
 
-                        <div className="p-6">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition">
-                                {room.name}
-                              </h3>
-
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Copy className="h-4 w-4" aria-hidden="true" />
-                                <span className="font-mono text-xs">ID: {room.id}</span>
-                              </div>
-                            </div>
+                        {/* Header: nombre + fecha */}
+                        <div className="px-6 pt-4 pb-4 border-b border-gray-100">
+                          <h3 className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition">
+                            {room.name}
+                          </h3>
+                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="text-[15px]" >{formatDate(room.createdAt)}</span>
                           </div>
-
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                            <Calendar className="h-4 w-4" aria-hidden="true" />
-                            <span>
-                              Creada el {formatDate(room.createdAt)}
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={() => navigate(`/rooms/${room.id}`)}
-                            className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
-                            aria-label={`Unirse a la sala ${room.name}`}
-                          >
-                            Unirse a la sala
-                          </button>
                         </div>
+
+                        {/* Body: ID + botón */}
+                        <div className="px-5 pt-3 pb-5 flex flex-col justify-between gap-4 flex-1">
+                          {/* Bloque ID */}
+                          <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                            <div>
+                              <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
+                                ID de sala
+                              </p>
+                              <p className="font-mono text-sm font-medium text-gray-600">
+                                {room.id}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(room.id)}
+                              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition"
+                              aria-label="Copiar ID de sala"
+                            >
+                              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                              Copiar
+                            </button>
+                          </div>
+
+                          {/* Botón entrar */}
+                          <button
+                              onClick={() => navigate(`/rooms/${room.id}`)}
+                              className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              aria-label={`Unirse a la sala ${room.name}`}
+                            >
+                              Entrar
+                              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
                       </article>
                     );
                   })}
