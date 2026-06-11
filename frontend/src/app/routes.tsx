@@ -7,7 +7,7 @@ import Forgot from "../modules/auth/pages/ForgotPage";
 import GoogleprofilePage from "../modules/auth/pages/GooglePage";
 
 /* LAYOUT */
-import { TopbarLayout } from "./TopbarLayout";
+import { TopbarLayout } from "../shared/components/TopbarLayout";
 import AuthLayout from "@/modules/auth/AuthLayout";
 
 /* PROTECTED PAGES */
