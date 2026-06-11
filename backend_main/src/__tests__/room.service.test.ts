@@ -29,10 +29,10 @@ describe("room.service", () => {
   });
 
   describe("deleteRoomsByOwner", () => {
-    it("debería borrar todas las salas del propietario usando un batch", async () => {
+    it("debería borrar todas las salas del propietario usando un batch y retornarlas", async () => {
       const mockDocs = [
-        { ref: "ref1" },
-        { ref: "ref2" }
+        { ref: "ref1", data: () => ({ id: "1", name: "Sala 1" }) },
+        { ref: "ref2", data: () => ({ id: "2", name: "Sala 2" }) }
       ];
       mockGet.mockResolvedValue({
         empty: false,
@@ -41,7 +41,7 @@ describe("room.service", () => {
       mockWhere.mockReturnValue({ get: mockGet });
       (db.collection as jest.Mock).mockReturnValue({ where: mockWhere });
 
-      await deleteRoomsByOwner("owner-123");
+      const result = await deleteRoomsByOwner("owner-123");
 
       expect(db.collection).toHaveBeenCalledWith("rooms");
       expect(mockWhere).toHaveBeenCalledWith("ownerUid", "==", "owner-123");
@@ -49,9 +49,13 @@ describe("room.service", () => {
       expect(mockBatchDelete).toHaveBeenCalledWith("ref1");
       expect(mockBatchDelete).toHaveBeenCalledWith("ref2");
       expect(mockBatchCommit).toHaveBeenCalled();
+      expect(result).toEqual([
+        { id: "1", name: "Sala 1" },
+        { id: "2", name: "Sala 2" }
+      ]);
     });
 
-    it("no debería hacer nada si el propietario no tiene salas", async () => {
+    it("debería retornar un array vacío si el propietario no tiene salas", async () => {
       mockGet.mockResolvedValue({
         empty: true,
         docs: []
@@ -59,9 +63,10 @@ describe("room.service", () => {
       mockWhere.mockReturnValue({ get: mockGet });
       (db.collection as jest.Mock).mockReturnValue({ where: mockWhere });
 
-      await deleteRoomsByOwner("owner-empty");
+      const result = await deleteRoomsByOwner("owner-empty");
 
       expect(mockBatchCommit).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
   });
 });
