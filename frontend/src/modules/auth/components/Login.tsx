@@ -309,7 +309,7 @@ export function Login() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             tabIndex={-1}
           >
@@ -358,7 +358,7 @@ export function Login() {
           aria-busy={loading}
           aria-disabled={isSubmitting}
           aria-label={loading ? "Iniciando sesión, por favor espera" : "Iniciar sesión"}
-          className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
         >
           {loading ? (
             <>
@@ -378,7 +378,7 @@ export function Login() {
           aria-busy={googleLoading}
           aria-disabled={isSubmitting}
           aria-label={googleLoading ? "Autenticando con Google, por favor espera" : "Iniciar sesión con Google"}
-          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal"
+          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
         >
           {googleLoading ? (
             <>
@@ -401,7 +401,7 @@ export function Login() {
         <button
           type="button"
           onClick={() => navigateWithTransition("/register")}
-          className="text-primary-600 font-semibold hover:underline text-sm"
+          className="text-primary-600 font-semibold hover:underline text-sm cursor-pointer"
           aria-label="Ir a registro"
           disabled={isSubmitting}
         >

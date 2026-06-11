@@ -220,7 +220,7 @@ export function TopbarLayout() {
                   ref={logoRef}
                   type="button"
                   onClick={() => navigate("/dashboard")}
-                  className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+                  className="cursor-pointer rounded-lg"
                   aria-label="Logo de UniDesk. Actualmente estás en UniDesk, en la página principal del dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas."
                 >
                   <img
@@ -231,38 +231,10 @@ export function TopbarLayout() {
                     className="h-12 w-auto"
                   />
                 </button>
-              </div>
-
-              <nav
-                className="hidden md:flex items-center gap-2 ml-6"
-                aria-label="Navegación principal"
-              >
-                {navItems.map((item) => {
-                  const isActive = item.isActive(pathname);
-                  const Icon = item.Icon;
-
-                  return (
-                    <Button
-                      key={item.path}
-                      variant={isActive ? "secondary" : "ghost"}
-                      onClick={() => navigate(item.path)}
-                      className="gap-2"
-                      aria-current={isActive ? "page" : undefined}
-                      aria-label={
-                        isActive
-                          ? `${item.label}, página actual`
-                          : `Ir a ${item.label}`
-                      }
-                    >
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                      {item.label}
-                    </Button>
-                  );
-                })}
-              </nav>
             </div>
+          </div>
 
-            <div
+          <div
               className="hidden md:flex items-center gap-2"
               aria-label="Opciones de cuenta"
             >

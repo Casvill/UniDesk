@@ -581,7 +581,7 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             tabIndex={-1}
           >
@@ -629,7 +629,7 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             aria-label={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
             tabIndex={-1}
           >
@@ -672,7 +672,7 @@ export function Register() {
           aria-busy={loading}
           aria-disabled={isSubmitting}
           aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
-          className="w-full bg-primary-600 text-white py-3 rounded-lg flex justify-center gap-2"
+          className="w-full bg-primary-600 text-white py-3 rounded-lg flex justify-center gap-2 cursor-pointer"
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
           {loading ? "Creando..." : "Crear cuenta"}
@@ -690,7 +690,7 @@ export function Register() {
               ? "Procesando registro con Google, por favor espera"
               : "Continuar con Google"
           }
-          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal"
+          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
         >
           {googleLoading ? (
             <>
@@ -713,7 +713,7 @@ export function Register() {
         <button
           type="button"
         onClick={() => navigateWithTransition("/")}
-        className="text-primary-600 font-semibold"
+        className="text-primary-600 font-semibold cursor-pointer"
           disabled={isSubmitting}
           aria-label="Ir a iniciar sesión"
         >

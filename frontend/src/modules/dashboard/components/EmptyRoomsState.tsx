@@ -41,7 +41,7 @@ export function EmptyRoomsState({
       <button
         type="button"
         onClick={onCreateRoom}
-        className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto"
+        className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto cursor-pointer"
         aria-label="Crear mi primera sala de estudio"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />

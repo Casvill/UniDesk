@@ -169,7 +169,7 @@ export function RoomCard({
             <button
               type="button"
               onClick={handleCopyRoomId}
-              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
               aria-label={`Copiar ID de la sala ${room.name}: ${room.id}`}
             >
               <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -193,7 +193,7 @@ export function RoomCard({
         <button
           type="button"
           onClick={() => navigate(`/rooms/${room.id}`)}
-          className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
           aria-label={`Entrar a la sala de estudio ${room.name}`}
         >
           Entrar
