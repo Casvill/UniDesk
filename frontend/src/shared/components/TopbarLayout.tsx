@@ -97,6 +97,7 @@ export function TopbarLayout() {
 
         <DropdownMenuItem
           onClick={() => navigate("/my-profile")}
+          className="cursor-pointer"
           aria-label="Ir a mi perfil"
         >
           <UserPen className="mr-2 h-4 w-4" aria-hidden="true" />

@@ -39,7 +39,7 @@ export function RoomCarousel({ rooms }: RoomCarouselProps) {
         tabIndex={0}
         aria-labelledby="active-rooms-heading"
         aria-describedby="active-rooms-description"
-        className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
       >
         <h2
           id="active-rooms-heading"

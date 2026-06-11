@@ -33,7 +33,7 @@ export function Dashboard() {
           tabIndex={0}
           role="group"
           aria-label={`Sección Dashboard de UniDesk. ${dashboardStateDescription}`}
-          className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
         >
           <h1
             id="dashboard-title"
@@ -69,7 +69,7 @@ export function Dashboard() {
             tabIndex={0}
             role="group"
             aria-label="Estado de error. No pudimos cargar tus salas."
-            className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-lg"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 rounded-lg"
           >
             <h2 className="text-red-600 font-semibold">
               No pudimos cargar tus salas
