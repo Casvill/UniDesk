@@ -102,7 +102,7 @@ export function RoomCard({
       <div className="px-6 pt-4 pb-4 border-b border-gray-100">
         <h3
           id={`room-title-${room.id}`}
-          className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition"
+          className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition truncate"
         >
           {room.name}
         </h3>
