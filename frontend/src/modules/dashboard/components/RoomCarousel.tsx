@@ -1,3 +1,4 @@
+import { useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Room } from "@/services/api";
 import { useCarousel } from "../hooks/useCarousel";
@@ -28,6 +29,18 @@ export function RoomCarousel({ rooms }: RoomCarouselProps) {
   const { animNames, animDurs } = useFloatingAnimation();
 
   const containerHeight = cardsPerPage === 1 ? 280 : cardsPerPage === 2 ? 300 : 320;
+
+  const scrollCooldownRef = useRef(false);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (scrollCooldownRef.current || totalPages <= 1) return;
+    const delta = e.deltaY || e.deltaX;
+    if (Math.abs(delta) < 30) return;
+    scrollCooldownRef.current = true;
+    if (delta > 0) goNext();
+    else goPrev();
+    setTimeout(() => { scrollCooldownRef.current = false; }, 400);
+  }, [goNext, goPrev, totalPages]);
 
   return (
     <section
@@ -102,6 +115,7 @@ export function RoomCarousel({ rooms }: RoomCarouselProps) {
             setContainerHovered(false);
             setHoveredCard(null);
           }}
+          onWheel={handleWheel}
         >
           <div
             className="relative"
