@@ -2,6 +2,7 @@ import { db, auth } from "../config/firebase";
 import { UserProfile, CreateUserDTO, UpdateUserDTO } from "../types/user.types";
 import { Timestamp } from "firebase-admin/firestore";
 import { normalizeUsername, getUsernameDocRef } from "./username.service";
+import { deleteRoomsByOwner } from "./room.service";
 
 const USERS_COLLECTION = "users";
 
@@ -126,6 +127,8 @@ export async function deleteUserProfile(uid: string): Promise<void> {
   const batch = db.batch();
   batch.delete(docRef);
   batch.delete(getUsernameDocRef(username));
+  
+  await deleteRoomsByOwner(uid);
   await batch.commit();
   await auth.deleteUser(uid);
 }

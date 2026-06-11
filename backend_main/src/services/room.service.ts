@@ -116,3 +116,27 @@ export async function deleteRoom(id: string): Promise<void> {
 
   await docRef.delete();
 }
+
+/**
+ * (D) Elimina en masa todas las salas de un propietario.
+ * 
+ * @param ownerUid - UID del propietario
+ * @returns Lista de salas eliminadas
+ */
+export async function deleteRoomsByOwner(ownerUid: string): Promise<Room[]> {
+  const snapshot = await db.collection(ROOMS_COLLECTION)
+    .where("ownerUid", "==", ownerUid)
+    .get();
+
+  if (snapshot.empty) return [];
+
+  const deletedRooms = snapshot.docs.map(doc => doc.data() as Room);
+  const batch = db.batch();
+  
+  snapshot.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+
+  await batch.commit();
+  return deletedRooms;
+}

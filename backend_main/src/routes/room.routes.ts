@@ -7,6 +7,7 @@ import {
   listRooms,
   updateRoom,
   deleteRoom,
+  deleteRoomsByOwner,
 } from "../services/room.service";
 import { handleFirebaseError } from "../utils/firebase-error.handler";
 import { db } from "../config/firebase";
@@ -206,6 +207,49 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
 
     const updatedRoom = await updateRoom(req.params.id, req.body);
     res.json(updatedRoom);
+  } catch (error) {
+    const handled = handleFirebaseError(error);
+    res.status(handled.statusCode).json({ message: handled.message });
+  }
+});
+
+/**
+ * @swagger
+ * /rooms:
+ *   delete:
+ *     summary: Eliminar todas las salas del usuario autenticado
+ *     description: Elimina en masa todas las salas de las que el usuario es propietario y retorna los datos de las salas eliminadas.
+ *     tags: [Rooms]
+ *     responses:
+ *       200:
+ *         description: Todas las salas eliminadas exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Todas tus salas han sido eliminadas exitosamente"
+ *                 deletedRooms:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Room'
+ *       401:
+ *         description: No autenticado
+ */
+router.delete("/", verifyToken, async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ message: "No autenticado" });
+      return;
+    }
+
+    const deletedRooms = await deleteRoomsByOwner(req.user.uid);
+    res.json({ 
+      message: "Todas tus salas han sido eliminadas exitosamente",
+      deletedRooms 
+    });
   } catch (error) {
     const handled = handleFirebaseError(error);
     res.status(handled.statusCode).json({ message: handled.message });
