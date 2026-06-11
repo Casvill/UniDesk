@@ -312,7 +312,8 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
  *   delete:
  *     summary: Eliminar cuenta de usuario
  *     description: >
- *       Elimina el perfil en Firestore y la cuenta en Firebase Auth.
+ *       Elimina el perfil en Firestore, la cuenta en Firebase Auth y 
+ *       todas las salas de estudio propiedad del usuario (eliminación en cascada).
  *       Solo el dueño de la cuenta puede eliminarla.
  *     tags: [Users]
  *     parameters:

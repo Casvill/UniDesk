@@ -14,7 +14,12 @@ jest.mock("../services/username.service", () => ({
   getUsernameDocRef: jest.fn(() => ({ get: jest.fn(), id: "mockref" })),
 }));
 
+jest.mock("../services/room.service", () => ({
+  deleteRoomsByOwner: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { db, auth } from "../config/firebase";
+import { deleteRoomsByOwner } from "../services/room.service";
 
 const mockGet = jest.fn();
 const mockUpdate = jest.fn();
@@ -91,6 +96,7 @@ describe("deleteUserProfile", () => {
 
     await deleteUserProfile("uid-123");
 
+    expect(deleteRoomsByOwner).toHaveBeenCalledWith("uid-123");
     expect(mockBatchCommit).toHaveBeenCalled();
     expect(auth.deleteUser).toHaveBeenCalledWith("uid-123");
   });
