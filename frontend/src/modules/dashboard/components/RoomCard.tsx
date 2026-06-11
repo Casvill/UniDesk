@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Copy, Calendar, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Room } from "@/services/api";
@@ -60,6 +61,50 @@ export function RoomCard({
   const navigate = useNavigate();
   const formattedDate = formatDate(room.createdAt);
 
+  const [copyMessage, setCopyMessage] = useState("");
+  const [copyStatus, setCopyStatus] = useState<"success" | "error" | null>(null);
+  const copyTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(room.id);
+
+      setCopyStatus("success");
+      setCopyMessage("ID copiado en el portapapeles.");
+
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setCopyMessage("");
+        setCopyStatus(null);
+      }, 2500);
+    } catch (error) {
+      console.error("Error al copiar el ID de la sala:", error);
+
+      setCopyStatus("error");
+      setCopyMessage("No se pudo copiar el ID. Inténtalo nuevamente.");
+
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setCopyMessage("");
+        setCopyStatus(null);
+      }, 3000);
+    }
+  };
+
   return (
     <article
       className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden group flex-shrink-0 flex flex-col h-auto"
@@ -109,26 +154,40 @@ export function RoomCard({
       </p>
 
       <div className="px-5 pt-3 pb-5 flex flex-col justify-between gap-4 flex-1">
-        <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-          <div>
-            <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
-              ID de sala
-            </p>
+        <div>
+          <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <div>
+              <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
+                ID de sala
+              </p>
 
-            <p className="font-mono text-sm font-medium text-gray-600">
-              {room.id}
-            </p>
+              <p className="font-mono text-sm font-medium text-gray-600">
+                {room.id}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyRoomId}
+              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label={`Copiar ID de la sala ${room.name}: ${room.id}`}
+            >
+              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+              Copiar
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(room.id)}
-            className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500"
-            aria-label={`Copiar ID de la sala ${room.name}: ${room.id}`}
-          >
-            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-            Copiar
-          </button>
+          {copyMessage && (
+            <p
+              className={`mt-2 text-xs font-medium ${
+                copyStatus === "success" ? "text-green-600" : "text-red-600"
+              }`}
+              role={copyStatus === "success" ? "status" : "alert"}
+              aria-live={copyStatus === "success" ? "polite" : "assertive"}
+            >
+              {copyMessage}
+            </p>
+          )}
         </div>
 
         <button
