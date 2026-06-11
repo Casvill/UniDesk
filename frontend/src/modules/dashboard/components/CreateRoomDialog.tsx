@@ -116,6 +116,7 @@ export function CreateRoomDialog({
   };
 
   const inputDescriptionIds = [
+    "room-name-help",
     showRoomNameError ? "room-name-error" : null,
     createRoomError ? "create-room-error" : null,
   ]
@@ -124,10 +125,11 @@ export function CreateRoomDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent aria-describedby="create-room-description">
         <DialogHeader>
           <DialogTitle>Crear sala de estudio</DialogTitle>
-          <DialogDescription>
+
+          <DialogDescription id="create-room-description">
             Dale un nombre a tu sala para empezar a estudiar en equipo.
           </DialogDescription>
         </DialogHeader>
@@ -151,25 +153,38 @@ export function CreateRoomDialog({
             onBlur={() => setHasTouchedRoomName(true)}
             placeholder="Ej: Grupo de estudio de cálculo"
             maxLength={ROOM_NAME_MAX_LENGTH}
+            disabled={isCreating}
             aria-invalid={Boolean(showRoomNameError || createRoomError)}
-            aria-describedby={inputDescriptionIds || undefined}
-            className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition ${
+            aria-describedby={inputDescriptionIds}
+            className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
               showRoomNameError || createRoomError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-indigo-500"
             }`}
           />
 
+          <p id="room-name-help" className="mt-1 text-xs text-gray-500">
+            El nombre debe tener entre 3 y 35 caracteres. Puedes usar letras,
+            números, espacios, tildes, guiones o puntos.
+          </p>
+
           <div className="mt-1 flex items-center justify-between">
             {showRoomNameError ? (
-              <p id="room-name-error" className="text-sm text-red-600">
+              <p
+                id="room-name-error"
+                className="text-sm text-red-600"
+                role="alert"
+              >
                 {roomNameError}
               </p>
             ) : (
               <span />
             )}
 
-            <span className="text-xs text-gray-500">
+            <span
+              className="text-xs text-gray-500"
+              aria-label={`${roomName.trim().length} de ${ROOM_NAME_MAX_LENGTH} caracteres usados`}
+            >
               {roomName.trim().length}/{ROOM_NAME_MAX_LENGTH}
             </span>
           </div>
@@ -192,6 +207,7 @@ export function CreateRoomDialog({
               type="button"
               disabled={isCreating}
               className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Cancelar creación de sala"
             >
               Cancelar
             </button>
@@ -201,9 +217,15 @@ export function CreateRoomDialog({
             type="button"
             onClick={handleCreate}
             disabled={isFormInvalid || isCreating}
+            aria-busy={isCreating}
+            aria-label={
+              isCreating
+                ? "Creando sala, por favor espera"
+                : "Crear sala de estudio"
+            }
             className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             {isCreating ? "Creando..." : "Crear sala"}
           </button>
         </DialogFooter>
