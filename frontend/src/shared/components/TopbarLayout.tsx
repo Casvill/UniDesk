@@ -36,7 +36,6 @@ export function TopbarLayout() {
   const { pathname } = useLocation();
   const { logout, profile, isAuthenticated } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const logoRef = useRef<HTMLButtonElement>(null);
 
@@ -58,21 +57,19 @@ export function TopbarLayout() {
   };
 
   const UserMenu = () => (
-    <DropdownMenu open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="h-auto px-2 py-1.5 rounded-r-none rounded-l-full flex items-center gap-2"
+          className="h-auto px-2 py-1.5 rounded-l-full flex items-center gap-2 group"
           aria-label={`Abrir menú de cuenta de ${username}`}
         >
           <ChevronDown
-            className={`h-4 w-4 text-gray-400 hidden lg:block transition-transform duration-200 ${
-              isUserMenuOpen ? "rotate-180" : ""
-            }`}
+            className="h-4 w-4 text-gray-400 hidden lg:block transition-transform duration-200 group-data-[state=open]:rotate-180"
             aria-hidden="true"
           />
 
-          <Avatar className="h-10 w-10 mr-1" aria-hidden="true">
+          <Avatar className="h-10 w-10" aria-hidden="true">
             <AvatarImage src={profile?.photoURL} alt="" />
             <AvatarFallback>
               {profile?.username?.slice(0, 2).toUpperCase() || "UN"}
