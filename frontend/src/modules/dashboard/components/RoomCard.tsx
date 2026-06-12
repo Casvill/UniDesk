@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Copy, Calendar, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { Copy, Check, Calendar, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Room } from "@/services/api";
 
@@ -61,47 +61,16 @@ export function RoomCard({
   const navigate = useNavigate();
   const formattedDate = formatDate(room.createdAt);
 
-  const [copyMessage, setCopyMessage] = useState("");
-  const [copyStatus, setCopyStatus] = useState<"success" | "error" | null>(null);
-  const copyTimeoutRef = useRef<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) {
-        window.clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleCopyRoomId = async () => {
+  const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(room.id);
-
-      setCopyStatus("success");
-      setCopyMessage("ID copiado en el portapapeles.");
-
-      if (copyTimeoutRef.current) {
-        window.clearTimeout(copyTimeoutRef.current);
-      }
-
-      copyTimeoutRef.current = window.setTimeout(() => {
-        setCopyMessage("");
-        setCopyStatus(null);
-      }, 2500);
-    } catch (error) {
-      console.error("Error al copiar el ID de la sala:", error);
-
-      setCopyStatus("error");
-      setCopyMessage("No se pudo copiar el ID. Inténtalo nuevamente.");
-
-      if (copyTimeoutRef.current) {
-        window.clearTimeout(copyTimeoutRef.current);
-      }
-
-      copyTimeoutRef.current = window.setTimeout(() => {
-        setCopyMessage("");
-        setCopyStatus(null);
-      }, 3000);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -121,8 +90,7 @@ export function RoomCard({
           ? "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)"
           : "all 0.3s ease-out",
       }}
-      aria-labelledby={`room-title-${room.id}`}
-      aria-describedby={`room-description-${room.id}`}
+      aria-label={`Sala seleccionada, nombre ${room.name}${formattedDate ? `, creada el ${formattedDate}` : ""}.`}
       onMouseEnter={() => onHover(room.id)}
       onMouseLeave={() => onHover(null)}
     >
@@ -134,7 +102,7 @@ export function RoomCard({
       <div className="px-6 pt-4 pb-4 border-b border-gray-100">
         <h3
           id={`room-title-${room.id}`}
-          className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition"
+          className="text-[20px] font-semibold text-gray-900 mb-1 group-hover:text-primary-700 transition truncate"
         >
           {room.name}
         </h3>
@@ -168,32 +136,28 @@ export function RoomCard({
 
             <button
               type="button"
-              onClick={handleCopyRoomId}
-              className="flex items-center gap-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1 hover:text-gray-800 hover:border-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500"
-              aria-label={`Copiar ID de la sala ${room.name}: ${room.id}`}
+              onClick={handleCopy}
+              className={`flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer ${
+                copied
+                  ? "bg-green-100 text-green-700 border border-green-200"
+                  : "text-gray-500 bg-white border border-gray-200 hover:text-gray-800 hover:border-gray-300"
+              }`}
+              aria-label={copied ? "ID copiado" : `Copiar ID de la sala ${room.name}: ${room.id}`}
             >
-              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-              Copiar
+              {copied ? (
+                <Check className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {copied ? "Copiado" : "Copiar ID"}
             </button>
           </div>
-
-          {copyMessage && (
-            <p
-              className={`mt-2 text-xs font-medium ${
-                copyStatus === "success" ? "text-green-600" : "text-red-600"
-              }`}
-              role={copyStatus === "success" ? "status" : "alert"}
-              aria-live={copyStatus === "success" ? "polite" : "assertive"}
-            >
-              {copyMessage}
-            </p>
-          )}
         </div>
 
         <button
           type="button"
           onClick={() => navigate(`/rooms/${room.id}`)}
-          className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
           aria-label={`Entrar a la sala de estudio ${room.name}`}
         >
           Entrar

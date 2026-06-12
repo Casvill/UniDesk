@@ -33,7 +33,7 @@ export function Dashboard() {
           tabIndex={0}
           role="group"
           aria-label={`Sección Dashboard de UniDesk. ${dashboardStateDescription}`}
-          className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
         >
           <h1
             id="dashboard-title"
@@ -51,7 +51,7 @@ export function Dashboard() {
           <button
             type="button"
             onClick={() => setShowCreateDialog(true)}
-            className="mt-6 w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            className="mt-6 w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
             aria-label="Crear una nueva sala de estudio"
           >
             <Plus className="h-5 w-5" aria-hidden="true" />
@@ -69,7 +69,7 @@ export function Dashboard() {
             tabIndex={0}
             role="group"
             aria-label="Estado de error. No pudimos cargar tus salas."
-            className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-lg"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 rounded-lg"
           >
             <h2 className="text-red-600 font-semibold">
               No pudimos cargar tus salas
@@ -90,7 +90,7 @@ export function Dashboard() {
                 ? "Reintentando cargar tus salas"
                 : "Reintentar cargar tus salas"
             }
-            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
           >
             {isLoadingRooms ? (
               <>

@@ -61,11 +61,11 @@ export function TopbarLayout() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="h-auto px-2 py-1.5 rounded-full flex items-center gap-2"
+          className="h-auto px-2 py-1.5 rounded-l-full flex items-center gap-2 group"
           aria-label={`Abrir menú de cuenta de ${username}`}
         >
           <ChevronDown
-            className="h-4 w-4 text-gray-400 hidden lg:block"
+            className="h-4 w-4 text-gray-400 hidden lg:block transition-transform duration-200 group-data-[state=open]:rotate-180"
             aria-hidden="true"
           />
 
@@ -97,6 +97,7 @@ export function TopbarLayout() {
 
         <DropdownMenuItem
           onClick={() => navigate("/my-profile")}
+          className="cursor-pointer"
           aria-label="Ir a mi perfil"
         >
           <UserPen className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -110,7 +111,7 @@ export function TopbarLayout() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-7">
-          <div className="flex items-center justify-between">
+          <div className="h-12 flex items-center justify-between">
             <div className="flex items-center flex-1 md:flex-none">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -209,7 +210,7 @@ export function TopbarLayout() {
                       aria-label="Cerrar sesión"
                     >
                       <LogOut className="h-4 w-4" aria-hidden="true" />
-                      Logout
+                      Salir
                     </Button>
                   </nav>
                 </SheetContent>
@@ -220,7 +221,7 @@ export function TopbarLayout() {
                   ref={logoRef}
                   type="button"
                   onClick={() => navigate("/dashboard")}
-                  className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+                  className="cursor-pointer rounded-lg outline-none"
                   aria-label="Logo de UniDesk. Actualmente estás en UniDesk, en la página principal del dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas."
                 >
                   <img
@@ -232,51 +233,27 @@ export function TopbarLayout() {
                   />
                 </button>
               </div>
-
-              <nav
-                className="hidden md:flex items-center gap-2 ml-6"
-                aria-label="Navegación principal"
-              >
-                {navItems.map((item) => {
-                  const isActive = item.isActive(pathname);
-                  const Icon = item.Icon;
-
-                  return (
-                    <Button
-                      key={item.path}
-                      variant={isActive ? "secondary" : "ghost"}
-                      onClick={() => navigate(item.path)}
-                      className="gap-2"
-                      aria-current={isActive ? "page" : undefined}
-                      aria-label={
-                        isActive
-                          ? `${item.label}, página actual`
-                          : `Ir a ${item.label}`
-                      }
-                    >
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                      {item.label}
-                    </Button>
-                  );
-                })}
-              </nav>
             </div>
 
             <div
-              className="hidden md:flex items-center gap-2"
+              className="hidden md:flex items-stretch h-full"
               aria-label="Opciones de cuenta"
             >
               {isAuthenticated && (
                 <>
-                  <UserMenu />
+                  <div className="h-full flex items-center">
+                    <UserMenu/>
+                  </div>
+
+                  <div className="w-px bg-gray-300/50" />
 
                   <Button
                     variant="ghost"
                     onClick={handleLogout}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-full rounded-r-full rounded-l-none flex items-center gap-2"
                     aria-label="Cerrar sesión"
                   >
-                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    <LogOut className="h-4 w-4 ml-1" aria-hidden="true" />
                     Salir
                   </Button>
                 </>

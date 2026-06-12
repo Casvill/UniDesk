@@ -26,7 +26,7 @@ export function EmptyRoomsState({
         tabIndex={0}
         role="group"
         aria-label="Estado vacío del dashboard. No tienes salas creadas."
-        className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-lg"
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
       >
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           Mucho silencio por estos pasillos virtuales...
@@ -41,7 +41,7 @@ export function EmptyRoomsState({
       <button
         type="button"
         onClick={onCreateRoom}
-        className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto"
+        className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mx-auto cursor-pointer"
         aria-label="Crear mi primera sala de estudio"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />

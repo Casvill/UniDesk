@@ -395,7 +395,7 @@ export function GooglePage() {
               ? "Completa un nombre de usuario válido para continuar"
               : "Finalizar registro de usuario"
           }
-          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition
+          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition cursor-pointer
             ${
               success
                 ? "bg-green-600 text-white"
