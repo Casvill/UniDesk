@@ -152,7 +152,7 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
  */
 router.get("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
-    const room = await getRoom(req.params.id);
+    const room = await getRoom(req.params.id as string);
     if (!room) {
       res.status(404).json({ message: "Sala no encontrada" });
       return;
@@ -194,7 +194,7 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    const room = await getRoom(req.params.id);
+    const room = await getRoom(req.params.id as string);
     if (!room) {
       res.status(404).json({ message: "Sala no encontrada" });
       return;
@@ -205,7 +205,7 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    const updatedRoom = await updateRoom(req.params.id, req.body);
+    const updatedRoom = await updateRoom(req.params.id as string, req.body);
     res.json(updatedRoom);
   } catch (error) {
     const handled = handleFirebaseError(error);
@@ -280,7 +280,7 @@ router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    const room = await getRoom(req.params.id);
+    const room = await getRoom(req.params.id as string);
     if (!room) {
       res.status(404).json({ message: "Sala no encontrada" });
       return;
@@ -291,7 +291,7 @@ router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    await deleteRoom(req.params.id);
+    await deleteRoom(req.params.id as string);
     res.json({ message: "Sala eliminada exitosamente" });
   } catch (error) {
     const handled = handleFirebaseError(error);

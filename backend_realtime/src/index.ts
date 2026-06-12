@@ -23,7 +23,7 @@ const io = new Server(server, {
 // Middleware de autenticación global para Socket.IO
 io.use(socketAuthMiddleware);
 
-const PORT = process.env.REALTIME_PORT || 3001;
+const PORT = process.env.PORT || process.env.REALTIME_PORT || 3001;
 
 interface UserInfo {
   uid: string;
