@@ -57,8 +57,8 @@ function getRoomErrorMessage(error: unknown) {
 
 function getParticipantName(participant: RoomParticipant) {
   return (
-    participant.displayName ||
     participant.username ||
+    participant.displayName ||
     "Usuario conectado"
   );
 }
@@ -113,6 +113,12 @@ export function JoinRoom() {
   const [isConnected, setIsConnected] = useState(false);
   const [joinCamera, setJoinCamera] = useState(false);
   const [joinMicrophone, setJoinMicrophone] = useState(true);
+
+  const currentUserName =
+    profile?.displayName || profile?.username || user?.email || "Tú";
+
+  const currentUsername =
+    profile?.username || profile?.displayName || user?.email || "Usuario";
 
   useEffect(() => {
     const loadRoom = async () => {
@@ -197,6 +203,8 @@ export function JoinRoom() {
 
         socket.emit("join-room", {
           roomId,
+          uid: user.uid,
+          username: currentUsername,
           cameraEnabled: joinCamera,
           microphoneEnabled: joinMicrophone,
         });
@@ -205,11 +213,8 @@ export function JoinRoom() {
           setParticipants((currentParticipants) =>
             upsertParticipant(currentParticipants, {
               uid: user.uid,
-              username: profile?.username,
-              displayName:
-                profile?.displayName ||
-                profile?.username ||
-                "Tú",
+              username: currentUsername,
+              displayName: currentUserName,
               photoURL: profile?.photoURL,
               isHost: room.ownerUid === user.uid,
             })
@@ -230,9 +235,36 @@ export function JoinRoom() {
       });
 
       const handleParticipantsUpdate = (currentParticipants: RoomParticipant[]) => {
-        if (Array.isArray(currentParticipants)) {
-          setParticipants(currentParticipants);
-        }
+        if (!Array.isArray(currentParticipants)) return;
+
+        setParticipants((previousParticipants) =>
+          currentParticipants.map((participant) => {
+            const previousParticipant = previousParticipants.find(
+              (item) => item.uid === participant.uid
+            );
+            const isCurrentUser = participant.uid === user.uid;
+
+            return {
+              ...previousParticipant,
+              ...participant,
+              username:
+                participant.username ||
+                previousParticipant?.username ||
+                (isCurrentUser ? currentUsername : undefined),
+              displayName:
+                participant.displayName ||
+                previousParticipant?.displayName ||
+                participant.username ||
+                previousParticipant?.username ||
+                (isCurrentUser ? currentUserName : "Usuario conectado"),
+              photoURL:
+                participant.photoURL ||
+                previousParticipant?.photoURL ||
+                (isCurrentUser ? profile?.photoURL : undefined),
+              isHost: participant.uid === room.ownerUid,
+            };
+          })
+        );
       };
 
       socket.on("room-participants-update", handleParticipantsUpdate);
@@ -241,9 +273,32 @@ export function JoinRoom() {
       socket.on("room:participant-joined", (participant: RoomParticipant) => {
         if (!participant?.uid) return;
 
-        setParticipants((currentParticipants) =>
-          upsertParticipant(currentParticipants, participant)
-        );
+        setParticipants((currentParticipants) => {
+          const previousParticipant = currentParticipants.find(
+            (item) => item.uid === participant.uid
+          );
+          const isCurrentUser = participant.uid === user.uid;
+
+          return upsertParticipant(currentParticipants, {
+            ...previousParticipant,
+            ...participant,
+            username:
+              participant.username ||
+              previousParticipant?.username ||
+              (isCurrentUser ? currentUsername : undefined),
+            displayName:
+              participant.displayName ||
+              previousParticipant?.displayName ||
+              participant.username ||
+              previousParticipant?.username ||
+              (isCurrentUser ? currentUserName : "Usuario conectado"),
+            photoURL:
+              participant.photoURL ||
+              previousParticipant?.photoURL ||
+              (isCurrentUser ? profile?.photoURL : undefined),
+            isHost: participant.uid === room.ownerUid,
+          });
+        });
       });
 
       socket.on(
