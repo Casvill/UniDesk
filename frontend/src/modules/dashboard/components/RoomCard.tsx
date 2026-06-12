@@ -57,6 +57,8 @@ interface RoomCardProps {
   onHover: (id: string | null) => void;
   canManage?: boolean;
   user?: { getIdToken: () => Promise<string> } | null;
+  onRoomUpdated?: (updatedRoom: Room) => void;
+  onRoomDeleted?: (deletedRoomId: string) => void;
 }
 
 export function RoomCard({
@@ -70,6 +72,8 @@ export function RoomCard({
   onHover,
   canManage = true,
   user = null,
+  onRoomUpdated,
+  onRoomDeleted,
 }: RoomCardProps) {
   const navigate = useNavigate();
   const formattedDate = formatDate(room.createdAt);
@@ -232,12 +236,15 @@ export function RoomCard({
         user={user}
         mode="edit"
         room={room}
+        onRoomUpdated={onRoomUpdated}
       />
 
       <DeleteRoomDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         room={room}
+        user={user}
+        onRoomDeleted={onRoomDeleted}
       />
     </>
   );

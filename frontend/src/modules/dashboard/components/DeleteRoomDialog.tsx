@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { api } from "@/services/api";
 import type { Room } from "@/services/api";
 import {
   Dialog,
@@ -14,15 +15,20 @@ interface DeleteRoomDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   room: Room | null;
+  user?: { getIdToken: () => Promise<string> } | null;
+  onRoomDeleted?: (deletedRoomId: string) => void;
 }
 
 export function DeleteRoomDialog({
   open,
   onOpenChange,
   room,
+  user = null,
+  onRoomDeleted,
 }: DeleteRoomDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   const roomName = room?.name ?? "seleccionada";
 
@@ -30,32 +36,65 @@ export function DeleteRoomDialog({
     if (!open) {
       setIsDeleting(false);
       setStatusMessage("");
+      setDeleteError("");
     }
   }, [open]);
 
   const handleDelete = async () => {
     if (!room || isDeleting) return;
 
-    setIsDeleting(true);
-    setStatusMessage(`Eliminando la sala ${roomName}. Por favor espera.`);
+    if (!user) {
+      setDeleteError(
+        "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
+      );
+      return;
+    }
 
-    console.log("Eliminar sala:", {
-      roomId: room.id,
-      roomName: room.name,
-    });
+    try {
+      setIsDeleting(true);
+      setDeleteError("");
+      setStatusMessage(`Eliminando la sala ${roomName}. Por favor espera.`);
 
-    setTimeout(() => {
+      const token = await user.getIdToken();
+
+      await api.deleteRoom(room.id, token);
+
+      onRoomDeleted?.(room.id);
+
+      setStatusMessage(`La sala ${roomName} fue eliminada correctamente.`);
+
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 700);
+    } catch (err) {
+      console.error("Error al eliminar la sala:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "No pudimos eliminar la sala. Inténtalo nuevamente.";
+
+      setDeleteError(message);
+      setStatusMessage("");
+    } finally {
       setIsDeleting(false);
-      onOpenChange(false);
-    }, 900);
+    }
   };
+
+  const describedBy = [
+    "delete-room-description",
+    statusMessage ? "delete-room-status" : null,
+    deleteError ? "delete-room-error" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         role="alertdialog"
         aria-labelledby="delete-room-title"
-        aria-describedby="delete-room-description delete-room-status"
+        aria-describedby={describedBy}
         className="max-w-[512px] rounded-xl bg-white px-6 py-6 shadow-xl"
       >
         <DialogHeader className="text-left">
@@ -76,14 +115,27 @@ export function DeleteRoomDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <p
-          id="delete-room-status"
-          className="sr-only"
-          role="status"
-          aria-live="assertive"
-        >
-          {statusMessage}
-        </p>
+        {statusMessage && (
+          <p
+            id="delete-room-status"
+            className="sr-only"
+            role="status"
+            aria-live="assertive"
+          >
+            {statusMessage}
+          </p>
+        )}
+
+        {deleteError && (
+          <p
+            id="delete-room-error"
+            className="mt-2 text-sm text-red-600"
+            role="alert"
+            aria-live="assertive"
+          >
+            {deleteError}
+          </p>
+        )}
 
         <DialogFooter className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <DialogClose asChild>

@@ -19,6 +19,7 @@ interface CreateRoomDialogProps {
   user?: { getIdToken: () => Promise<string> } | null;
   mode?: "create" | "edit";
   room?: Room | null;
+  onRoomUpdated?: (updatedRoom: Room) => void;
 }
 
 const ROOM_NAME_MIN_LENGTH = 3;
@@ -54,6 +55,7 @@ export function CreateRoomDialog({
   user,
   mode = "create",
   room = null,
+  onRoomUpdated,
 }: CreateRoomDialogProps) {
   const navigate = useNavigate();
 
@@ -114,23 +116,56 @@ export function CreateRoomDialog({
 
     if (isFormInvalid || isSaving) return;
 
+    const trimmedRoomName = roomName.trim();
+
     if (isEditMode) {
-      setIsSaving(true);
+      if (!room) {
+        setRoomError("No pudimos identificar la sala que deseas editar.");
+        return;
+      }
 
-      console.log("Editar nombre de sala:", {
-        roomId: room?.id,
-        previousName: room?.name,
-        newName: roomName.trim(),
-      });
+      if (!user) {
+        setRoomError(
+          "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
+        );
+        return;
+      }
 
-      setSuccessMessage(
-        "El nombre de la sala se está actualizando. En unos segundos verás el cambio reflejado en el dashboard."
-      );
+      if (trimmedRoomName === room.name.trim()) {
+        setRoomError("Escribe un nombre diferente al nombre actual.");
+        return;
+      }
 
-      setTimeout(() => {
+      try {
+        setIsSaving(true);
+
+        const token = await user.getIdToken();
+
+        const updatedRoom = await api.updateRoom(
+          room.id,
+          { name: trimmedRoomName },
+          token
+        );
+
+        onRoomUpdated?.(updatedRoom);
+
+        setSuccessMessage("El nombre de la sala se actualizó correctamente.");
+
+        setTimeout(() => {
+          handleOpenChange(false);
+        }, 700);
+      } catch (err) {
+        console.error("Error al actualizar la sala:", err);
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : "No pudimos actualizar el nombre de la sala. Inténtalo nuevamente.";
+
+        setRoomError(message);
+      } finally {
         setIsSaving(false);
-        handleOpenChange(false);
-      }, 900);
+      }
 
       return;
     }
@@ -146,7 +181,7 @@ export function CreateRoomDialog({
       setIsSaving(true);
 
       const token = await user.getIdToken();
-      const newRoom = await api.createRoom(roomName.trim(), token);
+      const newRoom = await api.createRoom(trimmedRoomName, token);
 
       if (!newRoom.id) {
         throw new Error("El servidor no devolvió el ID de la sala creada.");
@@ -173,6 +208,7 @@ export function CreateRoomDialog({
     isEditMode ? currentRoomNameId : null,
     showRoomNameError ? "room-name-error" : null,
     roomError ? "room-error" : null,
+    successMessage ? "room-success" : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -272,6 +308,7 @@ export function CreateRoomDialog({
 
           {successMessage && (
             <p
+              id="room-success"
               className="mt-3 text-sm text-green-700"
               role="status"
               aria-live="polite"
