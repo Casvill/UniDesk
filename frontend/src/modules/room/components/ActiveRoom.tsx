@@ -49,6 +49,18 @@ interface ChatMessage {
   createdAt?: string;
 }
 
+type ChatStatus = "loading" | "empty" | "error" | "success";
+
+type ChatHistoryPayload = {
+  roomId?: string;
+  messages?: NewMessagePayload[];
+};
+
+type ChatHistoryErrorPayload = {
+  roomId?: string;
+  message?: string;
+};
+
 type ApiError = Error & {
   code?: string;
   status?: number;
@@ -94,6 +106,37 @@ type NewMessagePayload = {
   message?: string;
   createdAt?: string;
 };
+
+function mapPayloadToChatMessage(
+  msg: NewMessagePayload,
+  fallbackRoomId?: string
+): ChatMessage | null {
+  const messageText = msg.content || msg.message || "";
+
+  if (!messageText.trim()) return null;
+
+  return {
+    id: msg.id || crypto.randomUUID(),
+    roomId: fallbackRoomId,
+    senderUid: msg.senderUid || msg.uid || "",
+    senderName:
+      msg.senderUsername ||
+      msg.senderName ||
+      msg.username ||
+      "Usuario",
+    message: messageText,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  };
+}
+
+function sortMessagesChronologically(messages: ChatMessage[]) {
+  return [...messages].sort((a, b) => {
+    const dateA = new Date(a.createdAt || "").getTime();
+    const dateB = new Date(b.createdAt || "").getTime();
+
+    return dateA - dateB;
+  });
+}
 
 function getRoomErrorMessage(error: unknown) {
   const apiError = error as ApiError;
@@ -327,6 +370,8 @@ export function ActiveRoom() {
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatStatus, setChatStatus] = useState<ChatStatus>("loading");
+  const [chatHistoryError, setChatHistoryError] = useState("");
   const [message, setMessage] = useState("");
 
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
@@ -424,6 +469,8 @@ export function ActiveRoom() {
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
+          setChatStatus("loading");
+          setChatHistoryError("");
 
           const localParticipant: RoomParticipant = {
             uid: user.uid,
@@ -509,23 +556,57 @@ export function ActiveRoom() {
           );
         });
 
+        socket.on(
+          "room-participants-update",
+          (currentParticipants: RoomParticipant[]) => {
+            if (!Array.isArray(currentParticipants)) return;
+
+            setParticipants(
+              currentParticipants.map((participant) => ({
+                ...participant,
+                displayName:
+                  participant.displayName ||
+                  participant.username ||
+                  "Usuario conectado",
+                isHost: participant.uid === room.ownerUid,
+                cameraEnabled: participant.cameraEnabled ?? false,
+                microphoneEnabled: participant.microphoneEnabled ?? true,
+                screenSharing: participant.screenSharing ?? false,
+                isSpeaking: participant.isSpeaking ?? false,
+              }))
+            );
+          }
+        );
+
+        socket.on("chat-history-success", (payload: ChatHistoryPayload) => {
+          const history = (payload.messages || [])
+            .map((msg) => mapPayloadToChatMessage(msg, payload.roomId || roomId))
+            .filter(Boolean) as ChatMessage[];
+
+          const orderedHistory = sortMessagesChronologically(history);
+
+          setChatMessages(orderedHistory);
+          setChatHistoryError("");
+          setChatStatus(orderedHistory.length === 0 ? "empty" : "success");
+        });
+
+        socket.on("chat-history-error", (payload: ChatHistoryErrorPayload) => {
+          setChatHistoryError(
+            payload?.message || "No se pudo cargar el historial del chat."
+          );
+          setChatStatus("error");
+        });
+
+        socket.on("send-message-error", (payload: { message?: string }) => {
+          setSocketError(payload?.message || "No se pudo enviar el mensaje.");
+        });
+
         socket.on("new-message", (msg: NewMessagePayload) => {
           console.log("Nuevo mensaje:", msg);
 
-          const newMessage: ChatMessage = {
-            id: msg.id || crypto.randomUUID(),
-            roomId,
-            senderUid: msg.senderUid || msg.uid || "",
-            senderName:
-              msg.senderUsername ||
-              msg.senderName ||
-              msg.username ||
-              "Usuario",
-            message: msg.content || msg.message || "",
-            createdAt: msg.createdAt || new Date().toISOString(),
-          };
+          const newMessage = mapPayloadToChatMessage(msg, roomId);
 
-          if (!newMessage.message) return;
+          if (!newMessage) return;
 
           setChatMessages((currentMessages) => {
             const exists = currentMessages.some(
@@ -534,8 +615,10 @@ export function ActiveRoom() {
 
             if (exists) return currentMessages;
 
-            return [...currentMessages, newMessage];
+            return sortMessagesChronologically([...currentMessages, newMessage]);
           });
+
+          setChatStatus("success");
         });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
@@ -605,6 +688,17 @@ export function ActiveRoom() {
     await navigator.clipboard.writeText(roomId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRetryChatHistory = () => {
+    if (!socketRef.current || !roomId) return;
+
+    setChatStatus("loading");
+    setChatHistoryError("");
+
+    socketRef.current.emit("load-chat-history", {
+      roomId,
+    });
   };
 
   const handleSendMessage = (event: React.FormEvent) => {
@@ -1043,7 +1137,56 @@ export function ActiveRoom() {
                   aria-relevant="additions text"
                   aria-label="Mensajes del chat de la sala"
                 >
-                  {chatMessages.length === 0 ? (
+                  {chatStatus === "loading" ? (
+                    <div className="flex h-full min-h-[220px] items-center justify-center">
+                      <div
+                        className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <Loader2
+                          className="mx-auto h-8 w-8 animate-spin text-primary"
+                          aria-hidden="true"
+                        />
+
+                        <p className="mt-4 font-semibold text-gray-800">
+                          Cargando historial del chat...
+                        </p>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          Estamos recuperando los mensajes anteriores de la sala.
+                        </p>
+                      </div>
+                    </div>
+                  ) : chatStatus === "error" ? (
+                    <div className="flex h-full min-h-[220px] items-center justify-center">
+                      <div
+                        className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
+                        role="alert"
+                      >
+                        <AlertCircle
+                          className="mx-auto h-8 w-8 text-red-600"
+                          aria-hidden="true"
+                        />
+
+                        <p className="mt-4 font-semibold text-gray-800">
+                          No pudimos cargar el historial
+                        </p>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          {chatHistoryError}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={handleRetryChatHistory}
+                          className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                        >
+                          Reintentar
+                        </button>
+                      </div>
+                    </div>
+                  ) : chatStatus === "empty" ? (
                     <div className="flex h-full min-h-[220px] items-center justify-center">
                       <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
                         <div

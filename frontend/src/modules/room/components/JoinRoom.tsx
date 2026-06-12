@@ -17,7 +17,7 @@ import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
 interface RoomParticipant {
   uid: string;
@@ -152,7 +152,7 @@ export function JoinRoom() {
   useEffect(() => {
     return () => {
       if (socketRef.current) {
-        socketRef.current.emit("room:leave", { roomId });
+        socketRef.current.emit("leave-room", { roomId });
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -195,7 +195,7 @@ export function JoinRoom() {
         setIsConnected(true);
         setIsJoining(false);
 
-        socket.emit("room:join", {
+        socket.emit("join-room", {
           roomId,
           cameraEnabled: joinCamera,
           microphoneEnabled: joinMicrophone,
@@ -229,11 +229,14 @@ export function JoinRoom() {
         setIsConnected(false);
       });
 
-      socket.on("room:participants", (currentParticipants: RoomParticipant[]) => {
+      const handleParticipantsUpdate = (currentParticipants: RoomParticipant[]) => {
         if (Array.isArray(currentParticipants)) {
           setParticipants(currentParticipants);
         }
-      });
+      };
+
+      socket.on("room-participants-update", handleParticipantsUpdate);
+      socket.on("room:participants", handleParticipantsUpdate);
 
       socket.on("room:participant-joined", (participant: RoomParticipant) => {
         if (!participant?.uid) return;
@@ -270,7 +273,7 @@ export function JoinRoom() {
 
   const handleLeaveRoom = () => {
     if (socketRef.current) {
-      socketRef.current.emit("room:leave", { roomId });
+      socketRef.current.emit("leave-room", { roomId });
       socketRef.current.disconnect();
       socketRef.current = null;
     }
