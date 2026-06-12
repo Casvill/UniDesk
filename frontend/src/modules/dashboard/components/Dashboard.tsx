@@ -6,12 +6,21 @@ import { useFloatingAnimation } from "../hooks/useFloatingAnimation";
 import { RoomCarousel } from "./RoomCarousel";
 import { EmptyRoomsState } from "./EmptyRoomsState";
 import { CreateRoomDialog } from "./CreateRoomDialog";
+import type { Room } from "@/services/api";
 
 export function Dashboard() {
   const { profile, user } = useAuth();
   const { activeRooms, isLoadingRooms, roomsError, refetchRooms } = useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  const handleRoomUpdated = (_updatedRoom: Room) => {
+    void refetchRooms();
+  };
+
+  const handleRoomDeleted = (_deletedRoomId: string) => {
+    void refetchRooms();
+  };
 
   const username = profile?.username
     ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1)
@@ -125,7 +134,12 @@ export function Dashboard() {
           animDur={animDurs[0]}
         />
       ) : (
-        <RoomCarousel rooms={activeRooms} />
+        <RoomCarousel
+          rooms={activeRooms}
+          user={user}
+          onRoomUpdated={handleRoomUpdated}
+          onRoomDeleted={handleRoomDeleted}
+        />
       )}
 
       <CreateRoomDialog
