@@ -576,38 +576,15 @@ export function ActiveRoom() {
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onClick={() => setIsChatOpen((value) => !value)}
-              className="w-full sm:w-auto bg-gray-700 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-              aria-label={isChatOpen ? "Ocultar panel de chat" : "Mostrar panel de chat"}
-              aria-expanded={isChatOpen}
-              aria-controls="room-chat-panel"
-            >
-              {isChatOpen ? (
-                <>
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  Ocultar chat
-                </>
-              ) : (
-                <>
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  Mostrar chat
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLeaveRoom}
-              className="w-full sm:w-auto bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-              aria-label="Salir de la sala"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              Salir
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleLeaveRoom}
+            className="w-full sm:w-auto bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+            aria-label="Salir de la sala"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            Salir
+          </button>
         </div>
       </header>
 
@@ -813,127 +790,134 @@ export function ActiveRoom() {
           </div>
         </main>
 
-        <aside
-          id="room-chat-panel"
-          className={`bg-white flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none ${
-            isChatOpen
-              ? "w-full lg:w-96 opacity-100"
-              : "w-0 opacity-0 pointer-events-none"
+        <div
+          className={`relative flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none ${
+            isChatOpen ? "w-full lg:w-96" : "w-0"
           }`}
-          aria-label="Panel de chat"
-          aria-hidden={!isChatOpen}
         >
-          {isChatOpen && (
-            <>
-              <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-bold text-white mb-1">
-                      Chat
-                    </h2>
+          <button
+            type="button"
+            onClick={() => setIsChatOpen((value) => !value)}
+            className="absolute left-0 top-1/2 z-30 h-16 w-11 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-2xl bg-gradient-to-b from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900 flex cursor-pointer"
+            aria-label={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+            aria-expanded={isChatOpen}
+            aria-controls="room-chat-panel"
+            title={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+          >
+            {isChatOpen ? (
+              <ChevronRight className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+            )}
+          </button>
 
-                    <p className="text-sm text-primary-100">
-                      {participants.length} participantes
-                    </p>
-                  </div>
+          <aside
+            id="room-chat-panel"
+            className={`h-full bg-white flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+            aria-label="Panel de chat"
+            aria-hidden={!isChatOpen}
+          >
+            {isChatOpen && (
+              <>
+                <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
+                  <h2 className="text-xl font-bold text-white mb-1">
+                    Chat
+                  </h2>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsChatOpen(false)}
-                    className="rounded-lg bg-white/10 p-2 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white cursor-pointer"
-                    aria-label="Ocultar chat"
-                  >
-                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                  </button>
+                  <p className="text-sm text-primary-100">
+                    {participants.length} participantes
+                  </p>
                 </div>
-              </div>
 
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50">
-                {chatMessages.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center">
-                    <p className="font-semibold text-gray-700">
-                      Aún no hay mensajes
-                    </p>
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50">
+                  {chatMessages.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center">
+                      <p className="font-semibold text-gray-700">
+                        Aún no hay mensajes
+                      </p>
 
-                    <p className="mt-1 text-sm text-gray-500">
-                      Escribe el primer mensaje de la sala.
-                    </p>
-                  </div>
-                ) : (
-                  chatMessages.map((msg) => (
-                    <div key={msg.id} className="flex gap-3">
-                      {msg.senderPhotoURL ? (
-                        <img
-                          src={msg.senderPhotoURL}
-                          alt=""
-                          className="flex-shrink-0 w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
-                          <span className="text-white text-sm font-bold">
-                            {getInitials(msg.senderName)}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between mb-1 gap-2">
-                          <span className="font-semibold text-gray-900 text-sm truncate">
-                            {msg.senderUid === user?.uid ||
-                            msg.senderName === currentUserName
-                              ? "Tú"
-                              : msg.senderName}
-                          </span>
-
-                          <span className="text-xs text-gray-500 flex-shrink-0">
-                            {formatMessageTime(msg.createdAt)}
-                          </span>
-                        </div>
-
-                        <p className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 shadow-sm border border-gray-200">
-                          {msg.message}
-                        </p>
-                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Escribe el primer mensaje de la sala.
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
+                  ) : (
+                    chatMessages.map((msg) => (
+                      <div key={msg.id} className="flex gap-3">
+                        {msg.senderPhotoURL ? (
+                          <img
+                            src={msg.senderPhotoURL}
+                            alt=""
+                            className="flex-shrink-0 w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
+                            <span className="text-white text-sm font-bold">
+                              {getInitials(msg.senderName)}
+                            </span>
+                          </div>
+                        )}
 
-              <form
-                onSubmit={handleSendMessage}
-                className="border-t border-gray-200 p-4 flex-shrink-0 bg-white"
-              >
-                <label htmlFor="chat-message" className="sr-only">
-                  Escribe un mensaje
-                </label>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between mb-1 gap-2">
+                            <span className="font-semibold text-gray-900 text-sm truncate">
+                              {msg.senderUid === user?.uid ||
+                              msg.senderName === currentUserName
+                                ? "Tú"
+                                : msg.senderName}
+                            </span>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    id="chat-message"
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    placeholder="Escribe un mensaje..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-                  />
+                            <span className="text-xs text-gray-500 flex-shrink-0">
+                              {formatMessageTime(msg.createdAt)}
+                            </span>
+                          </div>
 
-                  <button
-                    type="submit"
-                    disabled={!message.trim() || !isConnected}
-                    className="bg-gradient-to-r from-primary-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-                    aria-label={
-                      isConnected
-                        ? "Enviar mensaje"
-                        : "Conecta a la sala antes de enviar mensajes"
-                    }
-                  >
-                    <Send className="h-5 w-5" aria-hidden="true" />
-                  </button>
+                          <p className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 shadow-sm border border-gray-200">
+                            {msg.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              </form>
-            </>
-          )}
-        </aside>
+
+                <form
+                  onSubmit={handleSendMessage}
+                  className="border-t border-gray-200 p-4 flex-shrink-0 bg-white"
+                >
+                  <label htmlFor="chat-message" className="sr-only">
+                    Escribe un mensaje
+                  </label>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      id="chat-message"
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      placeholder="Escribe un mensaje..."
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!message.trim() || !isConnected}
+                      className="bg-gradient-to-r from-primary-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                      aria-label={
+                        isConnected
+                          ? "Enviar mensaje"
+                          : "Conecta a la sala antes de enviar mensajes"
+                      }
+                    >
+                      <Send className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </aside>
+        </div>
       </div>
     </div>
   );
