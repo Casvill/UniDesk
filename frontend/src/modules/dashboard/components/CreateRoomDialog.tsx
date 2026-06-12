@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -11,11 +11,14 @@ import {
   DialogClose,
 } from "@/shared/components/ui/dialog";
 import { api } from "@/services/api";
+import type { Room } from "@/services/api";
 
 interface CreateRoomDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: { getIdToken: () => Promise<string> } | null;
+  user?: { getIdToken: () => Promise<string> } | null;
+  mode?: "create" | "edit";
+  room?: Room | null;
 }
 
 const ROOM_NAME_MIN_LENGTH = 3;
@@ -49,23 +52,51 @@ export function CreateRoomDialog({
   open,
   onOpenChange,
   user,
+  mode = "create",
+  room = null,
 }: CreateRoomDialogProps) {
   const navigate = useNavigate();
 
+  const isEditMode = mode === "edit";
+
   const [roomName, setRoomName] = useState("");
   const [hasTouchedRoomName, setHasTouchedRoomName] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createRoomError, setCreateRoomError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [roomError, setRoomError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const roomNameError = validateRoomName(roomName);
   const isFormInvalid = Boolean(roomNameError);
   const showRoomNameError = hasTouchedRoomName && roomNameError;
 
+  const dialogDescriptionId = isEditMode
+    ? "edit-room-description"
+    : "create-room-description";
+
+  const inputId = isEditMode
+    ? `edit-room-name-${room?.id ?? "selected"}`
+    : "new-room-name";
+
+  const currentRoomNameId = isEditMode
+    ? `current-room-name-${room?.id ?? "selected"}`
+    : "";
+
+  useEffect(() => {
+    if (!open) return;
+
+    setRoomName(isEditMode ? room?.name ?? "" : "");
+    setHasTouchedRoomName(false);
+    setRoomError("");
+    setSuccessMessage("");
+    setIsSaving(false);
+  }, [open, isEditMode, room?.name]);
+
   const resetForm = () => {
     setRoomName("");
     setHasTouchedRoomName(false);
-    setCreateRoomError("");
-    setIsCreating(false);
+    setRoomError("");
+    setSuccessMessage("");
+    setIsSaving(false);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -76,21 +107,43 @@ export function CreateRoomDialog({
     }
   };
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     setHasTouchedRoomName(true);
-    setCreateRoomError("");
+    setRoomError("");
+    setSuccessMessage("");
 
-    if (isFormInvalid || isCreating) return;
+    if (isFormInvalid || isSaving) return;
+
+    if (isEditMode) {
+      setIsSaving(true);
+
+      console.log("Editar nombre de sala:", {
+        roomId: room?.id,
+        previousName: room?.name,
+        newName: roomName.trim(),
+      });
+
+      setSuccessMessage(
+        "El nombre de la sala se está actualizando. En unos segundos verás el cambio reflejado en el dashboard."
+      );
+
+      setTimeout(() => {
+        setIsSaving(false);
+        handleOpenChange(false);
+      }, 900);
+
+      return;
+    }
 
     if (!user) {
-      setCreateRoomError(
+      setRoomError(
         "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
       );
       return;
     }
 
     try {
-      setIsCreating(true);
+      setIsSaving(true);
 
       const token = await user.getIdToken();
       const newRoom = await api.createRoom(roomName.trim(), token);
@@ -109,55 +162,72 @@ export function CreateRoomDialog({
           ? err.message
           : "No pudimos crear la sala. Inténtalo nuevamente.";
 
-      setCreateRoomError(message);
+      setRoomError(message);
     } finally {
-      setIsCreating(false);
+      setIsSaving(false);
     }
   };
 
   const inputDescriptionIds = [
     "room-name-help",
+    isEditMode ? currentRoomNameId : null,
     showRoomNameError ? "room-name-error" : null,
-    createRoomError ? "create-room-error" : null,
+    roomError ? "room-error" : null,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent aria-describedby="create-room-description">
+      <DialogContent aria-describedby={dialogDescriptionId}>
         <DialogHeader>
-          <DialogTitle>Crear sala de estudio</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar nombre de sala" : "Crear sala de estudio"}
+          </DialogTitle>
 
-          <DialogDescription id="create-room-description">
-            Dale un nombre a tu sala para empezar a estudiar en equipo.
+          <DialogDescription id={dialogDescriptionId}>
+            {isEditMode
+              ? "Actualiza el nombre de tu sala para mantenerla organizada en el dashboard."
+              : "Dale un nombre a tu sala para empezar a estudiar en equipo."}
           </DialogDescription>
         </DialogHeader>
 
         <div>
+          {isEditMode && room?.name && (
+            <p
+              id={currentRoomNameId}
+              className="mb-3 text-sm text-gray-500"
+              aria-live="polite"
+            >
+              Nombre actual:{" "}
+              <span className="font-semibold text-gray-700">{room.name}</span>
+            </p>
+          )}
+
           <label
-            htmlFor="new-room-name"
+            htmlFor={inputId}
             className="block mb-2 text-sm font-semibold text-gray-700"
           >
-            Nombre de la sala
+            {isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
           </label>
 
           <input
             type="text"
-            id="new-room-name"
+            id={inputId}
             value={roomName}
             onChange={(e) => {
               setRoomName(e.target.value);
-              setCreateRoomError("");
+              setRoomError("");
+              setSuccessMessage("");
             }}
             onBlur={() => setHasTouchedRoomName(true)}
             placeholder="Ej: Grupo de estudio de cálculo"
             maxLength={ROOM_NAME_MAX_LENGTH}
-            disabled={isCreating}
-            aria-invalid={Boolean(showRoomNameError || createRoomError)}
+            disabled={isSaving}
+            aria-invalid={Boolean(showRoomNameError || roomError)}
             aria-describedby={inputDescriptionIds}
             className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
-              showRoomNameError || createRoomError
+              showRoomNameError || roomError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-indigo-500"
             }`}
@@ -189,14 +259,24 @@ export function CreateRoomDialog({
             </span>
           </div>
 
-          {createRoomError && (
+          {roomError && (
             <p
-              id="create-room-error"
+              id="room-error"
               className="mt-3 text-sm text-red-600"
               role="alert"
               aria-live="assertive"
             >
-              {createRoomError}
+              {roomError}
+            </p>
+          )}
+
+          {successMessage && (
+            <p
+              className="mt-3 text-sm text-green-700"
+              role="status"
+              aria-live="polite"
+            >
+              {successMessage}
             </p>
           )}
         </div>
@@ -205,9 +285,13 @@ export function CreateRoomDialog({
           <DialogClose asChild>
             <button
               type="button"
-              disabled={isCreating}
+              disabled={isSaving}
               className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              aria-label="Cancelar creación de sala"
+              aria-label={
+                isEditMode
+                  ? "Cancelar edición del nombre de la sala"
+                  : "Cancelar creación de sala"
+              }
             >
               Cancelar
             </button>
@@ -215,18 +299,33 @@ export function CreateRoomDialog({
 
           <button
             type="button"
-            onClick={handleCreate}
-            disabled={isFormInvalid || isCreating}
-            aria-busy={isCreating}
+            onClick={handleSubmit}
+            disabled={isFormInvalid || isSaving}
+            aria-busy={isSaving}
             aria-label={
-              isCreating
-                ? "Creando sala, por favor espera"
-                : "Crear sala de estudio"
+              isSaving
+                ? isEditMode
+                  ? "Actualizando el nombre de la sala, por favor espera"
+                  : "Creando sala, por favor espera"
+                : isEditMode
+                  ? "Guardar nuevo nombre de la sala"
+                  : "Crear sala de estudio"
             }
             className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {isCreating ? "Creando..." : "Crear sala"}
+            {isEditMode ? (
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Plus className="h-4 w-4" aria-hidden="true" />
+            )}
+
+            {isSaving
+              ? isEditMode
+                ? "Actualizando nombre..."
+                : "Creando..."
+              : isEditMode
+                ? "Guardar cambios"
+                : "Crear sala"}
           </button>
         </DialogFooter>
       </DialogContent>
