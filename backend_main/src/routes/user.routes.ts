@@ -307,6 +307,17 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
+    if (req.body.email) {
+      const email = req.body.email;
+      const allowedDomains = [".edu", ".edu.co", ".gov", ".gov.co", ".com.co", ".co"];
+      const isInstitutional = allowedDomains.some(domain => email.endsWith(domain));
+
+      if (!isInstitutional) {
+        res.status(400).json({ message: "El correo debe ser institucional (.edu, .edu.co, .gov, .gov.co, .com.co, .co)" });
+        return;
+      }
+    }
+
     const profile = await updateUserProfile(String(req.params.uid), req.body);
     res.json(profile);
   } catch (error) {
