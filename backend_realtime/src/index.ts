@@ -68,6 +68,12 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   socket.on("send-message", (data: { content: string }) => {
     const { content } = data;
     
+    // Check if user is authenticated
+    if (!socket.user) {
+      socket.emit("error", { message: "No autenticado" });
+      return;
+    }
+
     // Find sender info
     let userInfo: UserInfo | undefined;
     for (const users of rooms.values()) {
@@ -79,11 +85,13 @@ io.on("connection", (socket: AuthenticatedSocket) => {
 
     if (!userInfo) {
       console.error(`Error: Socket ${socket.id} intentó enviar un mensaje sin estar en una sala`);
+      socket.emit("error", { message: "Debe unirse a una sala primero" });
       return;
     }
 
     // Basic validation
     if (!content || content.trim().length === 0) {
+      socket.emit("error", { message: "El mensaje no puede estar vacío" });
       return;
     }
 
