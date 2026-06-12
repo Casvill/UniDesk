@@ -1,154 +1,138 @@
-import { useNavigate } from "react-router-dom";
-import { Plus, Users, Book, Clock } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useRooms } from "../hooks/useRooms";
+import { useFloatingAnimation } from "../hooks/useFloatingAnimation";
+import { RoomCarousel } from "./RoomCarousel";
+import { EmptyRoomsState } from "./EmptyRoomsState";
+import { CreateRoomDialog } from "./CreateRoomDialog";
 
 export function Dashboard() {
-  const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { activeRooms, isLoadingRooms, roomsError, refetchRooms } = useRooms(user);
+  const { animNames, animDurs } = useFloatingAnimation();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const activeRooms = [
-    {
-      id: "1",
-      name: "Calculus Study Group",
-      participants: 4,
-      subject: "Mathematics",
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      id: "2",
-      name: "CS Finals Prep",
-      participants: 8,
-      subject: "Computer Science",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      id: "3",
-      name: "Biology Lab Review",
-      participants: 3,
-      subject: "Biology",
-      color: "from-green-500 to-emerald-500",
-    },
-  ];
+  const username = profile?.username
+    ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1)
+    : "estudiante";
 
-  const upcomingSessions = [
-    {
-      id: "1",
-      name: "Chemistry Study Session",
-      time: "Today, 3:00 PM",
-      participants: 5,
-    },
-    {
-      id: "2",
-      name: "History Exam Prep",
-      time: "Tomorrow, 10:00 AM",
-      participants: 6,
-    },
-  ];
+  const dashboardStateDescription =
+    roomsError
+      ? "Hay un error al cargar tus salas."
+      : activeRooms.length === 0
+        ? "No tienes salas creadas."
+        : activeRooms.length === 1
+          ? "Tienes una sala creada."
+          : `Tienes ${activeRooms.length} salas creadas.`;
 
   return (
-    <div>
-      <div className="mb-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, {profile?.username ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1) : "Student"}
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Ready to start a productive study session?
-        </p>
-        <button
-          onClick={() => navigate("/rooms/create")}
-          className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+    <section aria-labelledby="dashboard-title" aria-busy={isLoadingRooms}>
+      <header className="mb-8">
+        <div
+          tabIndex={0}
+          role="group"
+          aria-label={`Sección Dashboard de UniDesk. ${dashboardStateDescription}`}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
         >
-          <Plus className="h-5 w-5" />
-          Create New Room
-        </button>
-      </div>
+          <h1
+            id="dashboard-title"
+            className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2"
+          >
+            ¡Qué bueno verte por aquí, {username}!
+          </h1>
 
-      <section className="mb-8" aria-labelledby="active-rooms-heading">
-        <h2
-          id="active-rooms-heading"
-          className="text-2xl font-bold text-gray-900 mb-4"
-        >
-          Active Study Rooms
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeRooms.map((room) => (
-            <article
-              key={room.id}
-              className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden group"
-            >
-              <div className={`h-2 bg-gradient-to-r ${room.color}`}></div>
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition">
-                      {room.name}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Book className="h-4 w-4" />
-                      <span>{room.subject}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                  <Users className="h-4 w-4" />
-                  <span>{room.participants} participants online</span>
-                </div>
-                <button
-                  onClick={() => navigate(`/rooms/${room.id}`)}
-                  className="w-full bg-gray-50 border border-gray-200 py-2.5 px-4 rounded-lg font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                >
-                  Join Room
-                </button>
-              </div>
-            </article>
-          ))}
+          <p className="text-gray-600 mb-2">
+            Organiza tus salas, únete a tus compañeros y continúa estudiando en equipo.
+          </p>
         </div>
-      </section>
 
-      <section aria-labelledby="upcoming-sessions-heading">
-        <h2
-          id="upcoming-sessions-heading"
-          className="text-2xl font-bold text-gray-900 mb-4"
+        {activeRooms.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowCreateDialog(true)}
+            className="mt-6 w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
+            aria-label="Crear una nueva sala de estudio"
+          >
+            <Plus className="h-5 w-5" aria-hidden="true" />
+            Crear nueva sala
+          </button>
+        )}
+      </header>
+
+      {roomsError ? (
+        <section
+          className="flex flex-col items-center justify-center py-20 text-center"
+          role="alert"
         >
-          Upcoming Sessions
-        </h2>
-        <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-          {upcomingSessions.map((session, index) => (
-            <div
-              key={session.id}
-              className={`p-6 hover:bg-gray-50 transition ${
-                index < upcomingSessions.length - 1
-                  ? "border-b border-gray-200"
-                  : ""
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {session.name}
-                  </h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{session.time}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>{session.participants} participants</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate(`/rooms/${session.id}`)}
-                  className="w-full sm:w-auto bg-indigo-600 text-white py-2.5 px-6 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md hover:shadow-lg"
-                >
-                  View Details
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
+          <div
+            tabIndex={0}
+            role="group"
+            aria-label="Estado de error. No pudimos cargar tus salas."
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 rounded-lg"
+          >
+            <h2 className="text-red-600 font-semibold">
+              No pudimos cargar tus salas
+            </h2>
+
+            <p className="text-gray-500 mt-2">
+              {roomsError}. Verifica tu conexión o intenta nuevamente.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={refetchRooms}
+            disabled={isLoadingRooms}
+            aria-busy={isLoadingRooms}
+            aria-label={
+              isLoadingRooms
+                ? "Reintentando cargar tus salas"
+                : "Reintentar cargar tus salas"
+            }
+            className="mt-4 bg-primary text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isLoadingRooms ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Reintentando...
+              </>
+            ) : (
+              "Reintentar"
+            )}
+          </button>
+        </section>
+      ) : isLoadingRooms && activeRooms.length === 0 ? (
+        <section
+          className="flex flex-col items-center justify-center py-20"
+          role="status"
+          aria-live="polite"
+          aria-label="Cargando tus salas de estudio"
+        >
+          <Loader2
+            className="h-10 w-10 animate-spin text-primary"
+            aria-hidden="true"
+          />
+
+          <p className="text-gray-500 mt-4">
+            Cargando tus salas...
+          </p>
+        </section>
+      ) : !isLoadingRooms && activeRooms.length === 0 ? (
+        <EmptyRoomsState
+          onCreateRoom={() => setShowCreateDialog(true)}
+          animName={animNames[0]}
+          animDur={animDurs[0]}
+        />
+      ) : (
+        <RoomCarousel rooms={activeRooms} />
+      )}
+
+      <CreateRoomDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        user={user}
+      />
+    </section>
   );
 }

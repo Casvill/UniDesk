@@ -16,6 +16,14 @@ import { api, UserProfile } from '../services/api';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'needs-profile';
 
+type UpdateProfileData = {
+  username?: string;
+  displayName?: string;
+  email?: string;
+  photoURL?: string;
+  university?: string;
+};
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -31,6 +39,8 @@ interface AuthContextType {
   }>;
   completeProfile: (data: { username: string; displayName: string; photoURL?: string }) => Promise<UserProfile>;
   register: (email: string, pass: string, name: string, username: string) => Promise<void>;
+  updateProfileData: (data: UpdateProfileData) => Promise<UserProfile>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +85,13 @@ function getBackendErrorCode(error: unknown): string {
     return 'backend/username-already-exists';
   }
 
+  if (
+    message.includes('email') ||
+    message.includes('correo')
+  ) {
+    return 'backend/email-already-exists';
+  }
+
   return 'backend/profile-create-failed';
 }
 
@@ -82,11 +99,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+
       if (currentUser) {
-        setUser(currentUser);
+        if (isProcessing) return;
 
         try {
           const token = await currentUser.getIdToken();
@@ -100,41 +120,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setStatus('needs-profile');
           }
         } catch (error) {
-          console.error('Error fetching profile:', error);
-          setStatus('authenticated');
+          console.error('Error fetching profile in listener:', error);
+          setProfile(null);
+          setStatus('unauthenticated');
         }
       } else {
-        setUser(null);
         setProfile(null);
         setStatus('unauthenticated');
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isProcessing]);
 
   const login = async (email: string, pass: string) => {
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
+    setIsProcessing(true);
 
-    const token = await result.user.getIdToken();
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
 
-    const existingProfile = await api.getProfile(result.user.uid, token);
+      const token = await result.user.getIdToken();
+      const existingProfile = await api.getProfile(result.user.uid, token);
 
-    if (existingProfile) {
-      setProfile(existingProfile);
-      setStatus('authenticated');
+      if (existingProfile) {
+        setProfile(existingProfile);
+        setStatus('authenticated');
 
-      return {
-        user: result.user,
-        isNewUser: false,
-        profile: existingProfile
-      };
-    } else {
+        return {
+          user: result.user,
+          isNewUser: false,
+          profile: existingProfile
+        };
+      }
+
       setProfile(null);
       setStatus('needs-profile');
 
@@ -143,25 +166,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isNewUser: true,
         profile: null
       };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const completeProfile = async (data: { username: string; displayName: string; photoURL?: string }): Promise<UserProfile> => {
     if (!user) throw new Error('Not authenticated');
 
-    const token = await user.getIdToken();
-    const newProfile = await api.createProfile(data, token);
+    setIsProcessing(true);
 
-    setProfile(newProfile);
-    setStatus('authenticated');
+    try {
+      const token = await user.getIdToken();
+      const newProfile = await api.createProfile(data, token);
 
-    return newProfile;
+      setProfile(newProfile);
+      setStatus('authenticated');
+
+      return newProfile;
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const register = async (email: string, pass: string, name: string, username: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    setIsProcessing(true);
+    let userCredential;
 
     try {
+      userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+
       await updateProfile(userCredential.user, { displayName: name });
 
       const token = await userCredential.user.getIdToken();
@@ -179,16 +213,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       const backendErrorCode = getBackendErrorCode(error);
 
-      try {
-        await deleteUser(userCredential.user);
-      } catch (deleteError) {
-        console.error('Error deleting Firebase user after profile creation failed:', deleteError);
+      if (userCredential?.user) {
+        try {
+          await deleteUser(userCredential.user);
+        } catch (deleteError) {
+          console.error('Error deleting Firebase user after profile creation failed:', deleteError);
+        }
       }
 
       throw createCodedError(
         backendErrorCode,
         getErrorMessage(error) || 'Profile creation failed'
       );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const updateProfileData = async (data: UpdateProfileData): Promise<UserProfile> => {
+    if (!user) throw new Error('Not authenticated');
+
+    const token = await user.getIdToken();
+
+    const updatedProfile = await api.updateProfile(
+      user.uid,
+      data,
+      token
+    );
+
+    setProfile(updatedProfile);
+    setStatus('authenticated');
+
+    return updatedProfile;
+  };
+
+  const deleteAccount = async () => {
+    if (!user) throw new Error('Not authenticated');
+
+    setIsProcessing(true);
+
+    try {
+      const token = await user.getIdToken();
+
+      await api.deleteProfile(user.uid, token);
+
+      setUser(null);
+      setProfile(null);
+      setStatus('unauthenticated');
+
+      await signOut(auth);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -207,6 +282,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loginWithGoogle,
     completeProfile,
     register,
+    updateProfileData,
+    deleteAccount,
   };
 
   return (
@@ -218,8 +295,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
   }
+
   return context;
 };

@@ -7,17 +7,15 @@ import Forgot from "../modules/auth/pages/ForgotPage";
 import GoogleprofilePage from "../modules/auth/pages/GooglePage";
 
 /* LAYOUT */
-import { TopbarLayout } from "./TopbarLayout";
+import { TopbarLayout } from "../shared/components/TopbarLayout";
+import AuthLayout from "@/modules/auth/AuthLayout";
 
 /* PROTECTED PAGES */
 import ProtectedRoute from "../shared/components/ProtectedRoute";
 import { Dashboard } from "../modules/dashboard/components/Dashboard";
-import { RoomList } from "../modules/room/components/RoomList";
-import { CreateRoom } from "../modules/room/components/CreateRoom";
 import { JoinRoom } from "../modules/room/components/JoinRoom";
 import { ActiveRoom } from "../modules/room/components/ActiveRoom";
-import { UserProfile } from "../modules/users/components/UserProfile";
-import { Settings } from "../shared/components/Settings";
+import { MyProfile } from "../modules/users/components/MyProfile";
 import { NotFound } from "../shared/components/NotFound";
 
 import PublicRoute from "../shared/components/PublicRoute";
@@ -27,23 +25,28 @@ export const router = createBrowserRouter([
     element: <PublicRoute />,
     children: [
       {
-        path: "/",
-        Component: LoginPage,
-      },
-      {
-        path: "/register",
-        Component: RegisterPage,
-      },
-      {
-        path: "/forgot-password",
-        Component: Forgot,
-      },
-      {
-        path: "/google-profile",
-        Component: GoogleprofilePage,
+        element: <AuthLayout />,
+        children: [
+          {
+            path: "/",
+            Component: LoginPage,
+          },
+          {
+            path: "/register",
+            Component: RegisterPage,
+          },
+          {
+            path: "/forgot-password",
+            Component: Forgot,
+          },
+          {
+            path: "/google-profile",
+            Component: GoogleprofilePage,
+          },
+        ],
       },
     ],
-  },
+    },
   {
     element: <ProtectedRoute />,
     children: [
@@ -56,24 +59,12 @@ export const router = createBrowserRouter([
             Component: Dashboard,
           },
           {
-            path: "rooms",
-            Component: RoomList,
-          },
-          {
-            path: "rooms/create",
-            Component: CreateRoom,
-          },
-          {
             path: "rooms/join/:roomId",
             Component: JoinRoom,
           },
           {
-            path: "profile",
-            Component: UserProfile,
-          },
-          {
-            path: "settings",
-            Component: Settings,
+            path: "my-profile",
+            Component: MyProfile,
           },
         ],
       },

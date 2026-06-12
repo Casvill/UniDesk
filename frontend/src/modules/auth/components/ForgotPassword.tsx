@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import logo from "@/assets/logo/unified-logo-light.svg";
+import { useCardTransition } from "@/context/CardTransitionContext";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
 
 interface ForgotPasswordProps {
@@ -8,7 +7,7 @@ interface ForgotPasswordProps {
 }
 
 export function Forgot({ onSubmit }: ForgotPasswordProps) {
-  const navigate = useNavigate();
+  const { navigateWithTransition } = useCardTransition();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -28,157 +27,131 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
   };
 
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8"
-      aria-label="Recuperación de contraseña"
-    >
-      <main className="w-full max-w-[1280px]">
-        <div className="max-w-[440px] mx-auto">
+    <>
+      <div className="text-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+          Recuperar contraseña
+        </h1>
+        <p className="text-muted-foreground">
+          Ingresa el correo asociado a tu cuenta y te enviaremos las instrucciones.
+        </p>
+      </div>
 
-          {/* HEADER */}
-          <div className="text-center mb-8">
-            <img
-              src={logo}
-              alt="UniDesk plataforma de estudio colaborativo"
-              className="h-20 w-auto mb-3 mx-auto"
-            />
+      {/* ANNOUNCER GLOBAL (CLAVE PARA VOICEOVER) */}
+      <div
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {loading && "Enviando enlace de recuperación de contraseña"}
+        {submitted &&
+          "Enlace enviado correctamente. Revisa tu correo electrónico."}
+      </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              Recuperar contraseña
-            </h1>
+      {!submitted ? (
+        <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* TEXTO NORMAL (SIN aria-live AQUÍ) */}
-            <p className="text-gray-600">
-              {!submitted
-                ? "Ingresa tu correo institucional y te enviaremos instrucciones para recuperar el acceso a tu cuenta."
-                : "Revisa tu correo electrónico para continuar con la recuperación de tu cuenta."}
-            </p>
-          </div>
+          {/* EMAIL */}
+          <div>
+            <label
+              htmlFor="reset-email"
+              className="block mb-2 text-sm font-semibold text-gray-700"
+            >
+              Correo institucional
+            </label>
 
-          {/* ANNOUNCER GLOBAL (CLAVE PARA VOICEOVER) */}
-          <div
-            className="sr-only"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {loading && "Enviando enlace de recuperación de contraseña"}
-            {submitted &&
-              "Enlace enviado correctamente. Revisa tu correo electrónico."}
-          </div>
-
-          <div
-            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100"
-            role="region"
-            aria-label="Formulario de recuperación de contraseña"
-          >
-
-            {!submitted ? (
-              <form onSubmit={handleSubmit} className="space-y-6">
-
-                {/* EMAIL */}
-                <div>
-                  <label
-                    htmlFor="reset-email"
-                    className="block mb-2 text-sm font-semibold text-gray-700"
-                  >
-                    Correo institucional o personal
-                  </label>
-
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                    </div>
-
-                    <input
-                      type="email"
-                      id="reset-email"
-                      name="email"
-                      required
-                      aria-required="true"
-                      placeholder="ejemplo@universidad.edu.co"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                    />
-                  </div>
-                </div>
-
-                {/* BUTTON */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  aria-busy={loading}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl"
-                >
-                  Enviar enlace de recuperación
-                </button>
-
-                {/* BACK */}
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  aria-label="Volver al inicio de sesión"
-                  className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded py-2"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Volver al inicio de sesión
-                </button>
-
-              </form>
-            ) : (
-              <div
-                className="space-y-6"
-                role="alert"
-                aria-live="assertive"
-                aria-atomic="true"
-              >
-
-                {/* SUCCESS MESSAGE */}
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                  <div className="flex gap-4">
-
-                    <CheckCircle
-                      className="h-6 w-6 text-green-600"
-                      aria-hidden="true"
-                    />
-
-                    <div>
-                      <h3 className="font-semibold text-green-900 mb-1">
-                        Enlace enviado correctamente
-                      </h3>
-
-                      <p className="text-sm text-green-700">
-                        Si la dirección de correo ingresada está asociada a una cuenta, recibirás un mensaje con instrucciones para restablecer tu contraseña.
-                      </p>
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* BACK BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  aria-label="Volver al inicio de sesión"
-                  className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded py-2"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Volver al inicio de sesión
-                </button>
-
-                <p className="text-center text-sm text-gray-600">
-                  ¿No recibiste el correo?{" "}
-                  <button
-                    onClick={() => setSubmitted(false)}
-                    className="font-semibold text-indigo-600 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
-                  >
-                    Intentar nuevamente
-                  </button>
-                </p>
-
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
               </div>
-            )}
+
+              <input
+                type="email"
+                id="reset-email"
+                name="email"
+                required
+                aria-required="true"
+                placeholder="ejemplo@universidad.edu.co"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+              />
+            </div>
           </div>
+
+          {/* BUTTON */}
+          <button
+            type="submit"
+            disabled={loading}
+            aria-busy={loading}
+            className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            Enviar enlace de recuperación
+          </button>
+
+          {/* BACK */}
+          <button
+            type="button"
+            onClick={() => navigateWithTransition("/")}
+            aria-label="Volver al inicio de sesión"
+            className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 rounded py-2"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Volver al inicio de sesión
+          </button>
+
+        </form>
+      ) : (
+        <div
+          className="space-y-6"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+
+          {/* SUCCESS MESSAGE */}
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+            <div className="flex gap-4">
+
+              <CheckCircle
+                className="h-6 w-6 text-green-600"
+                aria-hidden="true"
+              />
+
+              <div>
+                <h3 className="font-semibold text-green-900 mb-1">
+                  Enlace enviado correctamente
+                </h3>
+
+                <p className="text-sm text-green-700">
+                  Si la dirección de correo ingresada está asociada a una cuenta, recibirás un mensaje con instrucciones para restablecer tu contraseña.
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+          {/* BACK BUTTON */}
+          <button
+            type="button"
+            onClick={() => navigateWithTransition("/")}
+            aria-label="Volver al inicio de sesión"
+            className="w-full flex items-center justify-center gap-2 text-gray-600 hover:text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500 rounded py-2"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Volver al inicio de sesión
+          </button>
+
+          <p className="text-center text-sm text-gray-600">
+            ¿No recibiste el correo?{" "}
+            <button
+              onClick={() => setSubmitted(false)}
+              className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-1"
+            >
+              Intentar nuevamente
+            </button>
+          </p>
+
         </div>
-      </main>
-    </div>
+      )}
+    </>
   );
 }

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Chrome, Pencil, Loader2 } from "lucide-react";
-import logo from "@/assets/logo/unified-logo-light.svg";
+import { User, Pencil, Loader2, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
+import { useCardTransition } from "@/context/CardTransitionContext";
+import { api } from "@/services/api";
+import { showToast } from "@/shared/components/ui/toast";
+import { GoogleIcon } from "@/shared/components/ui/google-icon"
 
 type FormState = {
   fullName: string;
@@ -14,25 +16,6 @@ type FormState = {
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
-
-type FeedbackType = "error" | "success" | "info";
-
-type FeedbackState = {
-  type: FeedbackType;
-  message: string;
-} | null;
-
-function getFeedbackClasses(type: FeedbackType): string {
-  if (type === "success") {
-    return "rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700";
-  }
-
-  if (type === "info") {
-    return "rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700";
-  }
-
-  return "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700";
-}
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -157,9 +140,8 @@ function getGoogleRegisterErrorMessage(error: unknown): string {
 
 export function Register() {
   const navigate = useNavigate();
+  const { navigateWithTransition } = useCardTransition();
   const { register, loginWithGoogle } = useAuth();
-
-  const feedbackRef = useRef<HTMLDivElement | null>(null);
 
   const [form, setForm] = useState<FormState>({
     fullName: "",
@@ -171,32 +153,55 @@ export function Register() {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const isSubmitting = loading || googleLoading;
 
+  const cleanUsername = form.username.trim();
+
   useEffect(() => {
-    if (feedback && feedbackRef.current) {
-      feedbackRef.current.focus();
+    if (!cleanUsername) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
     }
-  }, [feedback]);
+
+    if (cleanUsername.length < 3 || cleanUsername.length > 15 || !/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const available = await api.checkUsername(cleanUsername);
+        setUsernameAvailable(available);
+      } catch (err) {
+        console.warn("No se pudo validar el username:", err);
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [cleanUsername]);
 
   const validate = () => {
     const newErrors: FieldErrors = {};
 
     if (!form.fullName.trim()) {
       newErrors.fullName = "El nombre completo es obligatorio";
-    }
-
-    if (!form.username.trim()) {
-      newErrors.username = "El nombre de usuario es obligatorio";
-    } else if (form.username.trim().length < 3 || form.username.trim().length > 15) {
-      newErrors.username = "El nombre debe tener entre 3 y 15 caracteres";
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(form.username.trim())) {
-      newErrors.username = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
     }
 
     if (!form.email.trim()) {
@@ -230,38 +235,38 @@ export function Register() {
     });
   };
 
-  const clearFeedback = () => {
-    if (feedback) {
-      setFeedback(null);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setFeedback(null);
+    setUsernameTouched(true);
 
     const validationErrors = validate();
     setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length > 0) {
-      const message = "Revisa los campos marcados antes de crear tu cuenta.";
+    let usernameError = "";
 
-      setFeedback({
-        type: "error",
-        message,
-      });
+    // if (!cleanUsername) {
+    //   usernameError = "El nombre de usuario es obligatorio";
+    // } else if (cleanUsername.length < 3 || cleanUsername.length > 15) {
+    //   usernameError = "El nombre debe tener entre 3 y 15 caracteres";
+    // } else if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+    //   usernameError = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+    // } else if (checkingUsername) {
+    //   usernameError = "Espera a que validemos la disponibilidad del nombre de usuario";
+    // } else if (usernameAvailable !== true) {
+    //   usernameError = "Este nombre de usuario no está disponible";
+    // }
 
-      toast.error(message);
+    if (Object.keys(validationErrors).length > 0 || usernameError) {
+      if (usernameError) {
+        showToast.error(usernameError);
+      } else {
+        showToast.error("Revisa los campos marcados antes de crear tu cuenta.");
+      }
       return;
     }
 
     setLoading(true);
-
-    setFeedback({
-      type: "info",
-      message: "Creando tu cuenta. Por favor espera.",
-    });
 
     try {
       await register(
@@ -271,14 +276,7 @@ export function Register() {
         form.username.trim()
       );
 
-      const successMessage = "Cuenta creada exitosamente. Redirigiendo al dashboard.";
-
-      setFeedback({
-        type: "success",
-        message: successMessage,
-      });
-
-      toast.success("Cuenta creada exitosamente");
+      showToast.success("Cuenta creada exitosamente");
 
       setTimeout(() => {
         navigate("/dashboard", { replace: true });
@@ -288,43 +286,30 @@ export function Register() {
 
       const message = getRegisterErrorMessage(error);
 
-      setFeedback({
-        type: "error",
-        message,
-      });
+      if (message.includes("nombre de usuario") || message.includes("ya está en uso")) {
+        setUsernameAvailable(false);
+        setUsernameTouched(true);
+      }
 
-      toast.error(message);
+      showToast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setFeedback(null);
     setGoogleLoading(true);
-
-    setFeedback({
-      type: "info",
-      message: "Abriendo registro con Google. Por favor espera.",
-    });
 
     try {
       const result = await loginWithGoogle();
 
-      const successMessage = result?.isNewUser
-        ? "Cuenta creada con Google. Completa tu perfil para continuar."
-        : "Sesión iniciada con Google. Redirigiendo al dashboard.";
-
-      setFeedback({
-        type: "success",
-        message: successMessage,
-      });
-
-      toast.success("Cuenta creada con Google");
+      showToast.success(result?.isNewUser
+        ? "Cuenta creada con Google, ingresa tu nombre de usuario para completar tu perfil"
+        : "Sesión iniciada con Google");
 
       setTimeout(() => {
         if (result?.isNewUser) {
-          navigate("/google-profile", { replace: true });
+          navigateWithTransition("/google-profile");
         } else {
           navigate("/dashboard", { replace: true });
         }
@@ -334,12 +319,7 @@ export function Register() {
 
       const message = getGoogleRegisterErrorMessage(error);
 
-      setFeedback({
-        type: "error",
-        message,
-      });
-
-      toast.error(message);
+      showToast.error(message);
     } finally {
       setGoogleLoading(false);
     }
@@ -355,22 +335,6 @@ export function Register() {
     });
 
     clearFieldError(fieldName);
-    clearFeedback();
-
-    if (fieldName === 'username') {
-      const trimmedValue = value.trim();
-      let error = "";
-      if (trimmedValue.length > 0 && (trimmedValue.length < 3 || trimmedValue.length > 15)) {
-        error = "El nombre debe tener entre 3 y 15 caracteres";
-      } else if (trimmedValue.length > 0 && !/^[a-zA-Z0-9_-]+$/.test(trimmedValue)) {
-        error = "Solo se permiten caracteres alfanuméricos, '_' y '-'";
-      }
-      
-      setErrors(prev => ({
-        ...prev,
-        username: error
-      }));
-    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -379,333 +343,385 @@ export function Register() {
 
     setAvatarPreview(URL.createObjectURL(file));
 
-    setFeedback({
-      type: "success",
-      message: "Imagen de perfil seleccionada correctamente.",
-    });
+    showToast.success("Imagen de perfil seleccionada correctamente.");
   };
 
+  const getUsernameMessage = () => {
+    if (!usernameTouched && !cleanUsername) return "";
+
+    if (!cleanUsername) return "El nombre de usuario es obligatorio";
+    if (cleanUsername.length < 3 || cleanUsername.length > 15) return "El nombre debe tener entre 3 y 15 caracteres";
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) return "Solo se permiten caracteres alfanuméricos, '_' y '-'";
+    if (checkingUsername) return "Validando disponibilidad...";
+    if (usernameAvailable === true) return "Nombre de usuario disponible";
+    if (usernameAvailable === false) return "Este nombre de usuario ya está en uso";
+    return "";
+  };
+
+  const usernameMessage = getUsernameMessage();
+
+  const isUsernameError =
+    usernameTouched &&
+    Boolean(usernameMessage) &&
+    usernameMessage !== "Nombre de usuario disponible" &&
+    usernameMessage !== "Validando disponibilidad...";
+
+  const showUsernameAsError = usernameAvailable === false || isUsernameError;
+
   return (
-    <div
-      className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4"
-      aria-label="Pantalla de registro"
-    >
-      <main className="w-full max-w-[1280px]">
-        <div className="max-w-[440px] mx-auto">
+    <>
+      <div className="text-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+          Crea tu cuenta
+        </h1>
+        <p className="text-muted-foreground">
+          Compartenos los siguientes datos para crearla
+        </p>
+      </div>
 
-          {/* HEADER */}
-          <header className="text-center mb-8">
-            <img
-              src={logo}
-              alt="UniDesk plataforma de estudio colaborativo"
-              className="h-20 w-auto mb-3 mx-auto"
-            />
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        aria-describedby="form-status"
+        noValidate
+      >
 
-            <h1 className="text-2xl font-bold">
-              Crea tu cuenta
-            </h1>
+      {/* AVATAR */}
+      <div className="flex flex-col items-center mb-6">
+        <div className="relative">
 
-            <p className="text-gray-600">
-              Únete a UniDesk
-            </p>
-          </header>
-
-          {/* CARD */}
-          <section
-            className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100"
-            aria-label="Formulario de registro"
+          <div
+            className="w-24 h-24 rounded-full bg-gray-100 border flex items-center justify-center overflow-hidden"
+            aria-label={
+              avatarPreview
+                ? "Vista previa del avatar seleccionado"
+                : "Vista previa del avatar"
+            }
           >
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5"
-              aria-describedby={feedback ? "form-feedback" : "form-status"}
-              noValidate
-            >
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="Vista previa del avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
+            )}
+          </div>
 
-              {feedback && (
-                <div
-                  id="form-feedback"
-                  ref={feedbackRef}
-                  tabIndex={-1}
-                  role={feedback.type === "error" ? "alert" : "status"}
-                  aria-live={feedback.type === "error" ? "assertive" : "polite"}
-                  aria-atomic="true"
-                  className={getFeedbackClasses(feedback.type)}
-                >
-                  {feedback.message}
-                </div>
-              )}
+          <label
+            htmlFor="avatar"
+            className="absolute bottom-0 right-0 bg-primary-600 p-2 rounded-full text-white cursor-pointer"
+            aria-label="Subir imagen de perfil"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
 
-              {/* AVATAR */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative">
-
-                  <div
-                    className="w-24 h-24 rounded-full bg-gray-100 border flex items-center justify-center overflow-hidden"
-                    aria-label={
-                      avatarPreview
-                        ? "Vista previa del avatar seleccionado"
-                        : "Vista previa del avatar"
-                    }
-                  >
-                    {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Vista previa del avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
-                    )}
-                  </div>
-
-                  <label
-                    htmlFor="avatar"
-                    className="absolute bottom-0 right-0 bg-indigo-600 p-2 rounded-full text-white cursor-pointer"
-                    aria-label="Subir imagen de perfil"
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                  </label>
-
-                  <input
-                    id="avatar"
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    aria-label="Seleccionar imagen de perfil"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </div>
-
-              {/* FULL NAME */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="fullName">
-                  Nombre completo
-                </label>
-
-                <input
-                  id="fullName"
-                  name="fullName"
-                  value={form.fullName}
-                  onChange={handleChange}
-                  placeholder="Ej: Juan Pérez"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.fullName)}
-                  aria-describedby={errors.fullName ? "fullName-error" : undefined}
-                  autoComplete="name"
-                  disabled={isSubmitting}
-                />
-
-                {errors.fullName && (
-                  <p
-                    id="fullName-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.fullName}
-                  </p>
-                )}
-              </div>
-
-              {/* USERNAME */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="username">
-                  Usuario
-                </label>
-
-                <input
-                  id="username"
-                  name="username"
-                  value={form.username}
-                  onChange={handleChange}
-                  placeholder="Ej: estudiante_123"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.username)}
-                  aria-describedby={errors.username ? "username-error" : undefined}
-                  autoComplete="username"
-                  disabled={isSubmitting}
-                />
-
-                {errors.username && (
-                  <p
-                    id="username-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.username}
-                  </p>
-                )}
-              </div>
-
-              {/* EMAIL */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="email">
-                  Correo institucional o personal
-                </label>
-
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  placeholder="ejemplo@universidad.edu.co"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? "email-error" : undefined}
-                  autoComplete="email"
-                  disabled={isSubmitting}
-                />
-
-                {errors.email && (
-                  <p
-                    id="email-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.email}
-                  </p>
-                )}
-              </div>
-
-              {/* PASSWORD */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="password">
-                  Contraseña
-                </label>
-
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder="Mínimo 8 caracteres"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.password)}
-                  aria-describedby={errors.password ? "password-error" : undefined}
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                />
-
-                {errors.password && (
-                  <p
-                    id="password-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.password}
-                  </p>
-                )}
-              </div>
-
-              {/* CONFIRM PASSWORD */}
-              <div>
-                <label className="text-sm font-semibold" htmlFor="confirmPassword">
-                  Confirmar contraseña
-                </label>
-
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repite tu contraseña"
-                  className="w-full px-4 py-3 border rounded-lg"
-                  aria-invalid={Boolean(errors.confirmPassword)}
-                  aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
-                  autoComplete="new-password"
-                  disabled={isSubmitting}
-                />
-
-                {errors.confirmPassword && (
-                  <p
-                    id="confirm-error"
-                    role="alert"
-                    aria-live="assertive"
-                    className="text-red-600 text-xs"
-                  >
-                    {errors.confirmPassword}
-                  </p>
-                )}
-              </div>
-
-              {/* STATUS ANNOUNCER */}
-              <div
-                id="form-status"
-                aria-live="polite"
-                aria-atomic="true"
-                className="sr-only"
-              >
-                {loading && "Creando tu cuenta. Por favor espera."}
-                {googleLoading && "Procesando registro con Google. Por favor espera."}
-              </div>
-
-              {/* SUBMIT */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                aria-busy={loading}
-                aria-disabled={isSubmitting}
-                aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg flex justify-center gap-2"
-              >
-                {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                {loading ? "Creando..." : "Crear cuenta"}
-              </button>
-
-              {/* GOOGLE */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isSubmitting}
-                aria-busy={googleLoading}
-                aria-disabled={isSubmitting}
-                aria-label={
-                  googleLoading
-                    ? "Procesando registro con Google, por favor espera"
-                    : "Continuar con Google"
-                }
-                className="w-full border py-3 rounded-lg flex justify-center gap-2"
-              >
-                {googleLoading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <Chrome className="h-5 w-5" aria-hidden="true" />
-                    Continuar con Google
-                  </>
-                )}
-              </button>
-
-              {/* LOGIN */}
-              <p className="text-center text-sm">
-                ¿Ya tienes cuenta?{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("/")}
-                  className="text-indigo-600 font-semibold"
-                  disabled={isSubmitting}
-                  aria-label="Ir a iniciar sesión"
-                >
-                  Iniciar sesión
-                </button>
-              </p>
-
-            </form>
-          </section>
+          <input
+            id="avatar"
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={handleAvatarChange}
+            aria-label="Seleccionar imagen de perfil"
+            disabled={isSubmitting}
+          />
         </div>
-      </main>
-    </div>
+      </div>
+
+      {/* FULL NAME */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="fullName">
+          Nombre completo
+        </label>
+
+        <input
+          id="fullName"
+          name="fullName"
+          value={form.fullName}
+          onChange={handleChange}
+          placeholder="Ej: Juan Pérez"
+          className={`w-full px-4 py-3 border rounded-lg ${errors.fullName ? "border-red-400" : ""}`}
+          aria-invalid={Boolean(errors.fullName)}
+          aria-describedby={errors.fullName ? "fullName-error" : undefined}
+          autoComplete="name"
+          disabled={isSubmitting}
+        />
+
+        <div className={`grid transition-all duration-300 ${errors.fullName ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.fullName && (
+              <p
+                id="fullName-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.fullName}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* USERNAME */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="username">
+          Usuario
+        </label>
+
+        <input
+          id="username"
+          name="username"
+          value={form.username}
+          onChange={(e) => {
+            handleChange(e);
+            setUsernameAvailable(null);
+          }}
+          onBlur={() => setUsernameTouched(true)}
+          placeholder="Ej: estudiante_123"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none ${showUsernameAsError ? "border-red-400" : ""}`}
+          aria-invalid={isUsernameError ? true : undefined}
+          aria-describedby={isUsernameError ? "username-error" : undefined}
+          autoComplete="username"
+          disabled={isSubmitting}
+        />
+
+        <div className={`grid transition-all duration-300 ${usernameMessage ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {usernameMessage && (
+              <p
+                id={isUsernameError ? "username-error" : undefined}
+                className={`mt-1 text-sm flex items-center gap-1 ${
+                  showUsernameAsError
+                    ? "text-red-500"
+                    : usernameAvailable === true
+                    ? "text-green-600"
+                    : "text-gray-500"
+                }`}
+              >
+                {showUsernameAsError ? (
+                  <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : usernameAvailable === true ? (
+                  <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : null}
+
+                {usernameMessage}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {usernameTouched && usernameMessage}
+        </div>
+      </div>
+
+      {/* EMAIL */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="email">
+          Correo institucional o personal
+        </label>
+
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={form.email}
+          onChange={handleChange}
+          placeholder="ejemplo@universidad.edu.co"
+          className={`w-full px-4 py-3 border rounded-lg ${errors.email ? "border-red-400" : ""}`}
+          aria-invalid={Boolean(errors.email)}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          autoComplete="email"
+          disabled={isSubmitting}
+        />
+
+        <div className={`grid transition-all duration-300 ${errors.email ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.email && (
+              <p
+                id="email-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.email}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* PASSWORD */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="password">
+          Contraseña
+        </label>
+
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            value={form.password}
+            onChange={handleChange}
+            placeholder="Mínimo 8 caracteres"
+            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.password ? "border-red-400" : ""}`}
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={errors.password ? "password-error" : undefined}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </div>
+
+        <div className={`grid transition-all duration-300 ${errors.password ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.password && (
+              <p
+                id="password-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.password}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* CONFIRM PASSWORD */}
+      <div>
+        <label className="text-sm font-semibold" htmlFor="confirmPassword">
+          Confirmar contraseña
+        </label>
+
+        <div className="relative">
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type={showConfirm ? "text" : "password"}
+            value={form.confirmPassword}
+            onChange={handleChange}
+            placeholder="Repite tu contraseña"
+            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.confirmPassword ? "border-red-400" : ""}`}
+            aria-invalid={Boolean(errors.confirmPassword)}
+            aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
+            autoComplete="new-password"
+            disabled={isSubmitting}
+          />
+
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            aria-label={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+            tabIndex={-1}
+          >
+            {showConfirm ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </div>
+
+        <div className={`grid transition-all duration-300 ${errors.confirmPassword ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            {errors.confirmPassword && (
+              <p
+                id="confirm-error"
+                role="alert"
+                aria-live="assertive"
+                className="text-red-500 mt-1 text-sm flex items-center gap-1"
+              >
+                {errors.confirmPassword}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* STATUS ANNOUNCER */}
+      <div
+        id="form-status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {loading && "Creando tu cuenta. Por favor espera."}
+        {googleLoading && "Procesando registro con Google. Por favor espera."}
+      </div>
+
+      <div className="space-y-2">
+        {/* SUBMIT */}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          aria-busy={loading}
+          aria-disabled={isSubmitting}
+          aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
+          className="w-full bg-primary-600 text-white py-3 rounded-lg flex justify-center gap-2 cursor-pointer"
+        >
+          {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+          {loading ? "Creando..." : "Crear cuenta"}
+        </button>
+
+        {/* GOOGLE */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={isSubmitting}
+          aria-busy={googleLoading}
+          aria-disabled={isSubmitting}
+          aria-label={
+            googleLoading
+              ? "Procesando registro con Google, por favor espera"
+              : "Continuar con Google"
+          }
+          className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
+        >
+          {googleLoading ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              Procesando...
+            </>
+          ) : (
+            <>
+              <GoogleIcon/>
+              Continuar con Google
+            </>
+          )}
+        </button>
+      </div>
+
+
+      {/* LOGIN */}
+      <p className="text-center text-sm">
+        ¿Ya tienes cuenta?{" "}
+        <button
+          type="button"
+        onClick={() => navigateWithTransition("/")}
+        className="text-primary-600 font-semibold cursor-pointer"
+          disabled={isSubmitting}
+          aria-label="Ir a iniciar sesión"
+        >
+          Iniciar sesión
+        </button>
+      </p>
+
+    </form>
+    </>
   );
 }

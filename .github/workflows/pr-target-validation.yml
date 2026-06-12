@@ -1,0 +1,30 @@
+name: Validate Pull Request Target
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+jobs:
+  validate-target:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate destination branch
+        run: |
+          BASE="${{ github.event.pull_request.base.ref }}"
+          HEAD="${{ github.event.pull_request.head.ref }}"
+
+          echo "Origen: $HEAD"
+          echo "Destino: $BASE"
+
+          # Si NO viene de develop, entonces DEBE apuntar a develop
+          if [ "$HEAD" != "develop" ] && [ "$BASE" != "develop" ]; then
+            echo "ERROR: Los PR desde ramas distintas a develop deben apuntar a develop."
+            exit 1
+          fi
+
+          echo "Validación correcta."
