@@ -29,6 +29,7 @@ interface UserInfo {
   uid: string;
   username: string;
   roomId: string;
+  avatar?: string;
 }
 
 // Map<roomId, Map<socketId, UserInfo>>
@@ -56,10 +57,29 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Map());
     }
-    rooms.get(roomId)!.set(socket.id, { uid, username, roomId });
+    rooms.get(roomId)!.set(socket.id, { 
+      uid, 
+      username, 
+      roomId, 
+      avatar: (socket.user as any).picture 
+    });
     
     socket.join(roomId);
     console.log(`Usuario ${username} (${uid}) se unió a la sala ${roomId}`);
+
+    // Fetch and send chat history
+    db.collection("messages")
+      .where("roomId", "==", roomId)
+      .orderBy("createdAt", "asc")
+      .get()
+      .then((snapshot) => {
+        const messages = snapshot.docs.map((doc) => ({
+          ...doc.data(),
+          createdAt: doc.data().createdAt.toDate().toISOString(),
+        }));
+        socket.emit("chat-history", messages);
+      })
+      .catch((err) => console.error("Error fetching chat history:", err));
 
     // Broadcast full updated list
     io.to(roomId).emit("room-participants-update", getParticipantsInRoom(roomId));
