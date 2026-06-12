@@ -641,7 +641,7 @@ export function ActiveRoom() {
       socketRef.current = null;
     }
 
-    navigate("/rooms");
+    navigate("/dashboard");
   };
 
   if (isLoadingRoom) {
