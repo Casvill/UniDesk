@@ -71,7 +71,7 @@ export function Dashboard() {
             </button>
           )}
 
-          <JoinRoomForm />
+          <JoinRoomForm user={user} />
         </div>
       </header>
 

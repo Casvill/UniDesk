@@ -281,6 +281,7 @@ export const api = {
   async listRooms(token: string): Promise<Room[]> {
     try {
       const response = await fetch(`${API_URL}/rooms`, {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
@@ -302,6 +303,51 @@ export const api = {
       handleNetworkError(
         error,
         'No pudimos conectar con el servidor para obtener las salas'
+      );
+    }
+  },
+
+  async getRoomById(roomId: string, token: string): Promise<Room> {
+    try {
+      const response = await fetch(
+        `${API_URL}/rooms/${encodeURIComponent(roomId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          'No encontramos una sala con ese código'
+        );
+
+        let code = 'backend/room-fetch-failed';
+
+        if (response.status === 401) {
+          code = 'backend/unauthorized';
+        }
+
+        if (response.status === 403) {
+          code = 'backend/forbidden';
+        }
+
+        if (response.status === 404) {
+          code = 'backend/room-not-found';
+        }
+
+        throw createApiError(message, code, response.status);
+      }
+
+      return response.json();
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para verificar la sala'
       );
     }
   },
