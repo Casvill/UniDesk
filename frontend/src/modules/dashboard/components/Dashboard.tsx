@@ -11,7 +11,8 @@ import type { Room } from "@/services/api";
 
 export function Dashboard() {
   const { profile, user } = useAuth();
-  const { activeRooms, isLoadingRooms, roomsError, refetchRooms } = useRooms(user);
+  const { activeRooms, isLoadingRooms, roomsError, refetchRooms } =
+    useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -27,14 +28,13 @@ export function Dashboard() {
     ? profile.username.charAt(0).toUpperCase() + profile.username.slice(1)
     : "estudiante";
 
-  const dashboardStateDescription =
-    roomsError
-      ? "Hay un error al cargar tus salas."
-      : activeRooms.length === 0
-        ? "No tienes salas creadas."
-        : activeRooms.length === 1
-          ? "Tienes una sala creada."
-          : `Tienes ${activeRooms.length} salas creadas.`;
+  const dashboardStateDescription = roomsError
+    ? "Hay un error al cargar tus salas."
+    : activeRooms.length === 0
+      ? "No tienes salas creadas."
+      : activeRooms.length === 1
+        ? "Tienes una sala creada."
+        : `Tienes ${activeRooms.length} salas creadas.`;
 
   return (
     <section aria-labelledby="dashboard-title" aria-busy={isLoadingRooms}>
@@ -53,7 +53,8 @@ export function Dashboard() {
           </h1>
 
           <p className="text-gray-600 mb-2">
-            Organiza tus salas, únete a tus compañeros y continúa estudiando en equipo.
+            Organiza tus salas, únete a tus compañeros y continúa estudiando en
+            equipo.
           </p>
         </div>
 
@@ -128,9 +129,7 @@ export function Dashboard() {
             aria-hidden="true"
           />
 
-          <p className="text-gray-500 mt-4">
-            Cargando tus salas...
-          </p>
+          <p className="text-gray-500 mt-4">Cargando tus salas...</p>
         </section>
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
         <EmptyRoomsState
