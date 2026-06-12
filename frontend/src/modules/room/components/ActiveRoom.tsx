@@ -8,6 +8,7 @@ import {
   Copy,
   Loader2,
   LogOut,
+  MessageSquare,
   Mic,
   MicOff,
   Monitor,
@@ -241,10 +242,7 @@ export function ActiveRoom() {
   const [isChatOpen, setIsChatOpen] = useState(true);
 
   const currentUserName =
-    profile?.displayName ||
-    profile?.username ||
-    user?.email ||
-    "Tú";
+    profile?.displayName || profile?.username || user?.email || "Tú";
 
   useEffect(() => {
     const loadRoom = async () => {
@@ -799,7 +797,7 @@ export function ActiveRoom() {
             type="button"
             onClick={() => setIsChatOpen((value) => !value)}
             className="absolute left-0 top-1/2 z-30 h-16 w-11 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-2xl bg-gradient-to-b from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900 flex cursor-pointer"
-            aria-label={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+            aria-label={isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"}
             aria-expanded={isChatOpen}
             aria-controls="room-chat-panel"
             title={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
@@ -816,97 +814,168 @@ export function ActiveRoom() {
             className={`h-full bg-white flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none ${
               isChatOpen ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
-            aria-label="Panel de chat"
+            role="region"
+            aria-labelledby="chat-title"
+            aria-describedby="chat-description"
             aria-hidden={!isChatOpen}
           >
             {isChatOpen && (
               <>
                 <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
-                  <h2 className="text-xl font-bold text-white mb-1">
-                    Chat
-                  </h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2
+                        id="chat-title"
+                        className="text-xl font-bold text-white mb-1"
+                      >
+                        Chat de la sala
+                      </h2>
 
-                  <p className="text-sm text-primary-100">
-                    {participants.length} participantes
-                  </p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gray-50">
-                  {chatMessages.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center">
-                      <p className="font-semibold text-gray-700">
-                        Aún no hay mensajes
-                      </p>
-
-                      <p className="mt-1 text-sm text-gray-500">
-                        Escribe el primer mensaje de la sala.
+                      <p id="chat-description" className="text-sm text-primary-100">
+                        {participants.length === 1
+                          ? "1 participante conectado"
+                          : `${participants.length} participantes conectados`}
                       </p>
                     </div>
-                  ) : (
-                    chatMessages.map((msg) => (
-                      <div key={msg.id} className="flex gap-3">
-                        {msg.senderPhotoURL ? (
-                          <img
-                            src={msg.senderPhotoURL}
-                            alt=""
-                            className="flex-shrink-0 w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
-                            <span className="text-white text-sm font-bold">
-                              {getInitials(msg.senderName)}
-                            </span>
-                          </div>
-                        )}
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline justify-between mb-1 gap-2">
-                            <span className="font-semibold text-gray-900 text-sm truncate">
-                              {msg.senderUid === user?.uid ||
-                              msg.senderName === currentUserName
-                                ? "Tú"
-                                : msg.senderName}
-                            </span>
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white"
+                      aria-hidden="true"
+                    >
+                      <MessageSquare className="h-5 w-5" />
+                    </div>
+                  </div>
+                </div>
 
-                            <span className="text-xs text-gray-500 flex-shrink-0">
-                              {formatMessageTime(msg.createdAt)}
-                            </span>
-                          </div>
-
-                          <p className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 shadow-sm border border-gray-200">
-                            {msg.message}
-                          </p>
+                <div
+                  className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50"
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions text"
+                  aria-label="Mensajes del chat de la sala"
+                >
+                  {chatMessages.length === 0 ? (
+                    <div className="flex h-full min-h-[280px] items-center justify-center">
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
+                        <div
+                          className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
+                          aria-hidden="true"
+                        >
+                          <MessageSquare className="h-6 w-6" />
                         </div>
+
+                        <p className="mt-4 font-semibold text-gray-800">
+                          Aún no hay mensajes
+                        </p>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          Escribe el primer mensaje para iniciar la conversación.
+                        </p>
                       </div>
-                    ))
+                    </div>
+                  ) : (
+                    <ul className="space-y-4">
+                      {chatMessages.map((msg) => {
+                        const isOwnMessage =
+                          msg.senderUid === user?.uid ||
+                          msg.senderName === currentUserName;
+
+                        return (
+                          <li
+                            key={msg.id}
+                            className={`flex gap-3 ${
+                              isOwnMessage ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            {!isOwnMessage && (
+                              <>
+                                {msg.senderPhotoURL ? (
+                                  <img
+                                    src={msg.senderPhotoURL}
+                                    alt=""
+                                    className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div
+                                    className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
+                                    aria-hidden="true"
+                                  >
+                                    <span className="text-xs font-bold text-white">
+                                      {getInitials(msg.senderName)}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            <div
+                              className={`max-w-[82%] ${
+                                isOwnMessage
+                                  ? "items-end text-right"
+                                  : "items-start text-left"
+                              } flex flex-col`}
+                            >
+                              <div className="mb-1 flex max-w-full items-center gap-2">
+                                <span className="truncate text-xs font-semibold text-gray-700">
+                                  {isOwnMessage ? "Tú" : msg.senderName}
+                                </span>
+
+                                <span className="text-[11px] text-gray-500">
+                                  {formatMessageTime(msg.createdAt)}
+                                </span>
+                              </div>
+
+                              <p
+                                className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
+                                  isOwnMessage
+                                    ? "rounded-br-sm bg-primary text-white"
+                                    : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
+                                }`}
+                              >
+                                {msg.message}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </div>
 
                 <form
                   onSubmit={handleSendMessage}
-                  className="border-t border-gray-200 p-4 flex-shrink-0 bg-white"
+                  className="border-t border-gray-200 bg-white p-4 flex-shrink-0"
+                  aria-label="Formulario para enviar mensajes"
                 >
                   <label htmlFor="chat-message" className="sr-only">
-                    Escribe un mensaje
+                    Escribe un mensaje para enviarlo al chat de la sala
                   </label>
 
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <p id="chat-message-help" className="sr-only">
+                    Escribe tu mensaje y presiona Enter o el botón enviar.
+                  </p>
+
+                  <div className="flex items-end gap-2">
                     <input
                       type="text"
                       id="chat-message"
                       value={message}
                       onChange={(event) => setMessage(event.target.value)}
                       placeholder="Escribe un mensaje..."
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                      aria-describedby="chat-message-help"
+                      disabled={!isConnected}
+                      className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                     />
 
                     <button
                       type="submit"
                       disabled={!message.trim() || !isConnected}
-                      className="bg-gradient-to-r from-primary-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                      className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                       aria-label={
                         isConnected
-                          ? "Enviar mensaje"
+                          ? message.trim()
+                            ? "Enviar mensaje"
+                            : "Escribe un mensaje antes de enviar"
                           : "Conecta a la sala antes de enviar mensajes"
                       }
                     >
