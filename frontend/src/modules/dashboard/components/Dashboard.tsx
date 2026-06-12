@@ -6,6 +6,7 @@ import { useFloatingAnimation } from "../hooks/useFloatingAnimation";
 import { RoomCarousel } from "./RoomCarousel";
 import { EmptyRoomsState } from "./EmptyRoomsState";
 import { CreateRoomDialog } from "./CreateRoomDialog";
+import { JoinRoomForm } from "./JoinRoomForm";
 import type { Room } from "@/services/api";
 
 export function Dashboard() {
@@ -56,17 +57,21 @@ export function Dashboard() {
           </p>
         </div>
 
-        {activeRooms.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowCreateDialog(true)}
-            className="mt-6 w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
-            aria-label="Crear una nueva sala de estudio"
-          >
-            <Plus className="h-5 w-5" aria-hidden="true" />
-            Crear nueva sala
-          </button>
-        )}
+        <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+          {activeRooms.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCreateDialog(true)}
+              className="h-12 w-full sm:w-auto bg-primary text-white px-6 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
+              aria-label="Crear una nueva sala de estudio"
+            >
+              <Plus className="h-5 w-5" aria-hidden="true" />
+              Crear nueva sala
+            </button>
+          )}
+
+          <JoinRoomForm />
+        </div>
       </header>
 
       {roomsError ? (
