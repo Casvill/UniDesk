@@ -11,7 +11,7 @@ const client2 = io(SERVER_URL, { auth: { token: JOSEPH_TOKEN } });
 // Helper to log updates
 const setupListener = (name, socket) => {
   socket.on("room-participants-update", (participants) => {
-    console.log(`[${name}] Received participant update:`, participants.map(p => p.username));
+    console.log(`[${name}] Received participant update:`, participants.map(p => ({ username: p.username, avatar: p.avatar })));
   });
 };
 
