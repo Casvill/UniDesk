@@ -52,7 +52,7 @@ export function Dashboard() {
             ¡Qué bueno verte por aquí, {username}!
           </h1>
 
-          <p className="text-gray-600 mb-2">
+          <p className="text-gray-600 mb-8">
             Organiza tus salas, únete a tus compañeros y continúa estudiando en
             equipo.
           </p>

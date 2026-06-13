@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/shared/components/ui/dialog";
+import { showToast } from "@/shared/components/ui/toast";
 
 interface DeleteRoomDialogProps {
   open: boolean;
@@ -27,16 +28,12 @@ export function DeleteRoomDialog({
   onRoomDeleted,
 }: DeleteRoomDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [deleteError, setDeleteError] = useState("");
 
   const roomName = room?.name ?? "seleccionada";
 
   useEffect(() => {
     if (!open) {
       setIsDeleting(false);
-      setStatusMessage("");
-      setDeleteError("");
     }
   }, [open]);
 
@@ -44,16 +41,18 @@ export function DeleteRoomDialog({
     if (!room || isDeleting) return;
 
     if (!user) {
-      setDeleteError(
+      showToast.error(
         "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
       );
       return;
     }
 
+    const loadingKey = showToast.loading(
+      `Eliminando la sala ${roomName}. Por favor espera.`
+    );
+
     try {
       setIsDeleting(true);
-      setDeleteError("");
-      setStatusMessage(`Eliminando la sala ${roomName}. Por favor espera.`);
 
       const token = await user.getIdToken();
 
@@ -61,7 +60,8 @@ export function DeleteRoomDialog({
 
       onRoomDeleted?.(room.id);
 
-      setStatusMessage(`La sala ${roomName} fue eliminada correctamente.`);
+      showToast.close(loadingKey);
+      showToast.success(`La sala ${roomName} fue eliminada correctamente.`);
 
       setTimeout(() => {
         onOpenChange(false);
@@ -69,25 +69,18 @@ export function DeleteRoomDialog({
     } catch (err) {
       console.error("Error al eliminar la sala:", err);
 
-      const message =
+      showToast.close(loadingKey);
+      showToast.error(
         err instanceof Error
           ? err.message
-          : "No pudimos eliminar la sala. Inténtalo nuevamente.";
+          : "No pudimos eliminar la sala. Inténtalo nuevamente."
+      );
 
-      setDeleteError(message);
-      setStatusMessage("");
-    } finally {
       setIsDeleting(false);
     }
   };
 
-  const describedBy = [
-    "delete-room-description",
-    statusMessage ? "delete-room-status" : null,
-    deleteError ? "delete-room-error" : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const describedBy = "delete-room-description";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,28 +108,6 @@ export function DeleteRoomDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {statusMessage && (
-          <p
-            id="delete-room-status"
-            className="sr-only"
-            role="status"
-            aria-live="assertive"
-          >
-            {statusMessage}
-          </p>
-        )}
-
-        {deleteError && (
-          <p
-            id="delete-room-error"
-            className="mt-2 text-sm text-red-600"
-            role="alert"
-            aria-live="assertive"
-          >
-            {deleteError}
-          </p>
-        )}
-
         <DialogFooter className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <DialogClose asChild>
             <button
@@ -154,14 +125,10 @@ export function DeleteRoomDialog({
             onClick={handleDelete}
             disabled={isDeleting}
             aria-busy={isDeleting}
-            aria-label={
-              isDeleting
-                ? `Eliminando la sala ${roomName}, por favor espera`
-                : `Confirmar eliminación de la sala ${roomName}`
-            }
+            aria-label={`Confirmar eliminación de la sala ${roomName}`}
             className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white shadow-lg transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
           >
-            {isDeleting ? "Eliminando..." : "Confirmar"}
+            Confirmar
           </button>
         </DialogFooter>
       </DialogContent>

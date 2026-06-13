@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -12,6 +12,12 @@ import {
 } from "@/shared/components/ui/dialog";
 import { api } from "@/services/api";
 import type { Room } from "@/services/api";
+import { showToast } from "@/shared/components/ui/toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 
 interface CreateRoomDialogProps {
   open: boolean;
@@ -65,8 +71,9 @@ export function CreateRoomDialog({
   const [hasTouchedRoomName, setHasTouchedRoomName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [roomError, setRoomError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
 
+  const initialName = isEditMode ? room?.name?.trim() ?? "" : "";
+  const isUnchanged = isEditMode && roomName.trim() === initialName;
   const roomNameError = validateRoomName(roomName);
   const isFormInvalid = Boolean(roomNameError);
   const showRoomNameError = hasTouchedRoomName && roomNameError;
@@ -89,7 +96,6 @@ export function CreateRoomDialog({
     setRoomName(isEditMode ? room?.name ?? "" : "");
     setHasTouchedRoomName(false);
     setRoomError("");
-    setSuccessMessage("");
     setIsSaving(false);
   }, [open, isEditMode, room?.name]);
 
@@ -97,7 +103,6 @@ export function CreateRoomDialog({
     setRoomName("");
     setHasTouchedRoomName(false);
     setRoomError("");
-    setSuccessMessage("");
     setIsSaving(false);
   };
 
@@ -112,7 +117,6 @@ export function CreateRoomDialog({
   const handleSubmit = async () => {
     setHasTouchedRoomName(true);
     setRoomError("");
-    setSuccessMessage("");
 
     if (isFormInvalid || isSaving) return;
 
@@ -136,6 +140,10 @@ export function CreateRoomDialog({
         return;
       }
 
+      const loadingKey = showToast.loading(
+        "Actualizando el nombre de la sala. Por favor espera."
+      );
+
       try {
         setIsSaving(true);
 
@@ -149,7 +157,10 @@ export function CreateRoomDialog({
 
         onRoomUpdated?.(updatedRoom);
 
-        setSuccessMessage("El nombre de la sala se actualizó correctamente.");
+        showToast.close(loadingKey);
+        showToast.success(
+          "El nombre de la sala se actualizó correctamente."
+        );
 
         setTimeout(() => {
           handleOpenChange(false);
@@ -157,13 +168,13 @@ export function CreateRoomDialog({
       } catch (err) {
         console.error("Error al actualizar la sala:", err);
 
-        const message =
+        showToast.close(loadingKey);
+        showToast.error(
           err instanceof Error
             ? err.message
-            : "No pudimos actualizar el nombre de la sala. Inténtalo nuevamente.";
+            : "No pudimos actualizar el nombre de la sala. Inténtalo nuevamente."
+        );
 
-        setRoomError(message);
-      } finally {
         setIsSaving(false);
       }
 
@@ -204,18 +215,22 @@ export function CreateRoomDialog({
   };
 
   const inputDescriptionIds = [
-    "room-name-help",
     isEditMode ? currentRoomNameId : null,
     showRoomNameError ? "room-name-error" : null,
     roomError ? "room-error" : null,
-    successMessage ? "room-success" : null,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent aria-describedby={dialogDescriptionId}>
+      <DialogContent
+        aria-describedby={dialogDescriptionId}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          document.getElementById(inputId)?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Editar nombre de sala" : "Crear sala de estudio"}
@@ -240,12 +255,31 @@ export function CreateRoomDialog({
             </p>
           )}
 
-          <label
-            htmlFor={inputId}
-            className="block mb-2 text-sm font-semibold text-gray-700"
-          >
-            {isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
-          </label>
+          <div className="flex items-center gap-1.5 mb-2">
+            <label
+              htmlFor={inputId}
+              className="text-sm font-semibold text-gray-700"
+            >
+              {isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
+            </label>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+                  aria-label="Requisitos del nombre de la sala"
+                >
+                  <Info className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+
+              <TooltipContent side="right" className="max-w-70">
+                El nombre debe tener entre 3 y 35 caracteres. Puedes usar
+                letras, números, espacios, tildes, guiones o puntos.
+              </TooltipContent>
+            </Tooltip>
+          </div>
 
           <input
             type="text"
@@ -254,7 +288,6 @@ export function CreateRoomDialog({
             onChange={(e) => {
               setRoomName(e.target.value);
               setRoomError("");
-              setSuccessMessage("");
             }}
             onBlur={() => setHasTouchedRoomName(true)}
             placeholder="Ej: Grupo de estudio de cálculo"
@@ -268,11 +301,6 @@ export function CreateRoomDialog({
                 : "border-gray-300 focus:ring-indigo-500"
             }`}
           />
-
-          <p id="room-name-help" className="mt-1 text-xs text-gray-500">
-            El nombre debe tener entre 3 y 35 caracteres. Puedes usar letras,
-            números, espacios, tildes, guiones o puntos.
-          </p>
 
           <div className="mt-1 flex items-center justify-between">
             {showRoomNameError ? (
@@ -306,16 +334,7 @@ export function CreateRoomDialog({
             </p>
           )}
 
-          {successMessage && (
-            <p
-              id="room-success"
-              className="mt-3 text-sm text-green-700"
-              role="status"
-              aria-live="polite"
-            >
-              {successMessage}
-            </p>
-          )}
+
         </div>
 
         <DialogFooter>
@@ -337,16 +356,12 @@ export function CreateRoomDialog({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isFormInvalid || isSaving}
+            disabled={isFormInvalid || isSaving || isUnchanged}
             aria-busy={isSaving}
             aria-label={
-              isSaving
-                ? isEditMode
-                  ? "Actualizando el nombre de la sala, por favor espera"
-                  : "Creando sala, por favor espera"
-                : isEditMode
-                  ? "Guardar nuevo nombre de la sala"
-                  : "Crear sala de estudio"
+              isEditMode
+                ? "Guardar nuevo nombre de la sala"
+                : "Crear sala de estudio"
             }
             className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
@@ -356,13 +371,7 @@ export function CreateRoomDialog({
               <Plus className="h-4 w-4" aria-hidden="true" />
             )}
 
-            {isSaving
-              ? isEditMode
-                ? "Actualizando nombre..."
-                : "Creando..."
-              : isEditMode
-                ? "Guardar cambios"
-                : "Crear sala"}
+            {isEditMode ? "Guardar cambios" : "Crear sala"}
           </button>
         </DialogFooter>
       </DialogContent>
