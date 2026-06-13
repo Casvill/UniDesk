@@ -25,6 +25,40 @@ function validateRoomCode(value: string) {
   return "";
 }
 
+function getJoinRoomErrorMessage(error: unknown) {
+  const apiError = error as Error & {
+    code?: string;
+    status?: number;
+  };
+
+  if (
+    apiError.code === "backend/room-not-found" ||
+    apiError.status === 404
+  ) {
+    return "No encontramos una sala con ese código. Verifica el ID e inténtalo nuevamente.";
+  }
+
+  if (
+    apiError.code === "backend/unauthorized" ||
+    apiError.status === 401
+  ) {
+    return "Tu sesión expiró. Inicia sesión nuevamente para unirte a una sala.";
+  }
+
+  if (
+    apiError.code === "backend/forbidden" ||
+    apiError.status === 403
+  ) {
+    return "No tienes permisos para ingresar a esta sala.";
+  }
+
+  if (apiError.code === "backend/network-error") {
+    return "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.";
+  }
+
+  return "No pudimos verificar la sala. Revisa el código e inténtalo nuevamente.";
+}
+
 export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
   const navigate = useNavigate();
 
@@ -69,12 +103,7 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
     } catch (error) {
       console.error("Error al unirse a la sala:", error);
 
-      const message =
-        error instanceof Error
-          ? error.message
-          : "No encontramos una sala con ese código.";
-
-      setRoomCodeError(message);
+      setRoomCodeError(getJoinRoomErrorMessage(error));
       inputRef.current?.focus();
     } finally {
       setIsJoining(false);
