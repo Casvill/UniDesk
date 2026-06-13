@@ -294,6 +294,7 @@ export function CreateRoomDialog({
             maxLength={ROOM_NAME_MAX_LENGTH}
             disabled={isSaving}
             aria-invalid={Boolean(showRoomNameError || roomError)}
+            aria-label={isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
             aria-describedby={inputDescriptionIds}
             className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
               showRoomNameError || roomError
@@ -308,6 +309,7 @@ export function CreateRoomDialog({
                 id="room-name-error"
                 className="text-sm text-red-600"
                 role="alert"
+                aria-live="assertive"
               >
                 {roomNameError}
               </p>
