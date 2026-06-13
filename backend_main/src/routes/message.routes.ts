@@ -94,7 +94,7 @@ router.get("/:roomId", verifyToken, async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const startAfter = req.query.startAfter as string;
-    const messages = await getMessagesByRoom(req.params.roomId, limit, startAfter);
+    const messages = await getMessagesByRoom(req.params.roomId as string, limit, startAfter);
     res.json(messages);
   } catch (error) {
     const handled = handleFirebaseError(error);
@@ -127,7 +127,7 @@ router.get("/:roomId/search", verifyToken, async (req: Request, res: Response) =
       res.status(400).json({ message: "El término de búsqueda 'q' es requerido" });
       return;
     }
-    const messages = await searchMessages(req.params.roomId, query);
+    const messages = await searchMessages(req.params.roomId as string, query);
     res.json(messages);
   } catch (error) {
     const handled = handleFirebaseError(error);
@@ -175,7 +175,7 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
     }
 
     // Verify ownership
-    const messageDoc = await db.collection("messages").doc(req.params.id).get();
+    const messageDoc = await db.collection("messages").doc(req.params.id as string).get();
     if (!messageDoc.exists) {
       res.status(404).json({ message: "Mensaje no encontrado" });
       return;
@@ -187,7 +187,7 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
       return;
     }
 
-    await updateMessage(req.params.id, content);
+    await updateMessage(req.params.id as string, content);
     res.json({ message: "Mensaje actualizado exitosamente" });
   } catch (error) {
     const handled = handleFirebaseError(error);

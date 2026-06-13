@@ -76,10 +76,19 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
       ? "google.com" as const
       : "password" as const;
 
+    const email = req.user.email ?? "";
+    const allowedDomains = [".edu", ".edu.co", ".gov", ".gov.co", ".com.co", ".co"];
+    const isInstitutional = allowedDomains.some(domain => email.endsWith(domain));
+
+    if (!isInstitutional) {
+      res.status(400).json({ message: "El correo debe ser institucional (.edu, .edu.co, .gov, .gov.co, .com.co, .co)" });
+      return;
+    }
+
     const profile = await createUserProfile({
       uid: req.user.uid,
       username,
-      email: req.user.email ?? "",
+      email,
       displayName,
       photoURL: photoURL ?? "",
       provider,
@@ -296,6 +305,17 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
     if (req.user.uid !== String(req.params.uid)) {
       res.status(403).json({ message: "No tienes permiso para modificar este perfil" });
       return;
+    }
+
+    if (req.body.email) {
+      const email = req.body.email;
+      const allowedDomains = [".edu", ".edu.co", ".gov", ".gov.co", ".com.co", ".co"];
+      const isInstitutional = allowedDomains.some(domain => email.endsWith(domain));
+
+      if (!isInstitutional) {
+        res.status(400).json({ message: "El correo debe ser institucional (.edu, .edu.co, .gov, .gov.co, .com.co, .co)" });
+        return;
+      }
     }
 
     const profile = await updateUserProfile(String(req.params.uid), req.body);
