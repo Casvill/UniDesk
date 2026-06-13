@@ -7,6 +7,7 @@ import { RoomCarousel } from "./RoomCarousel";
 import { EmptyRoomsState } from "./EmptyRoomsState";
 import { CreateRoomDialog } from "./CreateRoomDialog";
 import { JoinRoomForm } from "./JoinRoomForm";
+import { JoinRoomDialog } from "./JoinRoomDialog";
 import type { Room } from "@/services/api";
 
 export function Dashboard() {
@@ -15,6 +16,7 @@ export function Dashboard() {
     useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showJoinDialog, setShowJoinDialog] = useState(false);
 
   const handleRoomUpdated = (_updatedRoom: Room) => {
     void refetchRooms();
@@ -71,7 +73,7 @@ export function Dashboard() {
             </button>
           )}
 
-          <JoinRoomForm user={user} />
+          {activeRooms.length > 0 && <JoinRoomForm user={user} />}
         </div>
       </header>
 
@@ -134,6 +136,7 @@ export function Dashboard() {
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
         <EmptyRoomsState
           onCreateRoom={() => setShowCreateDialog(true)}
+          onJoinRoom={() => setShowJoinDialog(true)}
           animName={animNames[0]}
           animDur={animDurs[0]}
         />
@@ -149,6 +152,12 @@ export function Dashboard() {
       <CreateRoomDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+        user={user}
+      />
+
+      <JoinRoomDialog
+        open={showJoinDialog}
+        onOpenChange={setShowJoinDialog}
         user={user}
       />
     </section>
