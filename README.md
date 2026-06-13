@@ -54,7 +54,7 @@ UniTasker/
 ___
 # Ejecución local
 
-## Backend
+## Backend main
 
 **Variables de Entorno:**
 El proyecto utiliza variables de entorno para configuración sensible.
@@ -76,6 +76,29 @@ npm run dev
 ```
 
 Con esto ya estará andando el backend de manera local en http://localhost:3000/
+
+## Backend realtime
+
+**Variables de Entorno:**
+El proyecto utiliza variables de entorno para configuración sensible.
+Para configurar el entorno local:
+
+1. Copiar el archivo de ejemplo:
+```bash
+cp .env.example .env
+# (En Windows puedes duplicarlo manualmente.)
+```
+2. Completar las variables con los valores correspondientes.
+
+
+**Configuración del entorno**
+```bash
+cd backend
+npm install
+npm start
+```
+
+Con esto ya estará andando el backend de manera local en http://localhost:3001/
 
 ## Frontend
 
@@ -196,9 +219,9 @@ ___
 
 🟢 Sprint 0 — Equipo operativo + Arquitectura base + UX preliminar  
 🟢 Sprint 1 - Identidad y Autenticación (T1)  
-🟡 Sprint 2 - Perfil y Gestión Base de Salas (T1)  
-⚪ Sprint 3 - Salas Colaborativas y Mensajería Instantánea (T2)  
-⚪ Sprint 4 - Infraestructura WebRTC y Video Básico (T3)  
+🟢 Sprint 2 - Perfil y Gestión Base de Salas (T1)  
+🟢 Sprint 3 - Salas Colaborativas y Mensajería Instantánea (T2)  
+🟡 Sprint 4 - Infraestructura WebRTC y Video Básico (T3)  
 ⚪ Sprint 5 - Control de Medios y Presentación (T3, T4)  
 ⚪ Sprint 6 - Accesibilidad, Pruebas Heurísticas y Estabilización  
 ⚪ Sprint 7 - Integración final, despliegues y cierre de producto  
