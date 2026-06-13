@@ -281,8 +281,10 @@ export const api = {
   async listRooms(token: string): Promise<Room[]> {
     try {
       const response = await fetch(`${API_URL}/rooms`, {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
       });
 
@@ -305,6 +307,51 @@ export const api = {
     }
   },
 
+  async getRoomById(roomId: string, token: string): Promise<Room> {
+    try {
+      const response = await fetch(
+        `${API_URL}/rooms/${encodeURIComponent(roomId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          'No encontramos una sala con ese código'
+        );
+
+        let code = 'backend/room-fetch-failed';
+
+        if (response.status === 401) {
+          code = 'backend/unauthorized';
+        }
+
+        if (response.status === 403) {
+          code = 'backend/forbidden';
+        }
+
+        if (response.status === 404) {
+          code = 'backend/room-not-found';
+        }
+
+        throw createApiError(message, code, response.status);
+      }
+
+      return response.json();
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para verificar la sala'
+      );
+    }
+  },
+
   async createRoom(name: string, token: string): Promise<Room> {
     try {
       const response = await fetch(`${API_URL}/rooms`, {
@@ -312,6 +359,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
         body: JSON.stringify({ name }),
       });
@@ -331,6 +379,96 @@ export const api = {
       handleNetworkError(
         error,
         'No pudimos conectar con el servidor para crear la sala'
+      );
+    }
+  },
+
+  async updateRoom(
+    roomId: string,
+    data: {
+      name: string;
+    },
+    token: string
+  ): Promise<Room> {
+    try {
+      const response = await fetch(`${API_URL}/rooms/${roomId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          'Error al actualizar la sala'
+        );
+
+        let code = 'backend/room-update-failed';
+
+        if (response.status === 401) {
+          code = 'backend/unauthorized';
+        }
+
+        if (response.status === 403) {
+          code = 'backend/forbidden';
+        }
+
+        if (response.status === 404) {
+          code = 'backend/room-not-found';
+        }
+
+        throw createApiError(message, code, response.status);
+      }
+
+      return response.json();
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para actualizar la sala'
+      );
+    }
+  },
+
+  async deleteRoom(roomId: string, token: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_URL}/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(
+          response,
+          'Error al eliminar la sala'
+        );
+
+        let code = 'backend/room-delete-failed';
+
+        if (response.status === 401) {
+          code = 'backend/unauthorized';
+        }
+
+        if (response.status === 403) {
+          code = 'backend/forbidden';
+        }
+
+        if (response.status === 404) {
+          code = 'backend/room-not-found';
+        }
+
+        throw createApiError(message, code, response.status);
+      }
+    } catch (error) {
+      handleNetworkError(
+        error,
+        'No pudimos conectar con el servidor para eliminar la sala'
       );
     }
   },

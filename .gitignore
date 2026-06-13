@@ -63,3 +63,4 @@ temp/
 
 # Docs
 docs/
+.env*.local
