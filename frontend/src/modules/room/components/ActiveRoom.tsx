@@ -65,6 +65,24 @@ type PresenceUser = {
   picture?: string;
 };
 
+type PresencePayload = {
+  users?: unknown;
+  participants?: unknown;
+  onlineUsers?: unknown;
+  presence?: unknown;
+  connectedUsers?: unknown;
+  members?: unknown;
+  uid?: string;
+  userId?: string;
+  id?: string;
+  username?: string;
+  displayName?: string;
+  name?: string;
+  action?: string;
+  type?: string;
+  event?: string;
+};
+
 type NewMessagePayload = {
   id?: string;
   uid?: string;
@@ -167,6 +185,31 @@ function getArrayFromValue(value: unknown): unknown[] {
   return [];
 }
 
+function getPresenceUsersFromObject(value: unknown): PresenceUser[] {
+  if (!isObject(value)) return [];
+
+  return Object.entries(value)
+    .map(([uid, item]) => {
+      if (typeof item === "string") {
+        return {
+          uid,
+          username: item,
+          displayName: item,
+        };
+      }
+
+      if (isObject(item)) {
+        return {
+          uid,
+          ...item,
+        } as PresenceUser;
+      }
+
+      return null;
+    })
+    .filter(Boolean) as PresenceUser[];
+}
+
 function extractPresenceUsers(data: unknown): PresenceUser[] {
   if (Array.isArray(data)) {
     return data.filter(isObject) as PresenceUser[];
@@ -174,14 +217,28 @@ function extractPresenceUsers(data: unknown): PresenceUser[] {
 
   if (!isObject(data)) return [];
 
+  const payload = data as PresencePayload;
+
   const possibleLists = [
-    data.users,
-    data.participants,
-    data.onlineUsers,
-    data.presence,
+    payload.users,
+    payload.participants,
+    payload.onlineUsers,
+    payload.presence,
+    payload.connectedUsers,
+    payload.members,
   ];
 
   for (const list of possibleLists) {
+    if (Array.isArray(list)) {
+      return list.filter(isObject) as PresenceUser[];
+    }
+
+    const usersFromObject = getPresenceUsersFromObject(list);
+
+    if (usersFromObject.length > 0) {
+      return usersFromObject;
+    }
+
     const users = getArrayFromValue(list);
 
     if (users.length > 0) {
@@ -194,6 +251,47 @@ function extractPresenceUsers(data: unknown): PresenceUser[] {
   }
 
   return [];
+}
+
+function getPresenceAction(data: unknown) {
+  if (!isObject(data)) return "snapshot";
+
+  const payload = data as PresencePayload;
+  const action = String(payload.action || payload.type || payload.event || "")
+    .toLowerCase()
+    .trim();
+
+  if (
+    action.includes("leave") ||
+    action.includes("left") ||
+    action.includes("disconnect") ||
+    action.includes("offline")
+  ) {
+    return "leave";
+  }
+
+  if (
+    action.includes("join") ||
+    action.includes("joined") ||
+    action.includes("connect") ||
+    action.includes("online")
+  ) {
+    return "join";
+  }
+
+  if (
+    payload.users ||
+    payload.participants ||
+    payload.onlineUsers ||
+    payload.presence ||
+    payload.connectedUsers ||
+    payload.members ||
+    Array.isArray(data)
+  ) {
+    return "snapshot";
+  }
+
+  return "join";
 }
 
 function mapPresenceUserToParticipant(
@@ -224,6 +322,7 @@ export function ActiveRoom() {
   const { user, profile } = useAuth();
 
   const socketRef = useRef<Socket | null>(null);
+  const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -234,6 +333,7 @@ export function ActiveRoom() {
   const [roomError, setRoomError] = useState("");
   const [socketError, setSocketError] = useState("");
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("Conectando...");
 
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
@@ -290,12 +390,39 @@ export function ActiveRoom() {
           auth: {
             token,
           },
+          reconnection: true,
+          reconnectionAttempts: 8,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
         });
 
         socketRef.current = socket;
 
+        socket.io.on("reconnect_attempt", (attempt) => {
+          setConnectionStatus(`Reconectando... intento ${attempt}`);
+          setSocketError("");
+        });
+
+        socket.io.on("reconnect", () => {
+          setConnectionStatus("Reconectado en tiempo real");
+          setSocketError("");
+        });
+
+        socket.io.on("reconnect_error", () => {
+          setConnectionStatus("Intentando reconectar...");
+        });
+
+        socket.io.on("reconnect_failed", () => {
+          setIsConnected(false);
+          setConnectionStatus("Sin conexión en tiempo real");
+          setSocketError(
+            "No pudimos restablecer la conexión con la sala en tiempo real."
+          );
+        });
+
         socket.on("connect", () => {
           setIsConnected(true);
+          setConnectionStatus("En tiempo real");
           setSocketError("");
 
           const localParticipant: RoomParticipant = {
@@ -324,19 +451,27 @@ export function ActiveRoom() {
         socket.on("connect_error", (error) => {
           console.error("Error de conexión Socket.IO:", error);
           setIsConnected(false);
+          setConnectionStatus("Error de conexión");
           setSocketError(
-            "No pudimos conectar con la sala en tiempo real. Intenta nuevamente."
+            "No pudimos conectar con la sala en tiempo real. Verifica que el backend realtime esté activo."
           );
         });
 
-        socket.on("disconnect", () => {
+        socket.on("disconnect", (reason) => {
+          console.warn("Socket desconectado:", reason);
           setIsConnected(false);
+          setConnectionStatus("Desconectado");
+
+          if (reason === "io server disconnect") {
+            socket?.connect();
+          }
         });
 
         socket.on("presence-change", (data: unknown) => {
           console.log("Actualización de presencia:", data);
 
           const users = extractPresenceUsers(data);
+          const action = getPresenceAction(data);
 
           if (users.length === 0) return;
 
@@ -346,7 +481,32 @@ export function ActiveRoom() {
 
           if (mappedParticipants.length === 0) return;
 
-          setParticipants(mappedParticipants);
+          if (action === "snapshot") {
+            setParticipants(mappedParticipants);
+            return;
+          }
+
+          if (action === "leave") {
+            const leavingIds = mappedParticipants.map(
+              (participant) => participant.uid
+            );
+
+            setParticipants((currentParticipants) =>
+              currentParticipants.filter(
+                (participant) => !leavingIds.includes(participant.uid)
+              )
+            );
+
+            return;
+          }
+
+          setParticipants((currentParticipants) =>
+            mappedParticipants.reduce(
+              (updatedParticipants, participant) =>
+                upsertParticipant(updatedParticipants, participant),
+              currentParticipants
+            )
+          );
         });
 
         socket.on("new-message", (msg: NewMessagePayload) => {
@@ -379,6 +539,8 @@ export function ActiveRoom() {
         });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
+        setIsConnected(false);
+        setConnectionStatus("Error de conexión");
         setSocketError("No pudimos iniciar la conexión en tiempo real.");
       }
     };
@@ -419,6 +581,23 @@ export function ActiveRoom() {
       )
     );
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
+
+  useEffect(() => {
+    if (!isChatOpen) return;
+
+    const chatContainer = chatMessagesContainerRef.current;
+
+    if (!chatContainer) return;
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    chatContainer.scrollTo({
+      top: chatContainer.scrollHeight,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [chatMessages.length, isChatOpen]);
 
   const handleCopyId = async () => {
     if (!roomId) return;
@@ -468,7 +647,7 @@ export function ActiveRoom() {
   if (isLoadingRoom) {
     return (
       <section
-        className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-center"
+        className="flex h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 text-center"
         role="status"
         aria-live="polite"
       >
@@ -484,7 +663,7 @@ export function ActiveRoom() {
 
   if (roomError) {
     return (
-      <section className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 p-6">
+      <section className="flex h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 p-6">
         <div
           className="max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl"
           role="alert"
@@ -503,7 +682,7 @@ export function ActiveRoom() {
           <button
             type="button"
             onClick={() => navigate("/rooms")}
-            className="mt-6 rounded-lg bg-primary px-5 py-3 font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
+            className="mt-6 cursor-pointer rounded-lg bg-primary px-5 py-3 font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             Volver al dashboard
           </button>
@@ -513,21 +692,21 @@ export function ActiveRoom() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
-      <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 flex-shrink-0 shadow-lg">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
+      <header className="flex-shrink-0 border-b border-gray-700 bg-gray-900/90 shadow-lg backdrop-blur-sm">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div>
             <h1 className="text-xl font-bold text-white">
               {room?.name || "Sala de estudio"}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-4 mt-1">
+            <div className="mt-1 flex flex-wrap items-center gap-4">
               <p className="text-sm text-gray-400">ID: {roomId}</p>
 
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="flex items-center gap-1 text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900 rounded cursor-pointer"
+                className="flex cursor-pointer items-center gap-1 rounded text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                 aria-label={
                   copied
                     ? "ID copiado al portapapeles"
@@ -562,12 +741,12 @@ export function ActiveRoom() {
                 {isConnected ? (
                   <>
                     <Wifi className="h-4 w-4" aria-hidden="true" />
-                    En tiempo real
+                    {connectionStatus}
                   </>
                 ) : (
                   <>
                     <WifiOff className="h-4 w-4" aria-hidden="true" />
-                    Conectando...
+                    {connectionStatus}
                   </>
                 )}
               </div>
@@ -577,7 +756,7 @@ export function ActiveRoom() {
           <button
             type="button"
             onClick={handleLeaveRoom}
-            className="w-full sm:w-auto bg-red-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-2.5 font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:w-auto"
             aria-label="Salir de la sala"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -588,7 +767,7 @@ export function ActiveRoom() {
 
       {socketError && (
         <p
-          className="bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white"
+          className="flex-shrink-0 bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white"
           role="alert"
           aria-live="assertive"
         >
@@ -596,12 +775,12 @@ export function ActiveRoom() {
         </p>
       )}
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <main
-          className="flex-1 flex flex-col p-4 sm:p-6 gap-6"
+          className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
             {participants.length === 0 ? (
               <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
                 <div>
@@ -627,7 +806,7 @@ export function ActiveRoom() {
                 return (
                   <div
                     key={participant.uid}
-                    className={`bg-gray-800 rounded-2xl overflow-hidden relative shadow-xl transition-all ${
+                    className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
                       participant.isSpeaking
                         ? "ring-4 ring-green-500 shadow-green-500/50"
                         : "ring-2 ring-gray-700"
@@ -636,22 +815,22 @@ export function ActiveRoom() {
                       participant.isSpeaking ? " - hablando" : ""
                     }`}
                   >
-                    <div className="h-full min-h-[280px] flex items-center justify-center">
+                    <div className="flex h-full min-h-[280px] items-center justify-center">
                       <div className="text-center">
                         {participant.photoURL ? (
                           <img
                             src={participant.photoURL}
                             alt=""
-                            className="w-32 h-32 rounded-full mx-auto mb-4 object-cover shadow-2xl"
+                            className="mx-auto mb-4 h-32 w-32 rounded-full object-cover shadow-2xl"
                           />
                         ) : (
                           <div
-                            className={`w-32 h-32 bg-gradient-to-br ${getParticipantGradient(
+                            className={`mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${getParticipantGradient(
                               index
-                            )} rounded-full mx-auto mb-4 flex items-center justify-center shadow-2xl`}
+                            )} shadow-2xl`}
                             aria-hidden="true"
                           >
-                            <span className="text-white text-4xl font-bold">
+                            <span className="text-4xl font-bold text-white">
                               {getInitials(participantName)}
                             </span>
                           </div>
@@ -669,8 +848,8 @@ export function ActiveRoom() {
 
                         {participant.isSpeaking && (
                           <div className="mt-2 flex items-center justify-center gap-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-sm text-green-400 font-medium">
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                            <span className="text-sm font-medium text-green-400">
                               Hablando
                             </span>
                           </div>
@@ -679,9 +858,9 @@ export function ActiveRoom() {
                     </div>
 
                     {isCurrentUser && (
-                      <div className="absolute top-4 right-4 flex gap-2">
+                      <div className="absolute right-4 top-4 flex gap-2">
                         <span
-                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg shadow-lg ${
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
                             isCameraOn
                               ? "bg-green-500 text-white"
                               : "bg-gray-700 text-gray-300"
@@ -691,7 +870,7 @@ export function ActiveRoom() {
                         </span>
 
                         <span
-                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg shadow-lg ${
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
                             isMicOn
                               ? "bg-green-500 text-white"
                               : "bg-gray-700 text-gray-300"
@@ -707,16 +886,16 @@ export function ActiveRoom() {
             )}
           </div>
 
-          <div className="bg-gray-900/90 backdrop-blur-sm rounded-2xl p-4 sm:p-6 flex-shrink-0 shadow-2xl border border-gray-700">
+          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               <button
                 type="button"
                 onClick={() => setIsCameraOn((value) => !value)}
-                className={`p-3 sm:p-4 rounded-xl font-semibold transition shadow-lg hover:shadow-xl ${
+                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
                   isCameraOn
                     ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900 cursor-pointer`}
+                }`}
                 aria-pressed={isCameraOn}
                 aria-label={isCameraOn ? "Apagar cámara" : "Encender cámara"}
                 title={isCameraOn ? "Apagar cámara" : "Encender cámara"}
@@ -731,11 +910,11 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={() => setIsMicOn((value) => !value)}
-                className={`p-3 sm:p-4 rounded-xl font-semibold transition shadow-lg hover:shadow-xl ${
+                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
                   isMicOn
                     ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-gray-900 cursor-pointer`}
+                }`}
                 aria-pressed={isMicOn}
                 aria-label={
                   isMicOn ? "Silenciar micrófono" : "Activar micrófono"
@@ -752,11 +931,11 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={() => setIsScreenSharing((value) => !value)}
-                className={`p-3 sm:p-4 rounded-xl font-semibold transition shadow-lg hover:shadow-xl ${
+                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
                   isScreenSharing
                     ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer`}
+                }`}
                 aria-pressed={isScreenSharing}
                 aria-label={
                   isScreenSharing
@@ -778,7 +957,7 @@ export function ActiveRoom() {
 
               <button
                 type="button"
-                className="p-3 sm:p-4 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-gray-900 transition shadow-lg hover:shadow-xl cursor-pointer"
+                className="cursor-pointer rounded-xl bg-gray-700 p-3 text-gray-300 shadow-lg transition hover:bg-gray-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4"
                 aria-label="Configuración"
                 title="Configuración"
               >
@@ -789,30 +968,36 @@ export function ActiveRoom() {
         </main>
 
         <div
-          className={`relative flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none ${
-            isChatOpen ? "w-full lg:w-96" : "w-0"
+          className={`relative min-h-0 flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none ${
+            isChatOpen
+              ? "h-[42vh] w-full lg:h-full lg:w-96"
+              : "h-0 w-full lg:h-full lg:w-0"
           }`}
         >
           <button
             type="button"
             onClick={() => setIsChatOpen((value) => !value)}
-            className="absolute left-0 top-1/2 z-30 h-16 w-11 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-2xl bg-gradient-to-b from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900 flex cursor-pointer"
-            aria-label={isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"}
+            className="absolute right-4 top-0 z-30 flex h-10 w-16 -translate-y-full cursor-pointer items-center justify-center rounded-t-2xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
+            aria-label={
+              isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
+            }
             aria-expanded={isChatOpen}
             aria-controls="room-chat-panel"
             title={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
           >
             {isChatOpen ? (
-              <ChevronRight className="h-6 w-6" aria-hidden="true" />
+              <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
-              <ChevronLeft className="h-6 w-6" aria-hidden="true" />
+              <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             )}
+
+            <MessageSquare className="h-5 w-5 lg:hidden" aria-hidden="true" />
           </button>
 
           <aside
             id="room-chat-panel"
-            className={`h-full bg-white flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none ${
-              isChatOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`flex h-full min-h-0 flex-col overflow-hidden bg-white shadow-2xl transition-all duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
             role="region"
             aria-labelledby="chat-title"
@@ -821,17 +1006,20 @@ export function ActiveRoom() {
           >
             {isChatOpen && (
               <>
-                <div className="bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6 flex-shrink-0">
+                <div className="flex-shrink-0 bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2
                         id="chat-title"
-                        className="text-xl font-bold text-white mb-1"
+                        className="mb-1 text-xl font-bold text-white"
                       >
                         Chat de la sala
                       </h2>
 
-                      <p id="chat-description" className="text-sm text-primary-100">
+                      <p
+                        id="chat-description"
+                        className="text-sm text-primary-100"
+                      >
                         {participants.length === 1
                           ? "1 participante conectado"
                           : `${participants.length} participantes conectados`}
@@ -848,14 +1036,15 @@ export function ActiveRoom() {
                 </div>
 
                 <div
-                  className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50"
+                  ref={chatMessagesContainerRef}
+                  className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
                   role="log"
                   aria-live="polite"
                   aria-relevant="additions text"
                   aria-label="Mensajes del chat de la sala"
                 >
                   {chatMessages.length === 0 ? (
-                    <div className="flex h-full min-h-[280px] items-center justify-center">
+                    <div className="flex h-full min-h-[220px] items-center justify-center">
                       <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
                         <div
                           className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
@@ -909,11 +1098,11 @@ export function ActiveRoom() {
                             )}
 
                             <div
-                              className={`max-w-[82%] ${
+                              className={`flex max-w-[82%] flex-col ${
                                 isOwnMessage
                                   ? "items-end text-right"
                                   : "items-start text-left"
-                              } flex flex-col`}
+                              }`}
                             >
                               <div className="mb-1 flex max-w-full items-center gap-2">
                                 <span className="truncate text-xs font-semibold text-gray-700">
@@ -944,7 +1133,7 @@ export function ActiveRoom() {
 
                 <form
                   onSubmit={handleSendMessage}
-                  className="border-t border-gray-200 bg-white p-4 flex-shrink-0"
+                  className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
                   aria-label="Formulario para enviar mensajes"
                 >
                   <label htmlFor="chat-message" className="sr-only">
@@ -970,7 +1159,7 @@ export function ActiveRoom() {
                     <button
                       type="submit"
                       disabled={!message.trim() || !isConnected}
-                      className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                      className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                       aria-label={
                         isConnected
                           ? message.trim()
