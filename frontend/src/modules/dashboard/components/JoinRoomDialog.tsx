@@ -157,6 +157,7 @@ export function JoinRoomDialog({
               type="button"
               disabled={isJoining}
               className="flex-1 bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              aria-label="Cancelar y volver al dashboard"
             >
               Cancelar
             </button>
@@ -170,7 +171,9 @@ export function JoinRoomDialog({
             aria-label={
               isJoining
                 ? "Verificando la sala, por favor espera"
-                : "Unirse a la sala"
+                : roomCode.trim()
+                  ? `Unirse a la sala con código ${roomCode.trim()}`
+                  : "Unirse a una sala"
             }
             className="flex-1 bg-primary text-white px-4 py-2.5 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
