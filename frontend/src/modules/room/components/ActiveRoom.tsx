@@ -33,6 +33,7 @@ interface RoomParticipant {
   username?: string;
   displayName?: string;
   photoURL?: string;
+  avatar?: string;
   isHost?: boolean;
   isSpeaking?: boolean;
   cameraEnabled?: boolean;
@@ -62,6 +63,14 @@ type ChatHistoryErrorPayload = {
   message?: string;
 };
 
+type ChatHistoryResponse = NewMessagePayload[] | ChatHistoryPayload;
+
+function extractHistoryMessages(payload: ChatHistoryResponse): NewMessagePayload[] {
+  if (Array.isArray(payload)) return payload;
+
+  return payload.messages || [];
+}
+
 type ApiError = Error & {
   code?: string;
   status?: number;
@@ -76,6 +85,7 @@ type PresenceUser = {
   name?: string;
   photoURL?: string;
   picture?: string;
+  avatar?: string;
 };
 
 type PresencePayload = {
@@ -106,6 +116,7 @@ type NewMessagePayload = {
   senderPhotoURL?: string;
   photoURL?: string;
   picture?: string;
+  avatar?: string;
   content?: string;
   message?: string;
   createdAt?: string;
@@ -194,20 +205,15 @@ async function fetchUserProfileSummary(uid: string, token: string) {
 }
 
 function shouldFetchParticipantProfile(participant: RoomParticipant) {
-  return (
-    !participant.photoURL ||
-    !participant.username ||
-    !participant.displayName ||
-    participant.displayName === "Usuario conectado"
-  );
+  // El backend realtime puede enviar username como nombre completo.
+  // Por eso se intenta cargar una vez el perfil real por uid para priorizar el username guardado.
+  return Boolean(participant.uid);
 }
 
 function shouldFetchMessageProfile(message: ChatMessage) {
-  return (
-    !message.senderPhotoURL ||
-    !message.senderName ||
-    message.senderName === "Usuario"
-  );
+  // Aunque el mensaje ya tenga senderUsername, puede venir como nombre completo desde Firebase Auth.
+  // Se consulta el perfil por uid para mostrar el username real en el chat.
+  return Boolean(message.senderUid);
 }
 
 function mergeProfileIntoParticipant(
@@ -218,7 +224,8 @@ function mergeProfileIntoParticipant(
 
   return {
     ...participant,
-    username: participant.username || userProfile.username || userProfile.displayName,
+    // Siempre se prioriza el username del perfil, porque el backend puede mandar name/displayName.
+    username: userProfile.username || participant.username || userProfile.displayName,
     displayName:
       participant.displayName && participant.displayName !== "Usuario conectado"
         ? participant.displayName
@@ -237,12 +244,12 @@ function mergeProfileIntoMessage(
 
   return {
     ...message,
+    // En el chat debe verse el username, no el nombre completo.
     senderName:
-      message.senderName && message.senderName !== "Usuario"
-        ? message.senderName
-        : userProfile.username ||
-          userProfile.displayName ||
-          message.senderName,
+      userProfile.username ||
+      message.senderName ||
+      userProfile.displayName ||
+      "Usuario",
     senderPhotoURL: message.senderPhotoURL || userProfile.photoURL,
   };
 }
@@ -264,7 +271,7 @@ function mapPayloadToChatMessage(
       msg.username ||
       msg.senderName ||
       "Usuario",
-    senderPhotoURL: msg.senderPhotoURL || msg.photoURL || msg.picture,
+    senderPhotoURL: msg.senderPhotoURL || msg.photoURL || msg.picture || msg.avatar,
     message: messageText,
     createdAt: msg.createdAt || new Date().toISOString(),
   };
@@ -491,7 +498,7 @@ function mapPresenceUserToParticipant(
     username: item.username || item.name || item.displayName,
     displayName:
       item.displayName || item.username || item.name || "Usuario conectado",
-    photoURL: item.photoURL || item.picture,
+    photoURL: item.photoURL || item.picture || item.avatar,
     isHost: ownerUid ? uid === ownerUid : false,
     cameraEnabled: false,
     microphoneEnabled: true,
@@ -701,6 +708,7 @@ export function ActiveRoom() {
                       (isCurrentUser ? currentUserName : "Usuario conectado"),
                     photoURL:
                       participant.photoURL ||
+                      participant.avatar ||
                       previousParticipant?.photoURL ||
                       (isCurrentUser ? profile?.photoURL : undefined),
                   },
@@ -766,6 +774,7 @@ export function ActiveRoom() {
                       (isCurrentUser ? currentUserName : "Usuario conectado"),
                     photoURL:
                       participant.photoURL ||
+                      participant.avatar ||
                       previousParticipant?.photoURL ||
                       (isCurrentUser ? profile?.photoURL : undefined),
                     isHost: participant.uid === room.ownerUid,
@@ -793,9 +802,14 @@ export function ActiveRoom() {
           }
         );
 
-        socket.on("chat-history-success", (payload: ChatHistoryPayload) => {
-          const history = (payload.messages || [])
-            .map((msg) => mapPayloadToChatMessage(msg, payload.roomId || roomId))
+        const handleChatHistory = (payload: ChatHistoryResponse) => {
+          const history = extractHistoryMessages(payload)
+            .map((msg) =>
+              mapPayloadToChatMessage(
+                msg,
+                Array.isArray(payload) ? roomId : payload.roomId || roomId
+              )
+            )
             .filter(Boolean)
             .map((msg) => {
               const message = msg as ChatMessage;
@@ -811,13 +825,27 @@ export function ActiveRoom() {
           setChatMessages(orderedHistory);
           setChatHistoryError("");
           setChatStatus(orderedHistory.length === 0 ? "empty" : "success");
-        });
+        };
+
+        socket.on("chat-history", handleChatHistory);
+        socket.on("chat-history-success", handleChatHistory);
 
         socket.on("chat-history-error", (payload: ChatHistoryErrorPayload) => {
           setChatHistoryError(
             payload?.message || "No se pudo cargar el historial del chat."
           );
           setChatStatus("error");
+        });
+
+        socket.on("error", (payload: { message?: string }) => {
+          const errorMessage = payload?.message || "Ocurrió un error en la sala.";
+
+          setSocketError(errorMessage);
+
+          if (chatStatus === "loading") {
+            setChatHistoryError(errorMessage);
+            setChatStatus("error");
+          }
         });
 
         socket.on("send-message-error", (payload: { message?: string }) => {
@@ -1004,19 +1032,27 @@ export function ActiveRoom() {
     setChatStatus("loading");
     setChatHistoryError("");
 
-    socketRef.current.emit("load-chat-history", {
+    socketRef.current.emit("join-room", {
       roomId,
     });
   };
 
   const getMessageUsername = (msg: ChatMessage) => {
     const participant = participants.find((item) => item.uid === msg.senderUid);
+    const cachedProfile = msg.senderUid
+      ? userProfilesCacheRef.current.get(msg.senderUid)
+      : undefined;
 
     if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
       return currentUsername;
     }
 
-    return participant?.username || msg.senderName || "Usuario";
+    return (
+      cachedProfile?.username ||
+      participant?.username ||
+      msg.senderName ||
+      "Usuario"
+    );
   };
 
   const getMessageAvatar = (msg: ChatMessage) => {

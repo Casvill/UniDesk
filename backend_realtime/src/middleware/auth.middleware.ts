@@ -13,9 +13,11 @@ export interface AuthenticatedSocket extends Socket {
 export async function socketAuthMiddleware(socket: AuthenticatedSocket, next: (err?: Error) => void) {
   const token = socket.handshake.auth?.token;
 
-  if (!token) {
-    console.error(`Socket ${socket.id}: Intento de conexión sin token`);
-    return next(new Error("Authentication error: Token required"));
+  if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
+    console.error(`Socket ${socket.id}: Intento de conexión con token malformado`);
+    socket.emit("error", { message: "No está autenticado" });
+    socket.disconnect(true);
+    return;
   }
 
   try {
@@ -23,8 +25,13 @@ export async function socketAuthMiddleware(socket: AuthenticatedSocket, next: (e
     socket.user = decodedToken;
     console.log(`Socket ${socket.id}: Autenticado como ${decodedToken.email}`);
     next();
-  } catch (error) {
-    console.error(`Socket ${socket.id}: Token inválido`, error);
-    next(new Error("Authentication error: Invalid token"));
+  } catch (error: any) {
+    // Only log if it's not the argument-error, as we've already handled malformed tokens
+    if (error?.errorInfo?.code !== 'auth/argument-error') {
+       console.error(`Socket ${socket.id}: Error de autenticación`, error);
+    }
+    
+    socket.emit("error", { message: "No está autenticado" });
+    socket.disconnect(true);
   }
 }
