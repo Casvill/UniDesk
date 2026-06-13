@@ -79,7 +79,7 @@ export function RoomCarousel({
       >
         <h2
           id="active-rooms-heading"
-          className="text-2xl font-bold text-gray-900 mb-4"
+          className="text-2xl font-bold text-gray-900 mb-2"
         >
           Estas son tus salas de estudio:
         </h2>
@@ -98,7 +98,7 @@ export function RoomCarousel({
             className="absolute inset-0 pointer-events-none z-10"
             style={{
               background:
-                "linear-gradient(to right, #f6f7f9 0%, transparent 2%, transparent 98%, #f6f7f9 100%)",
+                "linear-gradient(to right, #f6f7f9 0%, transparent 1%, transparent 99%, #f6f7f9 100%)",
             }}
             aria-hidden="true"
           />
@@ -107,10 +107,11 @@ export function RoomCarousel({
         <div
           ref={containerRef}
           className="relative"
-          style={{
-            clipPath: "inset(-40px -20px -40px -20px)",
-            overflow: "clip",
-          }}
+          style={
+            totalPages > 1
+              ? { clipPath: "inset(-40px -20px -40px -20px)" }
+              : {}
+          }
           onMouseEnter={() => setContainerHovered(true)}
           onMouseLeave={() => {
             setContainerHovered(false);
@@ -127,7 +128,7 @@ export function RoomCarousel({
             }}
           >
             <div
-              className="flex gap-6 h-full transition-transform duration-500 ease-in-out"
+              className="flex gap-6 h-full items-center transition-transform duration-500 ease-in-out"
               style={{
                 transform: `translateX(-${translateX}px)`,
                 justifyContent:

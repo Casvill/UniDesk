@@ -48,7 +48,7 @@ export function useCarousel(itemCount: number) {
       const w = containerRef.current.offsetWidth;
       const gapTotal = 24 * (cardsPerPage - 1);
       setCardWidth(Math.floor((w - gapTotal) / cardsPerPage));
-      setTranslateX(page * w);
+      setTranslateX(page * (w + 24));
     }
   }, [page, cardsPerPage]);
 
