@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/services/api";
+import { showToast } from "@/shared/components/ui/toast";
 
 interface JoinRoomFormProps {
   user?: { getIdToken: () => Promise<string> } | null;
@@ -63,7 +64,6 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
   const navigate = useNavigate();
 
   const [roomCode, setRoomCode] = useState("");
-  const [roomCodeError, setRoomCodeError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,19 +74,19 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
     event.preventDefault();
 
     const normalizedCode = normalizeRoomCode(roomCode);
-    const validationError = validateRoomCode(normalizedCode);
 
     setRoomCode(normalizedCode);
-    setRoomCodeError("");
+
+    const validationError = validateRoomCode(normalizedCode);
 
     if (validationError) {
-      setRoomCodeError(validationError);
+      showToast.error(validationError);
       inputRef.current?.focus();
       return;
     }
 
     if (!user) {
-      setRoomCodeError(
+      showToast.error(
         "No pudimos validar tu sesión. Inicia sesión nuevamente e inténtalo otra vez."
       );
       inputRef.current?.focus();
@@ -103,7 +103,7 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
     } catch (error) {
       console.error("Error al unirse a la sala:", error);
 
-      setRoomCodeError(getJoinRoomErrorMessage(error));
+      showToast.error(getJoinRoomErrorMessage(error));
       inputRef.current?.focus();
     } finally {
       setIsJoining(false);
@@ -112,7 +112,6 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
 
   const inputDescriptionIds = [
     "join-room-description",
-    roomCodeError ? "join-room-error" : null,
     isJoining ? "join-room-status" : null,
   ]
     .filter(Boolean)
@@ -143,13 +142,9 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
           id="join-room-code"
           type="text"
           value={roomCode}
-          onChange={(event) => {
-            setRoomCode(event.target.value);
-            setRoomCodeError("");
-          }}
+          onChange={(event) => setRoomCode(event.target.value)}
           placeholder="Ingresa aquí tu código"
           disabled={isJoining}
-          aria-invalid={Boolean(roomCodeError)}
           aria-describedby={inputDescriptionIds}
           className="min-w-0 flex-1 px-4 text-sm text-gray-700 placeholder:text-gray-400 opacity-100 focus:outline-none transition-all duration-500 ease-out disabled:bg-gray-50 disabled:cursor-not-allowed motion-reduce:transition-none sm:w-0 sm:px-0 sm:opacity-0 sm:group-hover:w-full sm:group-hover:px-4 sm:group-hover:opacity-100 sm:group-focus-within:w-full sm:group-focus-within:px-4 sm:group-focus-within:opacity-100"
         />
@@ -192,16 +187,6 @@ export function JoinRoomForm({ user = null }: JoinRoomFormProps) {
         </p>
       )}
 
-      {roomCodeError && (
-        <p
-          id="join-room-error"
-          className="mt-2 text-sm text-red-600"
-          role="alert"
-          aria-live="assertive"
-        >
-          {roomCodeError}
-        </p>
-      )}
     </form>
   );
 }

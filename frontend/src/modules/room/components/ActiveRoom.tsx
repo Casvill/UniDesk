@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Copy,
   Loader2,
   LogOut,
@@ -1435,7 +1437,7 @@ export function ActiveRoom() {
           <button
             type="button"
             onClick={() => setIsChatOpen((value) => !value)}
-            className="absolute right-4 top-0 z-30 flex h-10 w-16 -translate-y-full cursor-pointer items-center justify-center rounded-t-2xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
+            className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-2xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
             aria-label={
               isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
             }
@@ -1444,12 +1446,16 @@ export function ActiveRoom() {
             title={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
           >
             {isChatOpen ? (
+              <ChevronDown className="h-5 w-5 lg:hidden" aria-hidden="true" />
+            ) : (
+              <ChevronUp className="h-5 w-5 lg:hidden" aria-hidden="true" />
+            )}
+
+            {isChatOpen ? (
               <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
               <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             )}
-
-            <MessageSquare className="h-5 w-5 lg:hidden" aria-hidden="true" />
           </button>
 
           <aside

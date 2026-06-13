@@ -3,12 +3,14 @@ import emptyState from "@/assets/empty/empty-state.svg";
 
 interface EmptyRoomsStateProps {
   onCreateRoom: () => void;
+  onJoinRoom: () => void;
   animName: string;
   animDur: string;
 }
 
 export function EmptyRoomsState({
   onCreateRoom,
+  onJoinRoom,
   animName,
   animDur,
 }: EmptyRoomsStateProps) {
@@ -45,8 +47,20 @@ export function EmptyRoomsState({
         aria-label="Crear mi primera sala de estudio"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
-        Crear primera sala
+        Crear mi primera sala
       </button>
+
+      <p className="mt-4 text-sm text-gray-400">
+        ¿Tienes el código de una sala?{" "}
+        <button
+          type="button"
+          onClick={onJoinRoom}
+          className="font-medium text-indigo-600 hover:text-indigo-800 underline transition focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded cursor-pointer"
+          aria-label="Unirse a una sala usando su código"
+        >
+          Unirse a una sala
+        </button>
+      </p>
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { RoomCarousel } from "./RoomCarousel";
 import { EmptyRoomsState } from "./EmptyRoomsState";
 import { CreateRoomDialog } from "./CreateRoomDialog";
 import { JoinRoomForm } from "./JoinRoomForm";
+import { JoinRoomDialog } from "./JoinRoomDialog";
 import type { Room } from "@/services/api";
 
 export function Dashboard() {
@@ -15,6 +16,7 @@ export function Dashboard() {
     useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showJoinDialog, setShowJoinDialog] = useState(false);
 
   const handleRoomUpdated = (_updatedRoom: Room) => {
     void refetchRooms();
@@ -63,7 +65,7 @@ export function Dashboard() {
             <button
               type="button"
               onClick={() => setShowCreateDialog(true)}
-              className="h-12 w-full sm:w-auto bg-primary text-white px-6 rounded-lg font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
+              className="h-12 w-full sm:w-auto bg-primary text-white px-5 rounded-lg text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer"
               aria-label="Crear una nueva sala de estudio"
             >
               <Plus className="h-5 w-5" aria-hidden="true" />
@@ -71,7 +73,22 @@ export function Dashboard() {
             </button>
           )}
 
-          <JoinRoomForm user={user} />
+          {activeRooms.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowJoinDialog(true)}
+                className="h-12 w-full bg-primary text-white px-5 rounded-lg text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer lg:hidden"
+                aria-label="Unirse a una sala usando su código"
+              >
+                Unirse a una sala
+              </button>
+
+              <div className="hidden lg:block">
+                <JoinRoomForm user={user} />
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -134,6 +151,7 @@ export function Dashboard() {
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
         <EmptyRoomsState
           onCreateRoom={() => setShowCreateDialog(true)}
+          onJoinRoom={() => setShowJoinDialog(true)}
           animName={animNames[0]}
           animDur={animDurs[0]}
         />
@@ -149,6 +167,12 @@ export function Dashboard() {
       <CreateRoomDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+        user={user}
+      />
+
+      <JoinRoomDialog
+        open={showJoinDialog}
+        onOpenChange={setShowJoinDialog}
         user={user}
       />
     </section>
