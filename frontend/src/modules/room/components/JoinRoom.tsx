@@ -17,7 +17,7 @@ import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
 interface RoomParticipant {
   uid: string;
@@ -57,8 +57,8 @@ function getRoomErrorMessage(error: unknown) {
 
 function getParticipantName(participant: RoomParticipant) {
   return (
-    participant.displayName ||
     participant.username ||
+    participant.displayName ||
     "Usuario conectado"
   );
 }
@@ -114,6 +114,12 @@ export function JoinRoom() {
   const [joinCamera, setJoinCamera] = useState(false);
   const [joinMicrophone, setJoinMicrophone] = useState(true);
 
+  const currentUserName =
+    profile?.displayName || profile?.username || user?.email || "Tú";
+
+  const currentUsername =
+    profile?.username || profile?.displayName || user?.email || "Usuario";
+
   useEffect(() => {
     const loadRoom = async () => {
       if (!roomId) {
@@ -152,7 +158,7 @@ export function JoinRoom() {
   useEffect(() => {
     return () => {
       if (socketRef.current) {
-        socketRef.current.emit("room:leave", { roomId });
+        socketRef.current.emit("leave-room", { roomId });
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -195,8 +201,10 @@ export function JoinRoom() {
         setIsConnected(true);
         setIsJoining(false);
 
-        socket.emit("room:join", {
+        socket.emit("join-room", {
           roomId,
+          uid: user.uid,
+          username: currentUsername,
           cameraEnabled: joinCamera,
           microphoneEnabled: joinMicrophone,
         });
@@ -205,11 +213,8 @@ export function JoinRoom() {
           setParticipants((currentParticipants) =>
             upsertParticipant(currentParticipants, {
               uid: user.uid,
-              username: profile?.username,
-              displayName:
-                profile?.displayName ||
-                profile?.username ||
-                "Tú",
+              username: currentUsername,
+              displayName: currentUserName,
               photoURL: profile?.photoURL,
               isHost: room.ownerUid === user.uid,
             })
@@ -229,18 +234,71 @@ export function JoinRoom() {
         setIsConnected(false);
       });
 
-      socket.on("room:participants", (currentParticipants: RoomParticipant[]) => {
-        if (Array.isArray(currentParticipants)) {
-          setParticipants(currentParticipants);
-        }
-      });
+      const handleParticipantsUpdate = (currentParticipants: RoomParticipant[]) => {
+        if (!Array.isArray(currentParticipants)) return;
+
+        setParticipants((previousParticipants) =>
+          currentParticipants.map((participant) => {
+            const previousParticipant = previousParticipants.find(
+              (item) => item.uid === participant.uid
+            );
+            const isCurrentUser = participant.uid === user.uid;
+
+            return {
+              ...previousParticipant,
+              ...participant,
+              username:
+                participant.username ||
+                previousParticipant?.username ||
+                (isCurrentUser ? currentUsername : undefined),
+              displayName:
+                participant.displayName ||
+                previousParticipant?.displayName ||
+                participant.username ||
+                previousParticipant?.username ||
+                (isCurrentUser ? currentUserName : "Usuario conectado"),
+              photoURL:
+                participant.photoURL ||
+                previousParticipant?.photoURL ||
+                (isCurrentUser ? profile?.photoURL : undefined),
+              isHost: participant.uid === room.ownerUid,
+            };
+          })
+        );
+      };
+
+      socket.on("room-participants-update", handleParticipantsUpdate);
+      socket.on("room:participants", handleParticipantsUpdate);
 
       socket.on("room:participant-joined", (participant: RoomParticipant) => {
         if (!participant?.uid) return;
 
-        setParticipants((currentParticipants) =>
-          upsertParticipant(currentParticipants, participant)
-        );
+        setParticipants((currentParticipants) => {
+          const previousParticipant = currentParticipants.find(
+            (item) => item.uid === participant.uid
+          );
+          const isCurrentUser = participant.uid === user.uid;
+
+          return upsertParticipant(currentParticipants, {
+            ...previousParticipant,
+            ...participant,
+            username:
+              participant.username ||
+              previousParticipant?.username ||
+              (isCurrentUser ? currentUsername : undefined),
+            displayName:
+              participant.displayName ||
+              previousParticipant?.displayName ||
+              participant.username ||
+              previousParticipant?.username ||
+              (isCurrentUser ? currentUserName : "Usuario conectado"),
+            photoURL:
+              participant.photoURL ||
+              previousParticipant?.photoURL ||
+              (isCurrentUser ? profile?.photoURL : undefined),
+            isHost: participant.uid === room.ownerUid,
+          });
+        });
       });
 
       socket.on(
@@ -270,7 +328,7 @@ export function JoinRoom() {
 
   const handleLeaveRoom = () => {
     if (socketRef.current) {
-      socketRef.current.emit("room:leave", { roomId });
+      socketRef.current.emit("leave-room", { roomId });
       socketRef.current.disconnect();
       socketRef.current = null;
     }

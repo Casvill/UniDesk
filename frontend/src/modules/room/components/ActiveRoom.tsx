@@ -26,12 +26,14 @@ import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface RoomParticipant {
   uid: string;
   username?: string;
   displayName?: string;
   photoURL?: string;
+  avatar?: string;
   isHost?: boolean;
   isSpeaking?: boolean;
   cameraEnabled?: boolean;
@@ -49,6 +51,26 @@ interface ChatMessage {
   createdAt?: string;
 }
 
+type ChatStatus = "loading" | "empty" | "error" | "success";
+
+type ChatHistoryPayload = {
+  roomId?: string;
+  messages?: NewMessagePayload[];
+};
+
+type ChatHistoryErrorPayload = {
+  roomId?: string;
+  message?: string;
+};
+
+type ChatHistoryResponse = NewMessagePayload[] | ChatHistoryPayload;
+
+function extractHistoryMessages(payload: ChatHistoryResponse): NewMessagePayload[] {
+  if (Array.isArray(payload)) return payload;
+
+  return payload.messages || [];
+}
+
 type ApiError = Error & {
   code?: string;
   status?: number;
@@ -63,6 +85,7 @@ type PresenceUser = {
   name?: string;
   photoURL?: string;
   picture?: string;
+  avatar?: string;
 };
 
 type PresencePayload = {
@@ -90,10 +113,178 @@ type NewMessagePayload = {
   senderUsername?: string;
   username?: string;
   senderName?: string;
+  senderPhotoURL?: string;
+  photoURL?: string;
+  picture?: string;
+  avatar?: string;
   content?: string;
   message?: string;
   createdAt?: string;
 };
+
+type UserProfileSummary = {
+  uid: string;
+  username?: string;
+  displayName?: string;
+  photoURL?: string;
+};
+
+function getStringValue(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function normalizeUserProfileResponse(
+  payload: unknown,
+  fallbackUid: string
+): UserProfileSummary | null {
+  if (!isObject(payload)) return null;
+
+  const possiblePayloads = [
+    payload,
+    payload.user,
+    payload.profile,
+    payload.data,
+  ];
+
+  for (const item of possiblePayloads) {
+    if (!isObject(item)) continue;
+
+    const uid =
+      getStringValue(item.uid) ||
+      getStringValue(item.id) ||
+      getStringValue(item.userId) ||
+      fallbackUid;
+
+    const username =
+      getStringValue(item.username) ||
+      getStringValue(item.name);
+
+    const displayName =
+      getStringValue(item.displayName) ||
+      getStringValue(item.fullName) ||
+      getStringValue(item.name) ||
+      username;
+
+    const photoURL =
+      getStringValue(item.photoURL) ||
+      getStringValue(item.photoUrl) ||
+      getStringValue(item.avatarURL) ||
+      getStringValue(item.avatarUrl) ||
+      getStringValue(item.picture) ||
+      getStringValue(item.photo);
+
+    if (username || displayName || photoURL) {
+      return {
+        uid,
+        username,
+        displayName,
+        photoURL,
+      };
+    }
+  }
+
+  return null;
+}
+
+async function fetchUserProfileSummary(uid: string, token: string) {
+  const response = await fetch(`${API_URL}/users/${encodeURIComponent(uid)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`No se pudo cargar el perfil ${uid}`);
+  }
+
+  const payload = await response.json();
+
+  return normalizeUserProfileResponse(payload, uid);
+}
+
+function shouldFetchParticipantProfile(participant: RoomParticipant) {
+  // El backend realtime puede enviar username como nombre completo.
+  // Por eso se intenta cargar una vez el perfil real por uid para priorizar el username guardado.
+  return Boolean(participant.uid);
+}
+
+function shouldFetchMessageProfile(message: ChatMessage) {
+  // Aunque el mensaje ya tenga senderUsername, puede venir como nombre completo desde Firebase Auth.
+  // Se consulta el perfil por uid para mostrar el username real en el chat.
+  return Boolean(message.senderUid);
+}
+
+function mergeProfileIntoParticipant(
+  participant: RoomParticipant,
+  userProfile?: UserProfileSummary
+): RoomParticipant {
+  if (!userProfile) return participant;
+
+  return {
+    ...participant,
+    // Siempre se prioriza el username del perfil, porque el backend puede mandar name/displayName.
+    username: userProfile.username || participant.username || userProfile.displayName,
+    displayName:
+      participant.displayName && participant.displayName !== "Usuario conectado"
+        ? participant.displayName
+        : userProfile.displayName ||
+          userProfile.username ||
+          participant.displayName,
+    photoURL: participant.photoURL || userProfile.photoURL,
+  };
+}
+
+function mergeProfileIntoMessage(
+  message: ChatMessage,
+  userProfile?: UserProfileSummary
+): ChatMessage {
+  if (!userProfile) return message;
+
+  return {
+    ...message,
+    // En el chat debe verse el username, no el nombre completo.
+    senderName:
+      userProfile.username ||
+      message.senderName ||
+      userProfile.displayName ||
+      "Usuario",
+    senderPhotoURL: message.senderPhotoURL || userProfile.photoURL,
+  };
+}
+
+function mapPayloadToChatMessage(
+  msg: NewMessagePayload,
+  fallbackRoomId?: string
+): ChatMessage | null {
+  const messageText = msg.content || msg.message || "";
+
+  if (!messageText.trim()) return null;
+
+  return {
+    id: msg.id || crypto.randomUUID(),
+    roomId: fallbackRoomId,
+    senderUid: msg.senderUid || msg.uid || "",
+    senderName:
+      msg.senderUsername ||
+      msg.username ||
+      msg.senderName ||
+      "Usuario",
+    senderPhotoURL: msg.senderPhotoURL || msg.photoURL || msg.picture || msg.avatar,
+    message: messageText,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  };
+}
+
+function sortMessagesChronologically(messages: ChatMessage[]) {
+  return [...messages].sort((a, b) => {
+    const dateA = new Date(a.createdAt || "").getTime();
+    const dateB = new Date(b.createdAt || "").getTime();
+
+    return dateA - dateB;
+  });
+}
 
 function getRoomErrorMessage(error: unknown) {
   const apiError = error as ApiError;
@@ -120,7 +311,7 @@ function getRoomErrorMessage(error: unknown) {
 }
 
 function getParticipantName(participant: RoomParticipant) {
-  return participant.displayName || participant.username || "Usuario conectado";
+  return participant.username || participant.displayName || "Usuario conectado";
 }
 
 function getInitials(name: string) {
@@ -307,7 +498,7 @@ function mapPresenceUserToParticipant(
     username: item.username || item.name || item.displayName,
     displayName:
       item.displayName || item.username || item.name || "Usuario conectado",
-    photoURL: item.photoURL || item.picture,
+    photoURL: item.photoURL || item.picture || item.avatar,
     isHost: ownerUid ? uid === ownerUid : false,
     cameraEnabled: false,
     microphoneEnabled: true,
@@ -323,10 +514,14 @@ export function ActiveRoom() {
 
   const socketRef = useRef<Socket | null>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
+  const userProfilesInFlightRef = useRef<Set<string>>(new Set());
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatStatus, setChatStatus] = useState<ChatStatus>("loading");
+  const [chatHistoryError, setChatHistoryError] = useState("");
   const [message, setMessage] = useState("");
 
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
@@ -343,6 +538,9 @@ export function ActiveRoom() {
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
+
+  const currentUsername =
+    profile?.username || profile?.displayName || user?.email || "Usuario";
 
   useEffect(() => {
     const loadRoom = async () => {
@@ -424,10 +622,12 @@ export function ActiveRoom() {
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
+          setChatStatus("loading");
+          setChatHistoryError("");
 
           const localParticipant: RoomParticipant = {
             uid: user.uid,
-            username: profile?.username,
+            username: currentUsername,
             displayName: currentUserName,
             photoURL: profile?.photoURL,
             isHost: room.ownerUid === user.uid,
@@ -440,7 +640,7 @@ export function ActiveRoom() {
           socket?.emit("join-room", {
             roomId,
             uid: user.uid,
-            username: currentUserName,
+            username: currentUsername,
           });
 
           setParticipants((currentParticipants) =>
@@ -482,7 +682,40 @@ export function ActiveRoom() {
           if (mappedParticipants.length === 0) return;
 
           if (action === "snapshot") {
-            setParticipants(mappedParticipants);
+            setParticipants((previousParticipants) =>
+              mappedParticipants.map((participant) => {
+                const previousParticipant = previousParticipants.find(
+                  (item) => item.uid === participant.uid
+                );
+                const cachedProfile = userProfilesCacheRef.current.get(
+                  participant.uid
+                );
+                const isCurrentUser = participant.uid === user.uid;
+
+                return mergeProfileIntoParticipant(
+                  {
+                    ...previousParticipant,
+                    ...participant,
+                    username:
+                      participant.username ||
+                      previousParticipant?.username ||
+                      (isCurrentUser ? currentUsername : undefined),
+                    displayName:
+                      participant.displayName ||
+                      previousParticipant?.displayName ||
+                      participant.username ||
+                      previousParticipant?.username ||
+                      (isCurrentUser ? currentUserName : "Usuario conectado"),
+                    photoURL:
+                      participant.photoURL ||
+                      participant.avatar ||
+                      previousParticipant?.photoURL ||
+                      (isCurrentUser ? profile?.photoURL : undefined),
+                  },
+                  cachedProfile
+                );
+              })
+            );
             return;
           }
 
@@ -509,23 +742,130 @@ export function ActiveRoom() {
           );
         });
 
+        socket.on(
+          "room-participants-update",
+          (currentParticipants: RoomParticipant[]) => {
+            if (!Array.isArray(currentParticipants)) return;
+
+            setParticipants((previousParticipants) =>
+              currentParticipants.map((participant) => {
+                const previousParticipant = previousParticipants.find(
+                  (item) => item.uid === participant.uid
+                );
+                const isCurrentUser = participant.uid === user.uid;
+
+                const cachedProfile = userProfilesCacheRef.current.get(
+                  participant.uid
+                );
+
+                return mergeProfileIntoParticipant(
+                  {
+                    ...previousParticipant,
+                    ...participant,
+                    username:
+                      participant.username ||
+                      previousParticipant?.username ||
+                      (isCurrentUser ? currentUsername : undefined),
+                    displayName:
+                      participant.displayName ||
+                      previousParticipant?.displayName ||
+                      participant.username ||
+                      previousParticipant?.username ||
+                      (isCurrentUser ? currentUserName : "Usuario conectado"),
+                    photoURL:
+                      participant.photoURL ||
+                      participant.avatar ||
+                      previousParticipant?.photoURL ||
+                      (isCurrentUser ? profile?.photoURL : undefined),
+                    isHost: participant.uid === room.ownerUid,
+                    cameraEnabled:
+                      participant.cameraEnabled ??
+                      previousParticipant?.cameraEnabled ??
+                      false,
+                    microphoneEnabled:
+                      participant.microphoneEnabled ??
+                      previousParticipant?.microphoneEnabled ??
+                      true,
+                    screenSharing:
+                      participant.screenSharing ??
+                      previousParticipant?.screenSharing ??
+                      false,
+                    isSpeaking:
+                      participant.isSpeaking ??
+                      previousParticipant?.isSpeaking ??
+                      false,
+                  },
+                  cachedProfile
+                );
+              })
+            );
+          }
+        );
+
+        const handleChatHistory = (payload: ChatHistoryResponse) => {
+          const history = extractHistoryMessages(payload)
+            .map((msg) =>
+              mapPayloadToChatMessage(
+                msg,
+                Array.isArray(payload) ? roomId : payload.roomId || roomId
+              )
+            )
+            .filter(Boolean)
+            .map((msg) => {
+              const message = msg as ChatMessage;
+              const cachedProfile = userProfilesCacheRef.current.get(
+                message.senderUid
+              );
+
+              return mergeProfileIntoMessage(message, cachedProfile);
+            }) as ChatMessage[];
+
+          const orderedHistory = sortMessagesChronologically(history);
+
+          setChatMessages(orderedHistory);
+          setChatHistoryError("");
+          setChatStatus(orderedHistory.length === 0 ? "empty" : "success");
+        };
+
+        socket.on("chat-history", handleChatHistory);
+        socket.on("chat-history-success", handleChatHistory);
+
+        socket.on("chat-history-error", (payload: ChatHistoryErrorPayload) => {
+          setChatHistoryError(
+            payload?.message || "No se pudo cargar el historial del chat."
+          );
+          setChatStatus("error");
+        });
+
+        socket.on("error", (payload: { message?: string }) => {
+          const errorMessage = payload?.message || "Ocurrió un error en la sala.";
+
+          setSocketError(errorMessage);
+
+          if (chatStatus === "loading") {
+            setChatHistoryError(errorMessage);
+            setChatStatus("error");
+          }
+        });
+
+        socket.on("send-message-error", (payload: { message?: string }) => {
+          setSocketError(payload?.message || "No se pudo enviar el mensaje.");
+        });
+
         socket.on("new-message", (msg: NewMessagePayload) => {
           console.log("Nuevo mensaje:", msg);
 
-          const newMessage: ChatMessage = {
-            id: msg.id || crypto.randomUUID(),
-            roomId,
-            senderUid: msg.senderUid || msg.uid || "",
-            senderName:
-              msg.senderUsername ||
-              msg.senderName ||
-              msg.username ||
-              "Usuario",
-            message: msg.content || msg.message || "",
-            createdAt: msg.createdAt || new Date().toISOString(),
-          };
+          const mappedMessage = mapPayloadToChatMessage(msg, roomId);
 
-          if (!newMessage.message) return;
+          if (!mappedMessage) return;
+
+          const cachedProfile = userProfilesCacheRef.current.get(
+            mappedMessage.senderUid
+          );
+          const newMessage = mergeProfileIntoMessage(
+            mappedMessage,
+            cachedProfile
+          );
 
           setChatMessages((currentMessages) => {
             const exists = currentMessages.some(
@@ -534,8 +874,10 @@ export function ActiveRoom() {
 
             if (exists) return currentMessages;
 
-            return [...currentMessages, newMessage];
+            return sortMessagesChronologically([...currentMessages, newMessage]);
           });
+
+          setChatStatus("success");
         });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
@@ -563,7 +905,84 @@ export function ActiveRoom() {
     profile?.username,
     profile?.photoURL,
     currentUserName,
+    currentUsername,
   ]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const uidsToLoad = new Set<string>();
+
+    participants.forEach((participant) => {
+      if (
+        participant.uid &&
+        participant.uid !== user.uid &&
+        shouldFetchParticipantProfile(participant) &&
+        !userProfilesCacheRef.current.has(participant.uid) &&
+        !userProfilesInFlightRef.current.has(participant.uid)
+      ) {
+        uidsToLoad.add(participant.uid);
+      }
+    });
+
+    chatMessages.forEach((chatMessage) => {
+      if (
+        chatMessage.senderUid &&
+        chatMessage.senderUid !== user.uid &&
+        shouldFetchMessageProfile(chatMessage) &&
+        !userProfilesCacheRef.current.has(chatMessage.senderUid) &&
+        !userProfilesInFlightRef.current.has(chatMessage.senderUid)
+      ) {
+        uidsToLoad.add(chatMessage.senderUid);
+      }
+    });
+
+    if (uidsToLoad.size === 0) return;
+
+    const loadMissingProfiles = async () => {
+      try {
+        const token = await user.getIdToken();
+
+        await Promise.all(
+          Array.from(uidsToLoad).map(async (uid) => {
+            userProfilesInFlightRef.current.add(uid);
+
+            try {
+              const userProfile = await fetchUserProfileSummary(uid, token);
+
+              if (!userProfile) return;
+
+              userProfilesCacheRef.current.set(uid, userProfile);
+
+              setParticipants((currentParticipants) =>
+                currentParticipants.map((participant) =>
+                  participant.uid === uid
+                    ? mergeProfileIntoParticipant(participant, userProfile)
+                    : participant
+                )
+              );
+
+              setChatMessages((currentMessages) =>
+                currentMessages.map((chatMessage) =>
+                  chatMessage.senderUid === uid
+                    ? mergeProfileIntoMessage(chatMessage, userProfile)
+                    : chatMessage
+                )
+              );
+            } catch (error) {
+              console.warn(`No se pudo cargar el perfil ${uid}:`, error);
+            } finally {
+              userProfilesInFlightRef.current.delete(uid);
+            }
+          })
+        );
+      } catch (error) {
+        console.warn("No se pudo validar la sesión para cargar perfiles:", error);
+      }
+    };
+
+    void loadMissingProfiles();
+  }, [participants, chatMessages, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -605,6 +1024,45 @@ export function ActiveRoom() {
     await navigator.clipboard.writeText(roomId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRetryChatHistory = () => {
+    if (!socketRef.current || !roomId) return;
+
+    setChatStatus("loading");
+    setChatHistoryError("");
+
+    socketRef.current.emit("join-room", {
+      roomId,
+    });
+  };
+
+  const getMessageUsername = (msg: ChatMessage) => {
+    const participant = participants.find((item) => item.uid === msg.senderUid);
+    const cachedProfile = msg.senderUid
+      ? userProfilesCacheRef.current.get(msg.senderUid)
+      : undefined;
+
+    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
+      return currentUsername;
+    }
+
+    return (
+      cachedProfile?.username ||
+      participant?.username ||
+      msg.senderName ||
+      "Usuario"
+    );
+  };
+
+  const getMessageAvatar = (msg: ChatMessage) => {
+    const participant = participants.find((item) => item.uid === msg.senderUid);
+
+    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
+      return profile?.photoURL;
+    }
+
+    return msg.senderPhotoURL || participant?.photoURL;
   };
 
   const handleSendMessage = (event: React.FormEvent) => {
@@ -1043,7 +1501,56 @@ export function ActiveRoom() {
                   aria-relevant="additions text"
                   aria-label="Mensajes del chat de la sala"
                 >
-                  {chatMessages.length === 0 ? (
+                  {chatStatus === "loading" ? (
+                    <div className="flex h-full min-h-[220px] items-center justify-center">
+                      <div
+                        className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <Loader2
+                          className="mx-auto h-8 w-8 animate-spin text-primary"
+                          aria-hidden="true"
+                        />
+
+                        <p className="mt-4 font-semibold text-gray-800">
+                          Cargando historial del chat...
+                        </p>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          Estamos recuperando los mensajes anteriores de la sala.
+                        </p>
+                      </div>
+                    </div>
+                  ) : chatStatus === "error" ? (
+                    <div className="flex h-full min-h-[220px] items-center justify-center">
+                      <div
+                        className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
+                        role="alert"
+                      >
+                        <AlertCircle
+                          className="mx-auto h-8 w-8 text-red-600"
+                          aria-hidden="true"
+                        />
+
+                        <p className="mt-4 font-semibold text-gray-800">
+                          No pudimos cargar el historial
+                        </p>
+
+                        <p className="mt-1 text-sm text-gray-500">
+                          {chatHistoryError}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={handleRetryChatHistory}
+                          className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                        >
+                          Reintentar
+                        </button>
+                      </div>
+                    </div>
+                  ) : chatStatus === "empty" ? (
                     <div className="flex h-full min-h-[220px] items-center justify-center">
                       <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
                         <div
@@ -1067,7 +1574,25 @@ export function ActiveRoom() {
                       {chatMessages.map((msg) => {
                         const isOwnMessage =
                           msg.senderUid === user?.uid ||
-                          msg.senderName === currentUserName;
+                          msg.senderName === currentUsername;
+                        const messageUsername = getMessageUsername(msg);
+                        const messageAvatar = getMessageAvatar(msg);
+                        const avatar = messageAvatar ? (
+                          <img
+                            src={messageAvatar}
+                            alt=""
+                            className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover shadow-md"
+                          />
+                        ) : (
+                          <div
+                            className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
+                            aria-hidden="true"
+                          >
+                            <span className="text-xs font-bold text-white">
+                              {getInitials(messageUsername)}
+                            </span>
+                          </div>
+                        );
 
                         return (
                           <li
@@ -1076,26 +1601,7 @@ export function ActiveRoom() {
                               isOwnMessage ? "justify-end" : "justify-start"
                             }`}
                           >
-                            {!isOwnMessage && (
-                              <>
-                                {msg.senderPhotoURL ? (
-                                  <img
-                                    src={msg.senderPhotoURL}
-                                    alt=""
-                                    className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div
-                                    className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
-                                    aria-hidden="true"
-                                  >
-                                    <span className="text-xs font-bold text-white">
-                                      {getInitials(msg.senderName)}
-                                    </span>
-                                  </div>
-                                )}
-                              </>
-                            )}
+                            {!isOwnMessage && avatar}
 
                             <div
                               className={`flex max-w-[82%] flex-col ${
@@ -1106,7 +1612,7 @@ export function ActiveRoom() {
                             >
                               <div className="mb-1 flex max-w-full items-center gap-2">
                                 <span className="truncate text-xs font-semibold text-gray-700">
-                                  {isOwnMessage ? "Tú" : msg.senderName}
+                                  {messageUsername}
                                 </span>
 
                                 <span className="text-[11px] text-gray-500">
@@ -1124,6 +1630,8 @@ export function ActiveRoom() {
                                 {msg.message}
                               </p>
                             </div>
+
+                            {isOwnMessage && avatar}
                           </li>
                         );
                       })}
