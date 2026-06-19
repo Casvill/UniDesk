@@ -6,6 +6,15 @@ import dotenv from "dotenv";
 import { db, auth } from "./config/firebase";
 import { Timestamp } from "firebase-admin/firestore";
 import { socketAuthMiddleware, AuthenticatedSocket } from "./middleware/auth.middleware.js";
+import {
+  areInSameRoom,
+  UserInfo,
+  WebRTCOfferPayload,
+  WebRTCAnswerPayload,
+  IceCandidatePayload,
+  UserJoinedPayload,
+  UserLeftPayload,
+} from "./signaling.js";
 
 dotenv.config();
 
@@ -15,7 +24,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || true,
     methods: ["GET", "POST"]
   }
 });
@@ -25,14 +34,7 @@ io.use(socketAuthMiddleware);
 
 const PORT = process.env.PORT || process.env.REALTIME_PORT || 3001;
 
-interface UserInfo {
-  uid: string;
-  username: string;
-  roomId: string;
-  avatar?: string;
-}
-
-// Map<roomId, Map<socketId, UserInfo>>
+// Map<roomId, Map<socketId, UserInfo>> — shared with signaling relays.
 const rooms = new Map<string, Map<string, UserInfo>>();
 
 // Helper to get array of users in a room
@@ -80,6 +82,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
         socket.emit("chat-history", messages);
       })
       .catch((err) => console.error("Error fetching chat history:", err));
+
+    // Notify EXISTING participants that a new peer joined — they initiate offers.
+    const joinerInfo: UserInfo = rooms.get(roomId)!.get(socket.id)!;
+    const joinedPayload: UserJoinedPayload = { socketId: socket.id, user: joinerInfo };
+    socket.to(roomId).emit("user-joined", joinedPayload);
 
     // Broadcast full updated list
     io.to(roomId).emit("room-participants-update", getParticipantsInRoom(roomId));
@@ -166,7 +173,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       });
 
       console.log(`Mensaje ${messageId} actualizado por ${socket.user.uid}`);
-      
+
       // Find room to broadcast
       let roomId: string | undefined;
       for (const users of rooms.values()) {
@@ -188,16 +195,38 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     }
   });
 
+  // ─── WebRTC signaling relays ───────────────────────────────────────────
+  // The server never parses SDP/ICE. It only enforces that sender and target
+  // share a room, then relays the opaque blob with a SERVER-VERIFIED `from`.
+  // Refusing a relay (not authed, not co-located, target gone) is silent on
+  // purpose: the offerer's local timeout is the feedback channel.
+
+  socket.on("webrtc-offer", (data: WebRTCOfferPayload) => {
+    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
+    io.to(data.to).emit("webrtc-offer", { from: socket.id, sdp: data.sdp });
+  });
+
+  socket.on("webrtc-answer", (data: WebRTCAnswerPayload) => {
+    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
+    io.to(data.to).emit("webrtc-answer", { from: socket.id, sdp: data.sdp });
+  });
+
+  socket.on("webrtc-ice-candidate", (data: IceCandidatePayload) => {
+    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
+    io.to(data.to).emit("webrtc-ice-candidate", { from: socket.id, candidate: data.candidate });
+  });
+
+
   const handleLeaveRoom = (socketId: string) => {
     let roomIdToNotify: string | null = null;
-    let userLeaving: string | null = null;
+    let leftUser: UserInfo | null = null;
 
     for (const [roomId, users] of rooms.entries()) {
       if (users.has(socketId)) {
-        userLeaving = users.get(socketId)!.username;
+        leftUser = users.get(socketId)!;
         users.delete(socketId);
         roomIdToNotify = roomId;
-        
+
         // Clean up empty rooms
         if (users.size === 0) {
           rooms.delete(roomId);
@@ -206,8 +235,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       }
     }
 
-    if (roomIdToNotify && userLeaving) {
-      console.log(`Usuario ${userLeaving} salió de la sala ${roomIdToNotify}`);
+    if (roomIdToNotify && leftUser) {
+      console.log(`Usuario ${leftUser.username} salió de la sala ${roomIdToNotify}`);
+      // Tell remaining peers to tear down their peer connection to the leaver.
+      const leftPayload: UserLeftPayload = { socketId, uid: leftUser.uid };
+      io.to(roomIdToNotify).emit("user-left", leftPayload);
       // Broadcast full updated list
       io.to(roomIdToNotify).emit("room-participants-update", getParticipantsInRoom(roomIdToNotify));
     }
