@@ -218,7 +218,19 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   const DEBUG_SIGNALING = process.env.DEBUG_SIGNALING === "1";
 
   /** Tagged log: signaling debug line, prefixed for easy grep/audit. */
-  const sigLog = (msg: string) => console.log(`[signaling] ${msg}`);
+  // ponytail: Standardized diagnostic logging utility to audit WebRTC lifecycle & signaling errors
+  const logDiagnostic = (level: "INFO" | "DEBUG" | "WARN" | "ERROR", event: string, msg: string, socketId: string, targetId?: string) => {
+    const roomId = findRoomOf(rooms, socketId) ?? "-";
+    const targetInfo = targetId ? ` | target=${targetId}` : "";
+    const logMsg = `[${level}] [signaling] [room=${roomId}] [sender=${socketId}]${targetInfo} | ${event} | ${msg}`;
+    if (level === "ERROR") {
+      console.error(logMsg);
+    } else if (level === "WARN") {
+      console.warn(logMsg);
+    } else {
+      console.log(logMsg);
+    }
+  };
 
   /**
    * Validate a signaling relay request. Returns a reason code on failure, or
@@ -248,18 +260,8 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     target: string | undefined,
     verbose: boolean,
   ): void => {
-    const senderRoom = findRoomOf(rooms, socket.id);
     socket.emit("signaling-error", { event, reason, target });
-    if (verbose) {
-      console.warn(
-        `[signaling] ${event} rechazado | reason=${reason} | sender=${socket.id}` +
-        ` (room=${senderRoom ?? "-"}) target=${target ?? "-"}`,
-      );
-    } else {
-      console.warn(
-        `[signaling] ${event} rechazado | reason=${reason} | sender=${socket.id} target=${target ?? "-"}`,
-      );
-    }
+    logDiagnostic("WARN", event, `Relay rechazado: ${reason}`, socket.id, target);
   };
 
   socket.on("send-offer", (data: SendOfferPayload) => {
@@ -275,7 +277,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     activePeerConnections.get(v.target)!.add(socket.id);
 
     io.to(v.target).emit("receive-offer", { from: socket.id, sdp: payload });
-    sigLog(`offer relayed ${socket.id} -> ${v.target}`);
+    logDiagnostic("INFO", "send-offer", "Offer relayed successfully", socket.id, v.target);
   });
 
   socket.on("send-answer", (data: SendAnswerPayload) => {
@@ -284,7 +286,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const payload = data?.sdp;
     if (payload === undefined) { rejectRelay("send-answer", "missing-payload", v.target, true); return; }
     io.to(v.target).emit("receive-answer", { from: socket.id, sdp: payload });
-    sigLog(`answer relayed ${socket.id} -> ${v.target}`);
+    logDiagnostic("INFO", "send-answer", "Answer relayed successfully", socket.id, v.target);
   });
 
   socket.on("send-ice-candidate", (data: SendIceCandidatePayload) => {
@@ -294,7 +296,9 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (payload === undefined) { rejectRelay("send-ice-candidate", "missing-payload", v.target, true); return; }
     io.to(v.target).emit("receive-ice-candidate", { from: socket.id, candidate: payload });
     // ICE trickles are high-volume; only audit when DEBUG_SIGNALING=1.
-    if (DEBUG_SIGNALING) sigLog(`ice-candidate relayed ${socket.id} -> ${v.target}`);
+    if (DEBUG_SIGNALING) {
+      logDiagnostic("DEBUG", "send-ice-candidate", "ICE candidate relayed successfully", socket.id, v.target);
+    }
   });
 
   // ponytail: Listen to media state changes, sync to UserInfo, and broadcast to other peers in room
@@ -341,42 +345,47 @@ io.on("connection", (socket: AuthenticatedSocket) => {
 
 
   const handleLeaveRoom = (socketId: string) => {
-    let roomIdToNotify: string | null = null;
-    let leftUser: UserInfo | null = null;
+    // ponytail: Wrap in try-catch to prevent a single peer leave failure from crashing the server
+    try {
+      let roomIdToNotify: string | null = null;
+      let leftUser: UserInfo | null = null;
 
-    for (const [roomId, users] of rooms.entries()) {
-      if (users.has(socketId)) {
-        leftUser = users.get(socketId)!;
-        users.delete(socketId);
-        roomIdToNotify = roomId;
+      for (const [roomId, users] of rooms.entries()) {
+        if (users.has(socketId)) {
+          leftUser = users.get(socketId)!;
+          users.delete(socketId);
+          roomIdToNotify = roomId;
 
-        // Clean up empty rooms
-        if (users.size === 0) {
-          rooms.delete(roomId);
-        }
-        break;
-      }
-    }
-
-    // ponytail: Dynamic destruction and state purging of peer references when a user leaves/disconnects
-    const connectedPeers = activePeerConnections.get(socketId);
-    if (connectedPeers) {
-      for (const peerId of connectedPeers) {
-        activePeerConnections.get(peerId)?.delete(socketId);
-        if (activePeerConnections.get(peerId)?.size === 0) {
-          activePeerConnections.delete(peerId);
+          // Clean up empty rooms
+          if (users.size === 0) {
+            rooms.delete(roomId);
+          }
+          break;
         }
       }
-      activePeerConnections.delete(socketId);
-    }
 
-    if (roomIdToNotify && leftUser) {
-      console.log(`Usuario ${leftUser.username} salió de la sala ${roomIdToNotify}`);
-      // Tell remaining peers to tear down their peer connection to the leaver.
-      const leftPayload: UserLeftPayload = { socketId, uid: leftUser.uid };
-      io.to(roomIdToNotify).emit("user-left", leftPayload);
-      // Broadcast full updated list
-      io.to(roomIdToNotify).emit("room-participants-update", getParticipantsInRoom(roomIdToNotify));
+      // ponytail: Dynamic destruction and state purging of peer references when a user leaves/disconnects
+      const connectedPeers = activePeerConnections.get(socketId);
+      if (connectedPeers) {
+        for (const peerId of connectedPeers) {
+          activePeerConnections.get(peerId)?.delete(socketId);
+          if (activePeerConnections.get(peerId)?.size === 0) {
+            activePeerConnections.delete(peerId);
+          }
+        }
+        activePeerConnections.delete(socketId);
+      }
+
+      if (roomIdToNotify && leftUser) {
+        console.log(`Usuario ${leftUser.username} salió de la sala ${roomIdToNotify}`);
+        // Tell remaining peers to tear down their peer connection to the leaver.
+        const leftPayload: UserLeftPayload = { socketId, uid: leftUser.uid };
+        io.to(roomIdToNotify).emit("user-left", leftPayload);
+        // Broadcast full updated list
+        io.to(roomIdToNotify).emit("room-participants-update", getParticipantsInRoom(roomIdToNotify));
+      }
+    } catch (err) {
+      console.error(`[signaling] Error en handleLeaveRoom para ${socketId}:`, err);
     }
   };
 
@@ -385,9 +394,33 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     handleLeaveRoom(socket.id);
   });
 
+  socket.on("disconnecting", () => {
+    // ponytail: clean up on disconnecting to ensure early and robust purge
+    handleLeaveRoom(socket.id);
+  });
+
   socket.on("disconnect", () => {
     console.log("Usuario desconectado:", socket.id);
     handleLeaveRoom(socket.id);
+  });
+
+  // ponytail: handle explicit peer connection closed/failed events gracefully
+  socket.on("peer-closed", (data: { to?: unknown }) => {
+    try {
+      const target = data?.to;
+      if (typeof target !== "string" || !target) return;
+      
+      activePeerConnections.get(socket.id)?.delete(target);
+      activePeerConnections.get(target)?.delete(socket.id);
+      
+      if (activePeerConnections.get(socket.id)?.size === 0) activePeerConnections.delete(socket.id);
+      if (activePeerConnections.get(target)?.size === 0) activePeerConnections.delete(target);
+
+      io.to(target).emit("peer-disconnected", { socketId: socket.id });
+      logDiagnostic("INFO", "peer-closed", "Peer connection explicitly closed", socket.id, target);
+    } catch (err) {
+      console.error(`[signaling] Error en peer-closed de ${socket.id}:`, err);
+    }
   });
 });
 

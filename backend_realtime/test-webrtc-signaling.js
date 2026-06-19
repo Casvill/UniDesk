@@ -162,9 +162,14 @@ async function main() {
   const m4 = await emitAndCapture(s1, "camera-on", {}, s2, "camera-on");
   assert(m4.socketId === s1.id, `receive camera-on event has correct socketId`);
 
-  // ── Test 8: disconnect triggers user-left ──────────────────────────────
+  // ── Test 8: peer-closed signaling relay ────────────────────────────────
+  console.log("\n── Test 8: peer-closed signaling → peer-disconnected ──");
+  const pc = await emitAndCapture(s1, "peer-closed", { to: s2.id }, s2, "peer-disconnected");
+  assert(pc.socketId === s1.id, `receive peer-disconnected event has correct socketId`);
 
-  console.log("\n── Test 8: disconnect → user-left ──");
+  // ── Test 9: disconnect triggers user-left ──────────────────────────────
+
+  console.log("\n── Test 9: disconnect → user-left ──");
   const s2Id = s2.id; // capture before disconnect destroys the reference
   const left = once(s1, "user-left");
   s2.disconnect();
