@@ -8,12 +8,14 @@ import { Timestamp } from "firebase-admin/firestore";
 import { socketAuthMiddleware, AuthenticatedSocket } from "./middleware/auth.middleware.js";
 import {
   areInSameRoom,
+  findRoomOf,
   UserInfo,
-  WebRTCOfferPayload,
-  WebRTCAnswerPayload,
-  IceCandidatePayload,
+  SendOfferPayload,
+  SendAnswerPayload,
+  SendIceCandidatePayload,
   UserJoinedPayload,
   UserLeftPayload,
+  SignalingErrorReason,
 } from "./signaling.js";
 
 dotenv.config();
@@ -198,22 +200,83 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   // ─── WebRTC signaling relays ───────────────────────────────────────────
   // The server never parses SDP/ICE. It only enforces that sender and target
   // share a room, then relays the opaque blob with a SERVER-VERIFIED `from`.
-  // Refusing a relay (not authed, not co-located, target gone) is silent on
-  // purpose: the offerer's local timeout is the feedback channel.
+  //
+  // On validation failure the sender gets a `signaling-error` and the server
+  // logs it — a refused relay is never silent. This differs from ICE candidate
+  // trickling, which can fire many times per second; to avoid log spam the ICE
+  // relay logs failures at debug level only (suppressed unless verbose).
+  //
+  // Naming: `send-offer`/`send-answer`/`send-ice-candidate` (client→server)
+  // become `receive-offer`/`receive-answer`/`receive-ice-candidate`
+  // (server→client target).
 
-  socket.on("webrtc-offer", (data: WebRTCOfferPayload) => {
-    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
-    io.to(data.to).emit("webrtc-offer", { from: socket.id, sdp: data.sdp });
+  /**
+   * Validate a signaling relay request. Returns a reason code on failure, or
+   * null on success. Centralizes the auth + room-scoping + payload checks so
+   * all three relay handlers share one ruleset.
+   */
+  const validateRelay = (
+    data: { to?: unknown },
+  ): { ok: true; target: string } | { ok: false; reason: SignalingErrorReason } => {
+    if (!socket.user) return { ok: false, reason: "not-authenticated" };
+    const target = data?.to;
+    if (typeof target !== "string" || !target) {
+      return { ok: false, reason: "missing-target" };
+    }
+    if (!areInSameRoom(rooms, socket.id, target)) {
+      // target could be a valid socket in a different room, or a ghost id.
+      const inSomeRoom = findRoomOf(rooms, target) !== null;
+      return { ok: false, reason: inSomeRoom ? "not-co-located" : "target-disconnected" };
+    }
+    return { ok: true, target };
+  };
+
+  /** Reject a relay: notify the sender + log with room context. */
+  const rejectRelay = (
+    event: string,
+    reason: SignalingErrorReason,
+    target: string | undefined,
+    verbose: boolean,
+  ): void => {
+    const senderRoom = findRoomOf(rooms, socket.id);
+    socket.emit("signaling-error", { event, reason, target });
+    if (verbose) {
+      console.warn(
+        `[signaling] ${event} rechazado | reason=${reason} | sender=${socket.id}` +
+        ` (room=${senderRoom ?? "-"}) target=${target ?? "-"}`,
+      );
+    } else {
+      console.warn(
+        `[signaling] ${event} rechazado | reason=${reason} | sender=${socket.id} target=${target ?? "-"}`,
+      );
+    }
+  };
+
+  socket.on("send-offer", (data: SendOfferPayload) => {
+    const v = validateRelay(data ?? {});
+    if (!v.ok) { rejectRelay("send-offer", v.reason, data?.to, true); return; }
+    const payload = data?.sdp;
+    if (payload === undefined) { rejectRelay("send-offer", "missing-payload", v.target, true); return; }
+    io.to(v.target).emit("receive-offer", { from: socket.id, sdp: payload });
+    console.log(`[signaling] offer relayed ${socket.id} -> ${v.target}`);
   });
 
-  socket.on("webrtc-answer", (data: WebRTCAnswerPayload) => {
-    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
-    io.to(data.to).emit("webrtc-answer", { from: socket.id, sdp: data.sdp });
+  socket.on("send-answer", (data: SendAnswerPayload) => {
+    const v = validateRelay(data ?? {});
+    if (!v.ok) { rejectRelay("send-answer", v.reason, data?.to, true); return; }
+    const payload = data?.sdp;
+    if (payload === undefined) { rejectRelay("send-answer", "missing-payload", v.target, true); return; }
+    io.to(v.target).emit("receive-answer", { from: socket.id, sdp: payload });
+    console.log(`[signaling] answer relayed ${socket.id} -> ${v.target}`);
   });
 
-  socket.on("webrtc-ice-candidate", (data: IceCandidatePayload) => {
-    if (!socket.user || !data?.to || !areInSameRoom(rooms, socket.id, data.to)) return;
-    io.to(data.to).emit("webrtc-ice-candidate", { from: socket.id, candidate: data.candidate });
+  socket.on("send-ice-candidate", (data: SendIceCandidatePayload) => {
+    const v = validateRelay(data ?? {});
+    if (!v.ok) { rejectRelay("send-ice-candidate", v.reason, data?.to, false); return; }
+    const payload = data?.candidate;
+    if (payload === undefined) { rejectRelay("send-ice-candidate", "missing-payload", v.target, false); return; }
+    io.to(v.target).emit("receive-ice-candidate", { from: socket.id, candidate: payload });
+    // ICE trickles are high-volume; log only on explicit success to keep output readable.
   });
 
 

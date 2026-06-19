@@ -112,37 +112,44 @@ async function main() {
   assert(j.socketId === s1.id, `user-joined.socketId === s1.id`);
   assert(j.user.uid, `user-joined.user.uid is present`);
 
-  // ── Test 2: offer relay ───────────────────────────────────────────────
-  console.log("\n── Test 2: webrtc-offer relay ──");
-  const o = await emitAndCapture(s1, "webrtc-offer",
-    { to: s2.id, sdp: { type: "offer", fake: true } }, s2, "webrtc-offer");
-  assert(o.from === s1.id, `webrtc-offer.from === s1.id (server-verified)`);
-  assert(o.sdp.fake === true, `webrtc-offer.sdp opaque blob preserved`);
+  // ── Test 2: send-offer → c2 receives receive-offer ─────────────────────
+  console.log("\n── Test 2: send-offer → receive-offer relay ──");
+  const o = await emitAndCapture(s1, "send-offer",
+    { to: s2.id, sdp: { type: "offer", fake: true } }, s2, "receive-offer");
+  assert(o.from === s1.id, `receive-offer.from === s1.id (server-verified)`);
+  assert(o.sdp.fake === true, `receive-offer.sdp opaque blob preserved`);
 
-  // ── Test 3: answer relay ───────────────────────────────────────────────
-  console.log("\n── Test 3: webrtc-answer relay ──");
-  const a = await emitAndCapture(s2, "webrtc-answer",
-    { to: s1.id, sdp: { type: "answer", fake: true } }, s1, "webrtc-answer");
-  assert(a.from === s2.id, `webrtc-answer.from === s2.id`);
-  assert(a.sdp.fake === true, `webrtc-answer.sdp opaque blob preserved`);
+  // ── Test 3: send-answer → c1 receives receive-answer ───────────────────
+  console.log("\n── Test 3: send-answer → receive-answer relay ──");
+  const a = await emitAndCapture(s2, "send-answer",
+    { to: s1.id, sdp: { type: "answer", fake: true } }, s1, "receive-answer");
+  assert(a.from === s2.id, `receive-answer.from === s2.id`);
+  assert(a.sdp.fake === true, `receive-answer.sdp opaque blob preserved`);
 
-  // ── Test 4: ice-candidate relay ───────────────────────────────────────
-  console.log("\n── Test 4: webrtc-ice-candidate relay ──");
-  const ic = await emitAndCapture(s1, "webrtc-ice-candidate",
+  // ── Test 4: ice-candidate relay ────────────────────────────────────────
+  console.log("\n── Test 4: send-ice-candidate → receive-ice-candidate ──");
+  const ic = await emitAndCapture(s1, "send-ice-candidate",
     { to: s2.id, candidate: { candidate: "candidate:1 1 UDP 2130706431 192.168.1.1 4444 typ host", sdpMid: "0" } },
-    s2, "webrtc-ice-candidate");
-  assert(ic.from === s1.id, `webrtc-ice-candidate.from === s1.id`);
-  assert(ic.candidate.sdpMid === "0", `webrtc-ice-candidate.candidate blob preserved`);
+    s2, "receive-ice-candidate");
+  assert(ic.from === s1.id, `receive-ice-candidate.from === s1.id`);
+  assert(ic.candidate.sdpMid === "0", `receive-ice-candidate.candidate blob preserved`);
 
-  // ── Test 5: offer to nonexistent socket → silently dropped ──────────────
-  console.log("\n── Test 5: offer to nonexistent socket → silent drop ──");
-  const trap = once(s2, "webrtc-offer", 500).catch(() => "dropped");
-  s1.emit("webrtc-offer", { to: "socket-that-does-not-exist", sdp: {} });
-  const t = await trap;
-  assert(t === "dropped", `offer to ghost socket silently dropped`);
+  // ── Test 5: offer to ghost socket → sender gets signaling-error ─────────
+  console.log("\n── Test 5: send-offer to ghost socket → signaling-error ──");
+  const e5 = await emitAndCapture(s1, "send-offer",
+    { to: "socket-that-does-not-exist", sdp: {} }, s1, "signaling-error");
+  assert(e5.event === "send-offer", `signaling-error.event === "send-offer"`);
+  assert(e5.reason === "target-disconnected", `signaling-error.reason === "target-disconnected"`);
+  assert(e5.target === "socket-that-does-not-exist", `signaling-error.target echoed back`);
 
-  // ── Test 6: disconnect triggers user-left ──────────────────────────────
-  console.log("\n── Test 6: disconnect → user-left ──");
+  // ── Test 6: offer missing `to` → signaling-error ───────────────────────
+  console.log("\n── Test 6: send-offer with no target → signaling-error ──");
+  const e6 = await emitAndCapture(s1, "send-offer", { sdp: {} }, s1, "signaling-error");
+  assert(e6.event === "send-offer", `signaling-error.event === "send-offer"`);
+  assert(e6.reason === "missing-target", `signaling-error.reason === "missing-target"`);
+
+  // ── Test 7: disconnect triggers user-left ──────────────────────────────
+  console.log("\n── Test 7: disconnect → user-left ──");
   const s2Id = s2.id; // capture before disconnect destroys the reference
   const left = once(s1, "user-left");
   s2.disconnect();
