@@ -84,3 +84,12 @@ Los desarrolladores pueden usar estos logs en consola para diagnosticar por qué
 2. **Desconexiones de Pares**: Si ves un `WARN` con `target-disconnected`, el destinatario de la oferta/respuesta o del candidato ICE ha cerrado su conexión.
 3. **Flujo ICE Completo**: Si habilitas `DEBUG_SIGNALING=1`, puedes rastrear la llegada masiva de candidatos ICE para determinar si se detiene el intercambio o si hay problemas de firewall/NAT.
 
+---
+
+## Arquitectura de Señalización WebRTC (Resumen)
+
+Para una explicación detallada del flujo de negociación SDP, intercambio de candidatos ICE trickle, eventos de señalización personalizados (como `peer-closed` para fallas del canal y eventos de audio/video como `user-muted`) y diagramas de secuencia interactivos de Mermaid.js, consulte la documentación técnica oficial:
+
+👉 **[docs/WEBRTC_SIGNALING.md](docs/WEBRTC_SIGNALING.md)**
+
+
