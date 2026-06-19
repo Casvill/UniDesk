@@ -148,8 +148,23 @@ async function main() {
   assert(e6.event === "send-offer", `signaling-error.event === "send-offer"`);
   assert(e6.reason === "missing-target", `signaling-error.reason === "missing-target"`);
 
-  // ── Test 7: disconnect triggers user-left ──────────────────────────────
-  console.log("\n── Test 7: disconnect → user-left ──");
+  // ── Test 7: media synchronization events ──────────────────────────────
+  console.log("\n── Test 7: media state synchronization events ──");
+  const m1 = await emitAndCapture(s1, "user-muted", {}, s2, "user-muted");
+  assert(m1.socketId === s1.id, `receive user-muted event has correct socketId`);
+
+  const m2 = await emitAndCapture(s1, "user-unmuted", {}, s2, "user-unmuted");
+  assert(m2.socketId === s1.id, `receive user-unmuted event has correct socketId`);
+
+  const m3 = await emitAndCapture(s1, "camera-off", {}, s2, "camera-off");
+  assert(m3.socketId === s1.id, `receive camera-off event has correct socketId`);
+
+  const m4 = await emitAndCapture(s1, "camera-on", {}, s2, "camera-on");
+  assert(m4.socketId === s1.id, `receive camera-on event has correct socketId`);
+
+  // ── Test 8: disconnect triggers user-left ──────────────────────────────
+
+  console.log("\n── Test 8: disconnect → user-left ──");
   const s2Id = s2.id; // capture before disconnect destroys the reference
   const left = once(s1, "user-left");
   s2.disconnect();

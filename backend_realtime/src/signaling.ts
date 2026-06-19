@@ -23,6 +23,8 @@ export interface UserInfo {
   username: string;
   roomId: string;
   avatar?: string;
+  audioEnabled?: boolean; // ponytail: track current audio status
+  videoEnabled?: boolean; // ponytail: track current video status
 }
 
 /** In-memory membership index: roomId -> (socketId -> UserInfo). */

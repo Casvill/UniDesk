@@ -68,7 +68,9 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       uid, 
       username, 
       roomId, 
-      avatar: (socket.user as any).picture 
+      avatar: (socket.user as any).picture,
+      audioEnabled: true, // ponytail: default media states on join
+      videoEnabled: true
     });
     
     socket.join(roomId);
@@ -294,6 +296,48 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     // ICE trickles are high-volume; only audit when DEBUG_SIGNALING=1.
     if (DEBUG_SIGNALING) sigLog(`ice-candidate relayed ${socket.id} -> ${v.target}`);
   });
+
+  // ponytail: Listen to media state changes, sync to UserInfo, and broadcast to other peers in room
+  socket.on("user-muted", () => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.audioEnabled = false;
+      socket.to(roomId).emit("user-muted", { socketId: socket.id });
+    }
+  });
+
+  socket.on("user-unmuted", () => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.audioEnabled = true;
+      socket.to(roomId).emit("user-unmuted", { socketId: socket.id });
+    }
+  });
+
+  socket.on("camera-on", () => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.videoEnabled = true;
+      socket.to(roomId).emit("camera-on", { socketId: socket.id });
+    }
+  });
+
+  socket.on("camera-off", () => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.videoEnabled = false;
+      socket.to(roomId).emit("camera-off", { socketId: socket.id });
+    }
+  });
+
 
 
   const handleLeaveRoom = (socketId: string) => {
