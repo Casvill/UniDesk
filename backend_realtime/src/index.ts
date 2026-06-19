@@ -202,13 +202,18 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   // share a room, then relays the opaque blob with a SERVER-VERIFIED `from`.
   //
   // On validation failure the sender gets a `signaling-error` and the server
-  // logs it — a refused relay is never silent. This differs from ICE candidate
-  // trickling, which can fire many times per second; to avoid log spam the ICE
-  // relay logs failures at debug level only (suppressed unless verbose).
+  // logs it — a refused relay is never silent. By default SDP relays log
+  // success verbosely and ICE relays stay quiet (trickling fires many times
+  // per second and would spam the log). Set DEBUG_SIGNALING=1 to audit every
+  // ICE candidate relay too.
   //
   // Naming: `send-offer`/`send-answer`/`send-ice-candidate` (client→server)
   // become `receive-offer`/`receive-answer`/`receive-ice-candidate`
   // (server→client target).
+  const DEBUG_SIGNALING = process.env.DEBUG_SIGNALING === "1";
+
+  /** Tagged log: signaling debug line, prefixed for easy grep/audit. */
+  const sigLog = (msg: string) => console.log(`[signaling] ${msg}`);
 
   /**
    * Validate a signaling relay request. Returns a reason code on failure, or
@@ -258,7 +263,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const payload = data?.sdp;
     if (payload === undefined) { rejectRelay("send-offer", "missing-payload", v.target, true); return; }
     io.to(v.target).emit("receive-offer", { from: socket.id, sdp: payload });
-    console.log(`[signaling] offer relayed ${socket.id} -> ${v.target}`);
+    sigLog(`offer relayed ${socket.id} -> ${v.target}`);
   });
 
   socket.on("send-answer", (data: SendAnswerPayload) => {
@@ -267,16 +272,17 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const payload = data?.sdp;
     if (payload === undefined) { rejectRelay("send-answer", "missing-payload", v.target, true); return; }
     io.to(v.target).emit("receive-answer", { from: socket.id, sdp: payload });
-    console.log(`[signaling] answer relayed ${socket.id} -> ${v.target}`);
+    sigLog(`answer relayed ${socket.id} -> ${v.target}`);
   });
 
   socket.on("send-ice-candidate", (data: SendIceCandidatePayload) => {
     const v = validateRelay(data ?? {});
-    if (!v.ok) { rejectRelay("send-ice-candidate", v.reason, data?.to, false); return; }
+    if (!v.ok) { rejectRelay("send-ice-candidate", v.reason, data?.to, true); return; }
     const payload = data?.candidate;
-    if (payload === undefined) { rejectRelay("send-ice-candidate", "missing-payload", v.target, false); return; }
+    if (payload === undefined) { rejectRelay("send-ice-candidate", "missing-payload", v.target, true); return; }
     io.to(v.target).emit("receive-ice-candidate", { from: socket.id, candidate: payload });
-    // ICE trickles are high-volume; log only on explicit success to keep output readable.
+    // ICE trickles are high-volume; only audit when DEBUG_SIGNALING=1.
+    if (DEBUG_SIGNALING) sigLog(`ice-candidate relayed ${socket.id} -> ${v.target}`);
   });
 
 
