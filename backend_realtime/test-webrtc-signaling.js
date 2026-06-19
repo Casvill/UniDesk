@@ -16,8 +16,11 @@ dotenv.config();
 
 const SERVER = "http://localhost:3001";
 const ROOM = "test-webrtc-room";
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY
-  || "AIzaSyCv6wBJwqNfgEkBiW8zGtufIjahC1Cb3Rg";
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
+if (!FIREBASE_WEB_API_KEY) {
+  throw new Error("FIREBASE_WEB_API_KEY environment variable is required.");
+}
+
 
 // ── Firebase Admin init ──────────────────────────────────────────────────
 const privateStr = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
