@@ -563,6 +563,16 @@ export function ActiveRoom() {
   const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
   const overflowVisibleCount = gridCols * 2 - 1;
 
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.uid === user?.uid) return -1;
+    if (b.uid === user?.uid) return 1;
+    return 0;
+  });
+  const visibleParticipants = sortedParticipants.slice(
+    0,
+    showOverflow ? overflowVisibleCount : sortedParticipants.length
+  );
+
   const renderOverflowAvatar = (p: RoomParticipant, idx: number) => (
     <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-gray-800 shadow-lg sm:h-12 sm:w-12 lg:h-14 lg:w-14">
       {p.photoURL ? (
@@ -1571,14 +1581,12 @@ export function ActiveRoom() {
               </div>
             ) : (
               <>
-                {participants
-                  .slice(0, showOverflow ? overflowVisibleCount : participants.length)
-                  .map((p, i) => {
-                    const gridColumn = isSm && participants.length === 5
-                      ? i < 3 ? "span 2" : "span 3"
-                      : undefined;
-                    return renderParticipantTile(p, i, gridColumn);
-                  })}
+                {visibleParticipants.map((p, i) => {
+                  const gridColumn = isSm && participants.length === 5
+                    ? i < 3 ? "span 2" : "span 3"
+                    : undefined;
+                  return renderParticipantTile(p, i, gridColumn);
+                })}
                 {showOverflow && (
                   <div
                     key="overflow"
@@ -1588,21 +1596,21 @@ export function ActiveRoom() {
                       <div className="flex items-center justify-center">
                         <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
                           {renderOverflowAvatar(
-                            participants[overflowVisibleCount],
+                            sortedParticipants[overflowVisibleCount],
                             overflowVisibleCount
                           )}
                         </div>
-                        {participants.length > overflowVisibleCount + 1 && (
+                        {sortedParticipants.length > overflowVisibleCount + 1 && (
                           <div>
                             {renderOverflowAvatar(
-                              participants[overflowVisibleCount + 1],
+                              sortedParticipants[overflowVisibleCount + 1],
                               overflowVisibleCount + 1
                             )}
                           </div>
                         )}
                       </div>
                       <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
-                        +{participants.length - overflowVisibleCount} más
+                        +{sortedParticipants.length - overflowVisibleCount} más
                       </p>
                     </div>
                   </div>
