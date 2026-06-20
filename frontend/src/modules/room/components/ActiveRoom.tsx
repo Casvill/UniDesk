@@ -86,7 +86,6 @@ export function ActiveRoom() {
   const webRTC = useWebRTC(localStreamRef);
 
   const {
-    localVideoRef,
     mediaPerms,
     mediaInitStatus,
     retryMedia,

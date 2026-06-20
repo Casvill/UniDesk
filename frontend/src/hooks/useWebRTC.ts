@@ -137,6 +137,10 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
       console.log("[WebRTC] peer desconectado:", payload.socketId);
       closePeerConnection(payload.socketId, null, false);
     });
+
+    socket.on("signaling-error", (payload: { event: string; reason: string; target?: string }) => {
+      console.error("[WebRTC] Error de señalización:", payload);
+    });
   }
 
   return {

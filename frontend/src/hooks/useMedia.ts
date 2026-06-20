@@ -6,8 +6,6 @@ export function useMedia(
   isMicOn: boolean,
   isCameraOn: boolean
 ) {
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-
   const [mediaPerms, setMediaPerms] = useState<{
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
@@ -30,7 +28,9 @@ export function useMedia(
         return;
       }
       try {
-        const constraints = kind === "audio" ? { audio: true } : { video: true };
+        const constraints = kind === "audio"
+          ? { audio: true }
+          : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -53,6 +53,8 @@ export function useMedia(
             setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
           } else if (err.name === "NotFoundError") {
             setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+          } else if (err.name === "NotReadableError") {
+            setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
           } else {
             setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
           }
@@ -87,7 +89,9 @@ export function useMedia(
       return;
     }
 
-    const constraints = kind === "audio" ? { audio: true } : { video: true };
+    const constraints = kind === "audio"
+      ? { audio: true }
+      : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
 
     const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
     oldTracks.forEach((t) => {
@@ -112,6 +116,8 @@ export function useMedia(
           setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
         } else if (err.name === "NotFoundError") {
           setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+        } else if (err.name === "NotReadableError") {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
         } else {
           setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
         }
@@ -136,5 +142,5 @@ export function useMedia(
     });
   }, [mediaPerms, getPeerConnections]);
 
-  return { localStreamRef, localVideoRef, mediaPerms, mediaInitStatus, retryMedia };
+  return { localStreamRef, mediaPerms, mediaInitStatus, retryMedia };
 }
