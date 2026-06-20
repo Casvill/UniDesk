@@ -308,7 +308,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.audioEnabled = false;
-      socket.to(roomId).emit("user-muted", { socketId: socket.id });
+      socket.to(roomId).emit("user-muted", { socketId: socket.id, uid: user.uid });
     }
   });
 
@@ -318,7 +318,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.audioEnabled = true;
-      socket.to(roomId).emit("user-unmuted", { socketId: socket.id });
+      socket.to(roomId).emit("user-unmuted", { socketId: socket.id, uid: user.uid });
     }
   });
 
@@ -328,7 +328,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.videoEnabled = true;
-      socket.to(roomId).emit("camera-on", { socketId: socket.id });
+      socket.to(roomId).emit("camera-on", { socketId: socket.id, uid: user.uid });
     }
   });
 
@@ -338,7 +338,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.videoEnabled = false;
-      socket.to(roomId).emit("camera-off", { socketId: socket.id });
+      socket.to(roomId).emit("camera-off", { socketId: socket.id, uid: user.uid });
     }
   });
 
