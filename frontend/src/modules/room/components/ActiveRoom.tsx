@@ -28,6 +28,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
+import { AnimatePresence, motion } from "motion/react";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -596,9 +597,14 @@ export function ActiveRoom() {
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? true;
 
     return (
-      <div
+      <motion.div
         key={p.uid}
-        className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
+        layout
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl ${
           p.isSpeaking
             ? "ring-4 ring-green-500 shadow-green-500/50"
             : "ring-2 ring-gray-700"
@@ -664,7 +670,7 @@ export function ActiveRoom() {
             )}
           </span>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
@@ -1580,7 +1586,7 @@ export function ActiveRoom() {
                 </div>
               </div>
             ) : (
-              <>
+              <AnimatePresence mode="popLayout">
                 {visibleParticipants.map((p, i) => {
                   const gridColumn = isSm && participants.length === 5
                     ? i < 3 ? "span 2" : "span 3"
@@ -1588,8 +1594,13 @@ export function ActiveRoom() {
                   return renderParticipantTile(p, i, gridColumn);
                 })}
                 {showOverflow && (
-                  <div
+                  <motion.div
                     key="overflow"
+                    layout
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                     className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
                   >
                     <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
@@ -1613,9 +1624,9 @@ export function ActiveRoom() {
                         +{sortedParticipants.length - overflowVisibleCount} más
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-              </>
+              </AnimatePresence>
             )}
           </div>
 
