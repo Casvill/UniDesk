@@ -66,6 +66,7 @@ export function ActiveRoom() {
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -75,28 +76,30 @@ export function ActiveRoom() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Conectando...");
   const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isMicOn, setIsMicOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
 
+  const webRTC = useWebRTC(localStreamRef);
+
   const {
-    localStreamRef,
     localVideoRef,
     mediaPerms,
     mediaInitStatus,
     retryMedia,
   } = useMedia(
+    localStreamRef,
     () =>
       new Map(
         Array.from(
           webRTC.peerConnectionsRef.current.entries()
         )
-      )
+      ),
+    isMicOn,
+    isCameraOn
   );
-
-  const webRTC = useWebRTC(localStreamRef);
   const chat = useChat(userProfilesCacheRef);
 
   const isSm = useMediaQuery("(min-width: 640px)");
@@ -148,8 +151,8 @@ export function ActiveRoom() {
   const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
     const name = getParticipantName(p);
     const isCurrent = p.uid === user?.uid;
-    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? true;
-    const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? true;
+    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? false;
+    const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
     const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
     const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
 
@@ -161,13 +164,9 @@ export function ActiveRoom() {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl ${
-          p.isSpeaking
-            ? "ring-4 ring-green-500 shadow-green-500/50"
-            : "ring-2 ring-gray-700"
-        }`}
+        className="relative overflow-hidden rounded-2xl bg-gray-800 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
         style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
-        aria-label={`${name}${p.isSpeaking ? " - hablando" : ""}`}
+        aria-label={name}
       >
         {isCurrent && camOn && localStreamRef.current?.getVideoTracks().length ? (
           <video
@@ -181,11 +180,11 @@ export function ActiveRoom() {
               }
             }}
           />
-        ) : !isCurrent && camOn && remoteStream ? (
+        ) : !isCurrent && remoteStream ? (
           <video
             autoPlay
             playsInline
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover ${!camOn ? "hidden" : ""}`}
             ref={(el) => {
               if (el && remoteStream && el.srcObject !== remoteStream) {
                 el.srcObject = remoteStream;
@@ -216,12 +215,6 @@ export function ActiveRoom() {
             </p>
             {p.isHost && (
               <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
-            )}
-            {p.isSpeaking && (
-              <div className="mt-2 flex items-center justify-center gap-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-400">Hablando</span>
-              </div>
             )}
           </div>
         </div>
@@ -358,6 +351,8 @@ export function ActiveRoom() {
             roomId,
             uid: user.uid,
             username: currentUsername,
+            microphoneEnabled: isMicOn,
+            cameraEnabled: isCameraOn,
           });
 
           setParticipants((currentParticipants) =>
@@ -464,6 +459,8 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
+            console.log("[Sync] room-participants-update received:", currentParticipants.map(p => ({ uid: p.uid, cam: p.cameraEnabled, mic: p.microphoneEnabled })));
+
             currentParticipants.forEach((p) => {
               if (p.socketId && p.uid) {
                 webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
@@ -506,9 +503,9 @@ export function ActiveRoom() {
                       previousParticipant?.cameraEnabled ??
                       false,
                     microphoneEnabled:
-                      participant.microphoneEnabled ??
-                      previousParticipant?.microphoneEnabled ??
-                      true,
+                       participant.microphoneEnabled ??
+                       previousParticipant?.microphoneEnabled ??
+                       false,
                     screenSharing:
                       participant.screenSharing ??
                       previousParticipant?.screenSharing ??
@@ -562,6 +559,7 @@ export function ActiveRoom() {
             )
           );
         });
+
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -686,6 +684,9 @@ export function ActiveRoom() {
           : participant
       )
     );
+
+    localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = isMicOn; });
+    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = isCameraOn; });
 
     const socket = socketRef.current;
     if (!socket) return;
@@ -1071,13 +1072,13 @@ export function ActiveRoom() {
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible lg:flex-row">
         <main
-          className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4 sm:p-6"
+          className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6"
           aria-label="Área de video"
         >
           <div
-            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-y-auto pr-1 sm:gap-4"
+            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
             style={{
               gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
             }}

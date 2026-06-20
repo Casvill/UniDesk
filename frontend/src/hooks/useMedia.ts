@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection>) {
-  const localStreamRef = useRef<MediaStream | null>(null);
+export function useMedia(
+  localStreamRef: React.MutableRefObject<MediaStream | null>,
+  getPeerConnections: () => Map<string, RTCPeerConnection>,
+  isMicOn: boolean,
+  isCameraOn: boolean
+) {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [mediaPerms, setMediaPerms] = useState<{
@@ -31,6 +35,8 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
         } else {
           localStreamRef.current = stream;
         }
+        const shouldEnable = kind === "audio" ? isMicOn : isCameraOn;
+        stream.getTracks().forEach((t) => { t.enabled = shouldEnable; });
         setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
         if (kind === "audio") audioDone = true;
         else videoDone = true;

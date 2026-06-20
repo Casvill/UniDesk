@@ -478,7 +478,7 @@ export function mapPresenceUserToParticipant(
     photoURL: item.photoURL || item.picture || item.avatar,
     isHost: ownerUid ? uid === ownerUid : false,
     cameraEnabled: false,
-    microphoneEnabled: true,
+    microphoneEnabled: false,
     screenSharing: false,
     isSpeaking: false,
   };
