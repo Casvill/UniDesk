@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMediaQuery } from "@mui/material";
 import {
   AlertCircle,
   Check,
@@ -541,6 +542,121 @@ export function ActiveRoom() {
   const [unreadCount, setUnreadCount] = useState(0);
   const isChatOpenRef = useRef(isChatOpen);
   isChatOpenRef.current = isChatOpen;
+
+  const isSm = useMediaQuery("(min-width: 640px)");
+  const isLg = useMediaQuery("(min-width: 1024px)");
+
+  const mobileCols = participants.length <= 3 ? 1 : 2;
+
+  const desktopCols =
+    participants.length <= 2
+      ? participants.length
+      : participants.length === 3
+        ? 3
+        : participants.length === 4
+          ? 2
+          : 3;
+
+  const gridCols = isSm ? desktopCols : mobileCols;
+  const effectiveGridCols = isSm && participants.length === 5 ? 6 : gridCols;
+
+  const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
+  const overflowVisibleCount = gridCols * 2 - 1;
+
+  const renderOverflowAvatar = (p: RoomParticipant, idx: number) => (
+    <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-gray-800 shadow-lg sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+      {p.photoURL ? (
+        <img src={p.photoURL} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div
+          className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${getParticipantGradient(idx)}`}
+        >
+          <span className="text-xs font-bold text-white sm:text-sm">
+            {getInitials(getParticipantName(p))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
+    const name = getParticipantName(p);
+    const isCurrent = p.uid === user?.uid;
+    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? true;
+    const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? true;
+
+    return (
+      <div
+        key={p.uid}
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
+          p.isSpeaking
+            ? "ring-4 ring-green-500 shadow-green-500/50"
+            : "ring-2 ring-gray-700"
+        }`}
+        style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
+        aria-label={`${name}${p.isSpeaking ? " - hablando" : ""}`}
+      >
+        <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+          <div className="text-center">
+            {p.photoURL ? (
+              <img
+                src={p.photoURL}
+                alt=""
+                className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+              />
+            ) : (
+              <div
+                className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                aria-hidden="true"
+              >
+                <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                  {getInitials(name)}
+                </span>
+              </div>
+            )}
+            <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+              {isCurrent ? "Tú" : name}
+            </p>
+            {p.isHost && (
+              <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+            )}
+            {p.isSpeaking && (
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-400">Hablando</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="absolute right-3 top-3 flex gap-1.5">
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+              camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={camOn ? "Cámara encendida" : "Cámara apagada"}
+          >
+            {camOn ? (
+              <Video className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+              micOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={micOn ? "Micrófono activado" : "Micrófono silenciado"}
+          >
+            {micOn ? (
+              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -1430,7 +1546,12 @@ export function ActiveRoom() {
           className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div
+            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-y-auto pr-1 sm:gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
+            }}
+          >
             {participants.length === 0 ? (
               <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
                 <div>
@@ -1449,112 +1570,44 @@ export function ActiveRoom() {
                 </div>
               </div>
             ) : (
-              participants.map((participant, index) => {
-                const participantName = getParticipantName(participant);
-                const isCurrentUser = participant.uid === user?.uid;
-                const participantCameraOn = isCurrentUser
-                  ? isCameraOn
-                  : participant.cameraEnabled ?? true;
-                const participantMicOn = isCurrentUser
-                  ? isMicOn
-                  : participant.microphoneEnabled ?? true;
-
-                return (
+              <>
+                {participants
+                  .slice(0, showOverflow ? overflowVisibleCount : participants.length)
+                  .map((p, i) => {
+                    const gridColumn = isSm && participants.length === 5
+                      ? i < 3 ? "span 2" : "span 3"
+                      : undefined;
+                    return renderParticipantTile(p, i, gridColumn);
+                  })}
+                {showOverflow && (
                   <div
-                    key={participant.uid}
-                    className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
-                      participant.isSpeaking
-                        ? "ring-4 ring-green-500 shadow-green-500/50"
-                        : "ring-2 ring-gray-700"
-                    }`}
-                    aria-label={`${participantName}${
-                      participant.isSpeaking ? " - hablando" : ""
-                    }`}
+                    key="overflow"
+                    className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
                   >
-                    <div className="flex h-full min-h-[280px] items-center justify-center">
-                      <div className="text-center">
-                        {participant.photoURL ? (
-                          <img
-                            src={participant.photoURL}
-                            alt=""
-                            className="mx-auto mb-4 h-32 w-32 rounded-full object-cover shadow-2xl"
-                          />
-                        ) : (
-                          <div
-                            className={`mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${getParticipantGradient(
-                              index
-                            )} shadow-2xl`}
-                            aria-hidden="true"
-                          >
-                            <span className="text-4xl font-bold text-white">
-                              {getInitials(participantName)}
-                            </span>
-                          </div>
-                        )}
-
-                        <p className="text-lg font-semibold text-white">
-                          {isCurrentUser ? "Tú" : participantName}
-                        </p>
-
-                        {participant.isHost && (
-                          <p className="mt-1 text-sm font-medium text-primary-200">
-                            Anfitrión
-                          </p>
-                        )}
-
-                        {participant.isSpeaking && (
-                          <div className="mt-2 flex items-center justify-center gap-2">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                            <span className="text-sm font-medium text-green-400">
-                              Hablando
-                            </span>
+                    <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+                      <div className="flex items-center justify-center">
+                        <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
+                          {renderOverflowAvatar(
+                            participants[overflowVisibleCount],
+                            overflowVisibleCount
+                          )}
+                        </div>
+                        {participants.length > overflowVisibleCount + 1 && (
+                          <div>
+                            {renderOverflowAvatar(
+                              participants[overflowVisibleCount + 1],
+                              overflowVisibleCount + 1
+                            )}
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="absolute right-3 top-3 flex gap-1.5">
-                      <span
-                        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
-                          participantCameraOn
-                            ? "bg-green-600 text-white"
-                            : "bg-black/60 text-gray-400"
-                        }`}
-                        aria-label={
-                          participantCameraOn
-                            ? "Cámara encendida"
-                            : "Cámara apagada"
-                        }
-                      >
-                        {participantCameraOn ? (
-                          <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                        ) : (
-                          <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
-                        )}
-                      </span>
-
-                      <span
-                        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
-                          participantMicOn
-                            ? "bg-green-600 text-white"
-                            : "bg-black/60 text-gray-400"
-                        }`}
-                        aria-label={
-                          participantMicOn
-                            ? "Micrófono activado"
-                            : "Micrófono silenciado"
-                        }
-                      >
-                        {participantMicOn ? (
-                          <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-                        ) : (
-                          <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
-                        )}
-                      </span>
+                      <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                        +{participants.length - overflowVisibleCount} más
+                      </p>
                     </div>
                   </div>
-                );
-              })
+                )}
+              </>
             )}
           </div>
 
