@@ -46,10 +46,17 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     console.log("[WebRTC] crear conexión peer para", socketId);
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
-    localStreamRef.current?.getTracks().forEach((track) => {
-      console.log("[WebRTC] agregando track local", track.kind, "a", socketId);
-      pc.addTrack(track, localStreamRef.current!);
-    });
+    const localTracks = localStreamRef.current?.getTracks() ?? [];
+    if (localTracks.length === 0) {
+      console.log("[WebRTC] sin tracks locales, agregando transceivers recvonly para", socketId);
+      pc.addTransceiver("audio", { direction: "recvonly" });
+      pc.addTransceiver("video", { direction: "recvonly" });
+    } else {
+      localTracks.forEach((track) => {
+        console.log("[WebRTC] agregando track local", track.kind, "a", socketId);
+        pc.addTrack(track, localStreamRef.current!);
+      });
+    }
 
     pc.ontrack = ({ streams }) => {
       console.log("[WebRTC] track remoto de", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
@@ -72,6 +79,10 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     pc.onnegotiationneeded = async () => {
       console.log("[WebRTC] negociación necesaria para", socketId);
+      if (pc.signalingState !== "stable") {
+        console.log("[WebRTC] diferir negociación — signalingState:", pc.signalingState);
+        return;
+      }
       try {
         await pc.setLocalDescription(await pc.createOffer());
         console.log("[WebRTC] enviando offer a", socketId);
@@ -142,8 +153,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
       const pc = peerConnectionsRef.current.get(payload.from);
-      if (!pc) return;
-      if (!pc.remoteDescription) {
+      if (!pc || !pc.remoteDescription) {
         const pending = pendingIceCandidatesRef.current;
         if (!pending.has(payload.from)) {
           pending.set(payload.from, []);
