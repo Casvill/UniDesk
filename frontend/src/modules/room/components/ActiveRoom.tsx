@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMediaQuery } from "@mui/material";
 import {
   AlertCircle,
   Check,
@@ -9,14 +10,15 @@ import {
   ChevronUp,
   Copy,
   Loader2,
-  LogOut,
   MessageSquare,
   Mic,
   MicOff,
-  Monitor,
-  MonitorOff,
+  ScreenShare,
+  ScreenShareOff,
+  Phone,
   Send,
   Settings as SettingsIcon,
+  X,
   Users,
   Video,
   VideoOff,
@@ -26,6 +28,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
+import { AnimatePresence, motion } from "motion/react";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -537,6 +540,139 @@ export function ActiveRoom() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isChatOpenRef = useRef(isChatOpen);
+  isChatOpenRef.current = isChatOpen;
+
+  const isSm = useMediaQuery("(min-width: 640px)");
+  const isLg = useMediaQuery("(min-width: 1024px)");
+
+  const mobileCols = participants.length <= 3 ? 1 : 2;
+
+  const desktopCols =
+    participants.length <= 2
+      ? participants.length
+      : participants.length === 3
+        ? 3
+        : participants.length === 4
+          ? 2
+          : 3;
+
+  const gridCols = isSm ? desktopCols : mobileCols;
+  const effectiveGridCols = isSm && participants.length === 5 ? 6 : gridCols;
+
+  const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
+  const overflowVisibleCount = gridCols * 2 - 1;
+
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.uid === user?.uid) return -1;
+    if (b.uid === user?.uid) return 1;
+    return 0;
+  });
+  const visibleParticipants = sortedParticipants.slice(
+    0,
+    showOverflow ? overflowVisibleCount : sortedParticipants.length
+  );
+
+  const renderOverflowAvatar = (p: RoomParticipant, idx: number) => (
+    <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-gray-800 shadow-lg sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+      {p.photoURL ? (
+        <img src={p.photoURL} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div
+          className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${getParticipantGradient(idx)}`}
+        >
+          <span className="text-xs font-bold text-white sm:text-sm">
+            {getInitials(getParticipantName(p))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
+    const name = getParticipantName(p);
+    const isCurrent = p.uid === user?.uid;
+    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? true;
+    const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? true;
+
+    return (
+      <motion.div
+        key={p.uid}
+        layout
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl ${
+          p.isSpeaking
+            ? "ring-4 ring-green-500 shadow-green-500/50"
+            : "ring-2 ring-gray-700"
+        }`}
+        style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
+        aria-label={`${name}${p.isSpeaking ? " - hablando" : ""}`}
+      >
+        <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+          <div className="text-center">
+            {p.photoURL ? (
+              <img
+                src={p.photoURL}
+                alt=""
+                className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+              />
+            ) : (
+              <div
+                className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                aria-hidden="true"
+              >
+                <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                  {getInitials(name)}
+                </span>
+              </div>
+            )}
+            <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+              {isCurrent ? "Tú" : name}
+            </p>
+            {p.isHost && (
+              <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+            )}
+            {p.isSpeaking && (
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-400">Hablando</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="absolute right-3 top-3 flex gap-1.5">
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+              camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={camOn ? "Cámara encendida" : "Cámara apagada"}
+          >
+            {camOn ? (
+              <Video className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+              micOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={micOn ? "Micrófono activado" : "Micrófono silenciado"}
+          >
+            {micOn ? (
+              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -880,6 +1016,42 @@ export function ActiveRoom() {
           });
 
           setChatStatus("success");
+
+          if (!isChatOpenRef.current) {
+            setUnreadCount((prev) => prev + 1);
+          }
+        });
+
+        socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: false } : p
+            )
+          );
+        });
+
+        socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: false } : p
+            )
+          );
         });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
@@ -1001,6 +1173,12 @@ export function ActiveRoom() {
           : participant
       )
     );
+
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    socket.emit(isMicOn ? "user-unmuted" : "user-muted");
+    socket.emit(isCameraOn ? "camera-on" : "camera-off");
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
@@ -1104,6 +1282,198 @@ export function ActiveRoom() {
     navigate("/dashboard");
   };
 
+  const renderChatContent = () => (
+    <>
+      <div
+        ref={chatMessagesContainerRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Mensajes del chat de la sala"
+      >
+        {chatStatus === "loading" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div
+              className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2
+                className="mx-auto h-8 w-8 animate-spin text-primary"
+                aria-hidden="true"
+              />
+
+              <p className="mt-4 font-semibold text-gray-800">
+                Cargando historial del chat...
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Estamos recuperando los mensajes anteriores de la sala.
+              </p>
+            </div>
+          </div>
+        ) : chatStatus === "error" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div
+              className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
+              role="alert"
+            >
+              <AlertCircle
+                className="mx-auto h-8 w-8 text-red-600"
+                aria-hidden="true"
+              />
+
+              <p className="mt-4 font-semibold text-gray-800">
+                No pudimos cargar el historial
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                {chatHistoryError}
+              </p>
+
+              <button
+                type="button"
+                onClick={handleRetryChatHistory}
+                className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
+        ) : chatStatus === "empty" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
+              <div
+                className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
+                aria-hidden="true"
+              >
+                <MessageSquare className="h-6 w-6" />
+              </div>
+
+              <p className="mt-4 font-semibold text-gray-800">
+                Aún no hay mensajes
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Escribe el primer mensaje para iniciar la conversación.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-4">
+            {chatMessages.map((msg) => {
+              const isOwnMessage =
+                msg.senderUid === user?.uid ||
+                msg.senderName === currentUsername;
+              const messageUsername = getMessageUsername(msg);
+              const messageAvatar = getMessageAvatar(msg);
+              const avatar = messageAvatar ? (
+                <img
+                  src={messageAvatar}
+                  alt=""
+                  className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover shadow-md"
+                />
+              ) : (
+                <div
+                  className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
+                  aria-hidden="true"
+                >
+                  <span className="text-xs font-bold text-white">
+                    {getInitials(messageUsername)}
+                  </span>
+                </div>
+              );
+
+              return (
+                <li
+                  key={msg.id}
+                  className={`flex gap-3 ${
+                    isOwnMessage ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {!isOwnMessage && avatar}
+
+                  <div
+                    className={`flex max-w-[82%] flex-col ${
+                      isOwnMessage
+                        ? "items-end text-right"
+                        : "items-start text-left"
+                    }`}
+                  >
+                    <div className="mb-1 flex max-w-full items-center gap-2">
+                      <span className="truncate text-xs font-semibold text-gray-700">
+                        {messageUsername}
+                      </span>
+
+                      <span className="text-[11px] text-gray-500">
+                        {formatMessageTime(msg.createdAt)}
+                      </span>
+                    </div>
+
+                    <p
+                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
+                        isOwnMessage
+                          ? "rounded-br-sm bg-primary text-white"
+                          : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
+                      }`}
+                    >
+                      {msg.message}
+                    </p>
+                  </div>
+
+                  {isOwnMessage && avatar}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <form
+        onSubmit={handleSendMessage}
+        className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
+        aria-label="Formulario para enviar mensajes"
+      >
+        <label htmlFor="chat-message" className="sr-only">
+          Escribe un mensaje para enviarlo al chat de la sala
+        </label>
+
+        <p id="chat-message-help" className="sr-only">
+          Escribe tu mensaje y presiona Enter o el botón enviar.
+        </p>
+
+        <div className="flex items-end gap-2">
+          <input
+            type="text"
+            id="chat-message"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Escribe un mensaje..."
+            aria-describedby="chat-message-help"
+            disabled={!isConnected}
+            className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+          />
+
+          <button
+            type="submit"
+            disabled={!message.trim() || !isConnected}
+            className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={
+              isConnected
+                ? message.trim()
+                  ? "Enviar mensaje"
+                  : "Escribe un mensaje antes de enviar"
+                : "Conecta a la sala antes de enviar mensajes"
+            }
+          >
+            <Send className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+    </>
+  );
+
   if (isLoadingRoom) {
     return (
       <section
@@ -1154,14 +1524,14 @@ export function ActiveRoom() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
       <header className="flex-shrink-0 border-b border-gray-700 bg-gray-900/90 shadow-lg backdrop-blur-sm">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-10 sm:py-6 lg:px-12">
           <div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-white sm:text-2xl">
               {room?.name || "Sala de estudio"}
             </h1>
 
-            <div className="mt-1 flex flex-wrap items-center gap-4">
-              <p className="text-sm text-gray-400">ID: {roomId}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 sm:mt-1.5 sm:gap-4">
+              <p className="text-sm font-medium text-gray-400">ID: {roomId}</p>
 
               <button
                 type="button"
@@ -1176,23 +1546,23 @@ export function ActiveRoom() {
                 {copied ? (
                   <>
                     <Check className="h-4 w-4" aria-hidden="true" />
-                    ID copiado
+                    <span className="hidden sm:inline">ID copiado</span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-4 w-4" aria-hidden="true" />
-                    Copiar ID
+                    <span className="hidden sm:inline">Copiar ID</span>
                   </>
                 )}
               </button>
 
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="flex items-center gap-1.5 text-sm text-gray-400 sm:gap-2">
                 <Users className="h-4 w-4" aria-hidden="true" />
-                <span>{participants.length} participantes</span>
+                <span>{participants.length}<span className="hidden sm:inline"> participantes</span></span>
               </div>
 
               <div
-                className={`flex items-center gap-2 text-sm ${
+                className={`flex items-center gap-1.5 text-sm sm:gap-2 ${
                   isConnected ? "text-green-400" : "text-gray-400"
                 }`}
                 role="status"
@@ -1201,27 +1571,17 @@ export function ActiveRoom() {
                 {isConnected ? (
                   <>
                     <Wifi className="h-4 w-4" aria-hidden="true" />
-                    {connectionStatus}
+                    <span className="hidden sm:inline">{connectionStatus}</span>
                   </>
                 ) : (
                   <>
                     <WifiOff className="h-4 w-4" aria-hidden="true" />
-                    {connectionStatus}
+                    <span className="hidden sm:inline">{connectionStatus}</span>
                   </>
                 )}
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleLeaveRoom}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-2.5 font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:w-auto"
-            aria-label="Salir de la sala"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            Salir
-          </button>
         </div>
       </header>
 
@@ -1240,7 +1600,12 @@ export function ActiveRoom() {
           className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div
+            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-y-auto pr-1 sm:gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
+            }}
+          >
             {participants.length === 0 ? (
               <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
                 <div>
@@ -1259,185 +1624,204 @@ export function ActiveRoom() {
                 </div>
               </div>
             ) : (
-              participants.map((participant, index) => {
-                const participantName = getParticipantName(participant);
-                const isCurrentUser = participant.uid === user?.uid;
-
-                return (
-                  <div
-                    key={participant.uid}
-                    className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
-                      participant.isSpeaking
-                        ? "ring-4 ring-green-500 shadow-green-500/50"
-                        : "ring-2 ring-gray-700"
-                    }`}
-                    aria-label={`${participantName}${
-                      participant.isSpeaking ? " - hablando" : ""
-                    }`}
+              <AnimatePresence mode="popLayout">
+                {visibleParticipants.map((p, i) => {
+                  const gridColumn = isSm && participants.length === 5
+                    ? i < 3 ? "span 2" : "span 3"
+                    : undefined;
+                  return renderParticipantTile(p, i, gridColumn);
+                })}
+                {showOverflow && (
+                  <motion.div
+                    key="overflow"
+                    layout
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
                   >
-                    <div className="flex h-full min-h-[280px] items-center justify-center">
-                      <div className="text-center">
-                        {participant.photoURL ? (
-                          <img
-                            src={participant.photoURL}
-                            alt=""
-                            className="mx-auto mb-4 h-32 w-32 rounded-full object-cover shadow-2xl"
-                          />
-                        ) : (
-                          <div
-                            className={`mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${getParticipantGradient(
-                              index
-                            )} shadow-2xl`}
-                            aria-hidden="true"
-                          >
-                            <span className="text-4xl font-bold text-white">
-                              {getInitials(participantName)}
-                            </span>
-                          </div>
-                        )}
-
-                        <p className="text-lg font-semibold text-white">
-                          {isCurrentUser ? "Tú" : participantName}
-                        </p>
-
-                        {participant.isHost && (
-                          <p className="mt-1 text-sm font-medium text-primary-200">
-                            Anfitrión
-                          </p>
-                        )}
-
-                        {participant.isSpeaking && (
-                          <div className="mt-2 flex items-center justify-center gap-2">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                            <span className="text-sm font-medium text-green-400">
-                              Hablando
-                            </span>
+                    <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+                      <div className="flex items-center justify-center">
+                        <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
+                          {renderOverflowAvatar(
+                            sortedParticipants[overflowVisibleCount],
+                            overflowVisibleCount
+                          )}
+                        </div>
+                        {sortedParticipants.length > overflowVisibleCount + 1 && (
+                          <div>
+                            {renderOverflowAvatar(
+                              sortedParticipants[overflowVisibleCount + 1],
+                              overflowVisibleCount + 1
+                            )}
                           </div>
                         )}
                       </div>
+                      <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                        +{sortedParticipants.length - overflowVisibleCount} más
+                      </p>
                     </div>
-
-                    {isCurrentUser && (
-                      <div className="absolute right-4 top-4 flex gap-2">
-                        <span
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
-                            isCameraOn
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-700 text-gray-300"
-                          }`}
-                        >
-                          CAM {isCameraOn ? "ON" : "OFF"}
-                        </span>
-
-                        <span
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
-                            isMicOn
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-700 text-gray-300"
-                          }`}
-                        >
-                          MIC {isMicOn ? "ON" : "OFF"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                  </motion.div>
+                )}
+              </AnimatePresence>
             )}
           </div>
 
-          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-sm sm:p-6">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4">
+            <div className="flex items-center justify-center gap-2 sm:gap-3">
+              {/* Camera */}
               <button
                 type="button"
                 onClick={() => setIsCameraOn((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isCameraOn
                     ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isCameraOn}
                 aria-label={isCameraOn ? "Apagar cámara" : "Encender cámara"}
-                title={isCameraOn ? "Apagar cámara" : "Encender cámara"}
               >
                 {isCameraOn ? (
-                  <Video className="h-6 w-6" aria-hidden="true" />
+                  <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <VideoOff className="h-6 w-6" aria-hidden="true" />
+                  <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Mic */}
               <button
                 type="button"
                 onClick={() => setIsMicOn((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isMicOn
                     ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isMicOn}
-                aria-label={
-                  isMicOn ? "Silenciar micrófono" : "Activar micrófono"
-                }
-                title={isMicOn ? "Silenciar micrófono" : "Activar micrófono"}
+                aria-label={isMicOn ? "Silenciar micrófono" : "Activar micrófono"}
               >
                 {isMicOn ? (
-                  <Mic className="h-6 w-6" aria-hidden="true" />
+                  <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <MicOff className="h-6 w-6" aria-hidden="true" />
+                  <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Share screen */}
               <button
                 type="button"
                 onClick={() => setIsScreenSharing((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isScreenSharing
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isScreenSharing}
-                aria-label={
-                  isScreenSharing
-                    ? "Dejar de compartir pantalla"
-                    : "Compartir pantalla"
-                }
-                title={
-                  isScreenSharing
-                    ? "Dejar de compartir pantalla"
-                    : "Compartir pantalla"
-                }
+                aria-label={isScreenSharing ? "Dejar de compartir pantalla" : "Compartir pantalla"}
               >
                 {isScreenSharing ? (
-                  <Monitor className="h-6 w-6" aria-hidden="true" />
+                  <ScreenShare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <MonitorOff className="h-6 w-6" aria-hidden="true" />
+                  <ScreenShareOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Chat — mobile only */}
+              <div className="relative lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => { setIsChatOpen((value) => !value); setUnreadCount(0); }}
+                  className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                    isChatOpen
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                  aria-pressed={isChatOpen}
+                  aria-label={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+                >
+                  <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                </button>
+                {unreadCount > 0 && !isChatOpen && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white sm:h-6 sm:w-6 sm:text-sm">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </div>
+
+              {/* Leave call */}
               <button
                 type="button"
-                className="cursor-pointer rounded-xl bg-gray-700 p-3 text-gray-300 shadow-lg transition hover:bg-gray-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4"
-                aria-label="Configuración"
-                title="Configuración"
+                onClick={handleLeaveRoom}
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-red-600 text-white shadow-lg transition hover:bg-red-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14"
+                aria-label="Salir de la sala"
               >
-                <SettingsIcon className="h-6 w-6" aria-hidden="true" />
+                <Phone className="h-6 w-6 rotate-[135deg] sm:h-7 sm:w-7" aria-hidden="true" />
               </button>
             </div>
           </div>
         </main>
 
+        {/* Mobile chat overlay (< lg) */}
         <div
-          className={`relative min-h-0 flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none ${
+          className={`fixed inset-0 z-50 flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:hidden ${
+            isChatOpen ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+          aria-hidden={!isChatOpen}
+        >
+          <div
+            className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={() => { setIsChatOpen(false); setUnreadCount(0); }}
+            aria-hidden="true"
+          />
+          <div
+            className={`relative z-10 mt-auto flex max-h-[75vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl transition-all duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+              <div className="flex-shrink-0 bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2
+                      id="chat-title-mobile"
+                      className="mb-1 text-xl font-bold text-white"
+                    >
+                      Chat de la sala
+                    </h2>
+                    <p className="text-sm text-primary-100">
+                      {participants.length === 1
+                        ? "1 participante conectado"
+                        : `${participants.length} participantes conectados`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsChatOpen(false); setUnreadCount(0); }}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+                    aria-label="Cerrar chat"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              {renderChatContent()}
+            </div>
+          </div>
+
+        {/* Desktop chat sidebar (lg+) */}
+        <div
+          className={`relative hidden min-h-0 flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none lg:block ${
             isChatOpen
-              ? "h-[42vh] w-full lg:h-full lg:w-96"
-              : "h-0 w-full lg:h-full lg:w-0"
+              ? "lg:h-full lg:w-96"
+              : "lg:h-full lg:w-0"
           }`}
         >
           <button
             type="button"
             onClick={() => setIsChatOpen((value) => !value)}
-            className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-2xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
+            className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-1xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
             aria-label={
               isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
             }
@@ -1498,194 +1882,7 @@ export function ActiveRoom() {
                     </div>
                   </div>
                 </div>
-
-                <div
-                  ref={chatMessagesContainerRef}
-                  className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
-                  role="log"
-                  aria-live="polite"
-                  aria-relevant="additions text"
-                  aria-label="Mensajes del chat de la sala"
-                >
-                  {chatStatus === "loading" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div
-                        className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        <Loader2
-                          className="mx-auto h-8 w-8 animate-spin text-primary"
-                          aria-hidden="true"
-                        />
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          Cargando historial del chat...
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          Estamos recuperando los mensajes anteriores de la sala.
-                        </p>
-                      </div>
-                    </div>
-                  ) : chatStatus === "error" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div
-                        className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
-                        role="alert"
-                      >
-                        <AlertCircle
-                          className="mx-auto h-8 w-8 text-red-600"
-                          aria-hidden="true"
-                        />
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          No pudimos cargar el historial
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          {chatHistoryError}
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={handleRetryChatHistory}
-                          className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                        >
-                          Reintentar
-                        </button>
-                      </div>
-                    </div>
-                  ) : chatStatus === "empty" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
-                        <div
-                          className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
-                          aria-hidden="true"
-                        >
-                          <MessageSquare className="h-6 w-6" />
-                        </div>
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          Aún no hay mensajes
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          Escribe el primer mensaje para iniciar la conversación.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <ul className="space-y-4">
-                      {chatMessages.map((msg) => {
-                        const isOwnMessage =
-                          msg.senderUid === user?.uid ||
-                          msg.senderName === currentUsername;
-                        const messageUsername = getMessageUsername(msg);
-                        const messageAvatar = getMessageAvatar(msg);
-                        const avatar = messageAvatar ? (
-                          <img
-                            src={messageAvatar}
-                            alt=""
-                            className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover shadow-md"
-                          />
-                        ) : (
-                          <div
-                            className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
-                            aria-hidden="true"
-                          >
-                            <span className="text-xs font-bold text-white">
-                              {getInitials(messageUsername)}
-                            </span>
-                          </div>
-                        );
-
-                        return (
-                          <li
-                            key={msg.id}
-                            className={`flex gap-3 ${
-                              isOwnMessage ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            {!isOwnMessage && avatar}
-
-                            <div
-                              className={`flex max-w-[82%] flex-col ${
-                                isOwnMessage
-                                  ? "items-end text-right"
-                                  : "items-start text-left"
-                              }`}
-                            >
-                              <div className="mb-1 flex max-w-full items-center gap-2">
-                                <span className="truncate text-xs font-semibold text-gray-700">
-                                  {messageUsername}
-                                </span>
-
-                                <span className="text-[11px] text-gray-500">
-                                  {formatMessageTime(msg.createdAt)}
-                                </span>
-                              </div>
-
-                              <p
-                                className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
-                                  isOwnMessage
-                                    ? "rounded-br-sm bg-primary text-white"
-                                    : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
-                                }`}
-                              >
-                                {msg.message}
-                              </p>
-                            </div>
-
-                            {isOwnMessage && avatar}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                <form
-                  onSubmit={handleSendMessage}
-                  className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
-                  aria-label="Formulario para enviar mensajes"
-                >
-                  <label htmlFor="chat-message" className="sr-only">
-                    Escribe un mensaje para enviarlo al chat de la sala
-                  </label>
-
-                  <p id="chat-message-help" className="sr-only">
-                    Escribe tu mensaje y presiona Enter o el botón enviar.
-                  </p>
-
-                  <div className="flex items-end gap-2">
-                    <input
-                      type="text"
-                      id="chat-message"
-                      value={message}
-                      onChange={(event) => setMessage(event.target.value)}
-                      placeholder="Escribe un mensaje..."
-                      aria-describedby="chat-message-help"
-                      disabled={!isConnected}
-                      className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={!message.trim() || !isConnected}
-                      className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                      aria-label={
-                        isConnected
-                          ? message.trim()
-                            ? "Enviar mensaje"
-                            : "Escribe un mensaje antes de enviar"
-                          : "Conecta a la sala antes de enviar mensajes"
-                      }
-                    >
-                      <Send className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </form>
+                {renderChatContent()}
               </>
             )}
           </aside>
