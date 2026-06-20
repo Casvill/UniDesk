@@ -43,9 +43,11 @@ const rooms = new Map<string, Map<string, UserInfo>>();
 const activePeerConnections = new Map<string, Set<string>>();
 
 // Helper to get array of users in a room
-function getParticipantsInRoom(roomId: string): UserInfo[] {
+function getParticipantsInRoom(roomId: string): (UserInfo & { socketId: string })[] {
   const roomUsers = rooms.get(roomId);
-  return roomUsers ? Array.from(roomUsers.values()) : [];
+  return roomUsers
+    ? Array.from(roomUsers.entries()).map(([socketId, info]) => ({ ...info, socketId }))
+    : [];
 }
 
 io.on("connection", (socket: AuthenticatedSocket) => {
