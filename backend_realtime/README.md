@@ -86,9 +86,9 @@ Los desarrolladores pueden usar estos logs en consola para diagnosticar por qué
 
 ---
 
-## Arquitectura de Señalización WebRTC (Resumen)
+## Arquitectura de Señalización WebRTC 
 
-Para una explicación detallada del flujo de negociación SDP, intercambio de candidatos ICE trickle, eventos de señalización personalizados (como `peer-closed` para fallas del canal y eventos de audio/video como `user-muted`) y diagramas de secuencia interactivos de Mermaid.js, consulte la documentación técnica oficial:
+Para una explicación detallada del flujo de negociación SDP, intercambio de candidatos ICE trickle, eventos de señalización personalizados (como `peer-closed` para fallas del canal y eventos de audio/video como `user-muted`) y diagramas de secuencia interactivos de Mermaid.js, puedes ver este documento:
 
 👉 **[docs/WEBRTC_SIGNALING.md](docs/WEBRTC_SIGNALING.md)**
 
