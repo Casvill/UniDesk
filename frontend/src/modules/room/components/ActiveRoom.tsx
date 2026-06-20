@@ -67,6 +67,7 @@ export function ActiveRoom() {
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -685,8 +686,33 @@ export function ActiveRoom() {
       )
     );
 
-    localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = isMicOn; });
-    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = isCameraOn; });
+    if (isCameraOn) {
+      const videoTracks = localStreamRef.current?.getVideoTracks();
+      if (!videoTracks || videoTracks.length === 0) {
+        if (!retryingMediaRef.current.has("video")) {
+          retryingMediaRef.current.add("video");
+          retryMedia("video").finally(() => retryingMediaRef.current.delete("video"));
+        }
+      } else {
+        videoTracks.forEach((t) => { t.enabled = true; });
+      }
+    } else {
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = false; });
+    }
+
+    if (isMicOn) {
+      const audioTracks = localStreamRef.current?.getAudioTracks();
+      if (!audioTracks || audioTracks.length === 0) {
+        if (!retryingMediaRef.current.has("audio")) {
+          retryingMediaRef.current.add("audio");
+          retryMedia("audio").finally(() => retryingMediaRef.current.delete("audio"));
+        }
+      } else {
+        audioTracks.forEach((t) => { t.enabled = true; });
+      }
+    } else {
+      localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = false; });
+    }
 
     const socket = socketRef.current;
     if (!socket) return;

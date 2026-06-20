@@ -23,6 +23,12 @@ export function useMedia(
     setMediaInitStatus("initializing");
 
     async function requestDevice(kind: "audio" | "video") {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+        if (kind === "audio") audioDone = true;
+        else videoDone = true;
+        return;
+      }
       try {
         const constraints = kind === "audio" ? { audio: true } : { video: true };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -76,6 +82,11 @@ export function useMedia(
   }, []);
 
   const retryMedia = useCallback(async (kind: "audio" | "video") => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+      return;
+    }
+
     const constraints = kind === "audio" ? { audio: true } : { video: true };
 
     const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
@@ -91,6 +102,8 @@ export function useMedia(
       } else {
         localStreamRef.current = stream;
       }
+      const shouldEnable = kind === "audio" ? isMicOn : isCameraOn;
+      stream.getTracks().forEach((t) => { t.enabled = shouldEnable; });
       setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
       setMediaInitStatus("ready");
     } catch (err) {
@@ -106,7 +119,7 @@ export function useMedia(
         setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
       }
     }
-  }, []);
+  }, [isMicOn, isCameraOn]);
 
   useEffect(() => {
     const stream = localStreamRef.current;
