@@ -150,6 +150,8 @@ export function ActiveRoom() {
     const isCurrent = p.uid === user?.uid;
     const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? true;
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? true;
+    const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
+    const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
 
     return (
       <motion.div
@@ -176,6 +178,17 @@ export function ActiveRoom() {
             ref={(el) => {
               if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
                 el.srcObject = localStreamRef.current;
+              }
+            }}
+          />
+        ) : !isCurrent && camOn && remoteStream ? (
+          <video
+            autoPlay
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+            ref={(el) => {
+              if (el && remoteStream && el.srcObject !== remoteStream) {
+                el.srcObject = remoteStream;
               }
             }}
           />
