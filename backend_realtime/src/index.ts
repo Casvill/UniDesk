@@ -39,6 +39,9 @@ const PORT = process.env.PORT || process.env.REALTIME_PORT || 3001;
 // Map<roomId, Map<socketId, UserInfo>> — shared with signaling relays.
 const rooms = new Map<string, Map<string, UserInfo>>();
 
+// ponytail: Design and implement a data structure to track multiple WebRTC peer connections per participant
+const activePeerConnections = new Map<string, Set<string>>();
+
 // Helper to get array of users in a room
 function getParticipantsInRoom(roomId: string): UserInfo[] {
   const roomUsers = rooms.get(roomId);
@@ -262,6 +265,13 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!v.ok) { rejectRelay("send-offer", v.reason, data?.to, true); return; }
     const payload = data?.sdp;
     if (payload === undefined) { rejectRelay("send-offer", "missing-payload", v.target, true); return; }
+
+    // ponytail: Associate/map active peer connections directly to connected user sessions (Socket IDs)
+    if (!activePeerConnections.has(socket.id)) activePeerConnections.set(socket.id, new Set());
+    activePeerConnections.get(socket.id)!.add(v.target);
+    if (!activePeerConnections.has(v.target)) activePeerConnections.set(v.target, new Set());
+    activePeerConnections.get(v.target)!.add(socket.id);
+
     io.to(v.target).emit("receive-offer", { from: socket.id, sdp: payload });
     sigLog(`offer relayed ${socket.id} -> ${v.target}`);
   });
@@ -302,6 +312,18 @@ io.on("connection", (socket: AuthenticatedSocket) => {
         }
         break;
       }
+    }
+
+    // ponytail: Dynamic destruction and state purging of peer references when a user leaves/disconnects
+    const connectedPeers = activePeerConnections.get(socketId);
+    if (connectedPeers) {
+      for (const peerId of connectedPeers) {
+        activePeerConnections.get(peerId)?.delete(socketId);
+        if (activePeerConnections.get(peerId)?.size === 0) {
+          activePeerConnections.delete(peerId);
+        }
+      }
+      activePeerConnections.delete(socketId);
     }
 
     if (roomIdToNotify && leftUser) {
