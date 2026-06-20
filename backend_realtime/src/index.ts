@@ -53,12 +53,12 @@ function getParticipantsInRoom(roomId: string): (UserInfo & { socketId: string }
 io.on("connection", (socket: AuthenticatedSocket) => {
   console.log("Usuario conectado:", socket.id, "UID:", socket.user?.uid);
 
-  socket.on("join-room", (data: { roomId: string }) => {
+  socket.on("join-room", (data: { roomId: string; microphoneEnabled?: boolean; cameraEnabled?: boolean }) => {
     if (!socket.user) {
       return;
     }
 
-    const { roomId } = data;
+    const { roomId, microphoneEnabled, cameraEnabled } = data;
     const { uid, name, email } = socket.user;
     const username = name || email || "Anonymous";
     
@@ -71,8 +71,8 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       username, 
       roomId, 
       avatar: (socket.user as any).picture,
-      audioEnabled: true, // ponytail: default media states on join
-      videoEnabled: true
+      microphoneEnabled: microphoneEnabled ?? false,
+      cameraEnabled: cameraEnabled ?? false,
     });
     
     socket.join(roomId);
@@ -309,7 +309,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!roomId) return;
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
-      user.audioEnabled = false;
+      user.microphoneEnabled = false;
       socket.to(roomId).emit("user-muted", { socketId: socket.id, uid: user.uid });
     }
   });
@@ -319,7 +319,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!roomId) return;
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
-      user.audioEnabled = true;
+      user.microphoneEnabled = true;
       socket.to(roomId).emit("user-unmuted", { socketId: socket.id, uid: user.uid });
     }
   });
@@ -329,7 +329,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!roomId) return;
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
-      user.videoEnabled = true;
+      user.cameraEnabled = true;
       socket.to(roomId).emit("camera-on", { socketId: socket.id, uid: user.uid });
     }
   });
@@ -339,12 +339,10 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (!roomId) return;
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
-      user.videoEnabled = false;
+      user.cameraEnabled = false;
       socket.to(roomId).emit("camera-off", { socketId: socket.id, uid: user.uid });
     }
   });
-
-
 
   const handleLeaveRoom = (socketId: string) => {
     // ponytail: Wrap in try-catch to prevent a single peer leave failure from crashing the server
