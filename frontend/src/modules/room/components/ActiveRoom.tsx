@@ -742,13 +742,16 @@ export function ActiveRoom() {
   }, [roomId, user]);
 
   function createPeerConnection(socketId: string): RTCPeerConnection {
+    console.log("[WebRTC] createPeerConnection for", socketId);
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
     localStreamRef.current?.getTracks().forEach((track) => {
+      console.log("[WebRTC] adding local track", track.kind, "to", socketId);
       pc.addTrack(track, localStreamRef.current!);
     });
 
     pc.ontrack = ({ streams }) => {
+      console.log("[WebRTC] ontrack from", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
       setRemoteStreams((prev) => {
         const next = new Map(prev);
         next.set(socketId, streams[0]);
@@ -758,6 +761,7 @@ export function ActiveRoom() {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
+        console.log("[WebRTC] ICE candidate from", socketId);
         socketRef.current?.emit("send-ice-candidate", {
           to: socketId,
           candidate: e.candidate.toJSON(),
@@ -766,8 +770,10 @@ export function ActiveRoom() {
     };
 
     pc.onnegotiationneeded = async () => {
+      console.log("[WebRTC] negotiationneeded for", socketId);
       try {
         await pc.setLocalDescription(await pc.createOffer());
+        console.log("[WebRTC] sending offer to", socketId);
         socketRef.current?.emit("send-offer", {
           to: socketId,
           sdp: pc.localDescription,
@@ -778,6 +784,7 @@ export function ActiveRoom() {
     };
 
     pc.onconnectionstatechange = () => {
+      console.log("[WebRTC] connection state for", socketId, ":", pc.connectionState);
       if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
         closePeerConnection(socketId);
       }
@@ -1151,6 +1158,7 @@ export function ActiveRoom() {
         });
 
         socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
+          console.log("[WebRTC] user-joined:", payload.socketId, payload.user.uid);
           socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
           if (payload.user.uid === user.uid) return;
           if (peerConnectionsRef.current.has(payload.socketId)) return;
@@ -1162,6 +1170,7 @@ export function ActiveRoom() {
         });
 
         socket.on("receive-offer", async (payload: { from: string; sdp: unknown }) => {
+          console.log("[WebRTC] receive-offer from", payload.from);
           let pc = peerConnectionsRef.current.get(payload.from);
           if (!pc) {
             pc = createPeerConnection(payload.from);
@@ -1180,6 +1189,7 @@ export function ActiveRoom() {
         });
 
         socket.on("receive-answer", async (payload: { from: string; sdp: unknown }) => {
+          console.log("[WebRTC] receive-answer from", payload.from);
           const pc = peerConnectionsRef.current.get(payload.from);
           if (!pc) return;
           try {
@@ -1192,6 +1202,7 @@ export function ActiveRoom() {
         socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
           const pc = peerConnectionsRef.current.get(payload.from);
           if (!pc || !pc.remoteDescription) return;
+          console.log("[WebRTC] receive-ice-candidate from", payload.from);
           try {
             await pc.addIceCandidate(new RTCIceCandidate(payload.candidate as RTCIceCandidateInit));
           } catch (err) {
@@ -1200,6 +1211,7 @@ export function ActiveRoom() {
         });
 
         socket.on("peer-disconnected", (payload: { socketId: string }) => {
+          console.log("[WebRTC] peer-disconnected:", payload.socketId);
           closePeerConnection(payload.socketId, false);
         });
       } catch (error) {
