@@ -27,16 +27,16 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
   }
 
   function createPeerConnection(socketId: string, socket: Socket): RTCPeerConnection {
-    console.log("[WebRTC] createPeerConnection for", socketId);
+    console.log("[WebRTC] crear conexión peer para", socketId);
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
     localStreamRef.current?.getTracks().forEach((track) => {
-      console.log("[WebRTC] adding local track", track.kind, "to", socketId);
+      console.log("[WebRTC] agregando track local", track.kind, "a", socketId);
       pc.addTrack(track, localStreamRef.current!);
     });
 
     pc.ontrack = ({ streams }) => {
-      console.log("[WebRTC] ontrack from", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
+      console.log("[WebRTC] track remoto de", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
       setRemoteStreams((prev) => {
         const next = new Map(prev);
         next.set(socketId, streams[0]);
@@ -46,7 +46,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        console.log("[WebRTC] ICE candidate from", socketId);
+        console.log("[WebRTC] ICE candidate de", socketId);
         socket.emit("send-ice-candidate", {
           to: socketId,
           candidate: e.candidate.toJSON(),
@@ -55,21 +55,21 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     };
 
     pc.onnegotiationneeded = async () => {
-      console.log("[WebRTC] negotiationneeded for", socketId);
+      console.log("[WebRTC] negociación necesaria para", socketId);
       try {
         await pc.setLocalDescription(await pc.createOffer());
-        console.log("[WebRTC] sending offer to", socketId);
+        console.log("[WebRTC] enviando offer a", socketId);
         socket.emit("send-offer", {
           to: socketId,
           sdp: pc.localDescription,
         });
       } catch (err) {
-        console.error("Error creating offer:", err);
+        console.error("Error al crear offer:", err);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log("[WebRTC] connection state for", socketId, ":", pc.connectionState);
+      console.log("[WebRTC] estado de conexión para", socketId, ":", pc.connectionState);
       if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
         closePeerConnection(socketId, socket);
       }
@@ -81,7 +81,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
   function registerWebRTCEventHandlers(socket: Socket, currentUserUid: string) {
     socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
-      console.log("[WebRTC] user-joined:", payload.socketId, payload.user.uid);
+      console.log("[WebRTC] usuario conectado:", payload.socketId, payload.user.uid);
       socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
       if (payload.user.uid === currentUserUid) return;
       if (peerConnectionsRef.current.has(payload.socketId)) return;
@@ -93,7 +93,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     });
 
     socket.on("receive-offer", async (payload: { from: string; sdp: unknown }) => {
-      console.log("[WebRTC] receive-offer from", payload.from);
+      console.log("[WebRTC] offer recibido de", payload.from);
       let pc = peerConnectionsRef.current.get(payload.from);
       if (!pc) {
         pc = createPeerConnection(payload.from, socket);
@@ -107,34 +107,34 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
           sdp: pc.localDescription,
         });
       } catch (err) {
-        console.error("Error handling offer:", err);
+        console.error("Error al procesar offer:", err);
       }
     });
 
     socket.on("receive-answer", async (payload: { from: string; sdp: unknown }) => {
-      console.log("[WebRTC] receive-answer from", payload.from);
+      console.log("[WebRTC] answer recibido de", payload.from);
       const pc = peerConnectionsRef.current.get(payload.from);
       if (!pc) return;
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
       } catch (err) {
-        console.error("Error handling answer:", err);
+        console.error("Error al procesar answer:", err);
       }
     });
 
     socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
       const pc = peerConnectionsRef.current.get(payload.from);
       if (!pc || !pc.remoteDescription) return;
-      console.log("[WebRTC] receive-ice-candidate from", payload.from);
+      console.log("[WebRTC] ICE candidate recibido de", payload.from);
       try {
         await pc.addIceCandidate(new RTCIceCandidate(payload.candidate as RTCIceCandidateInit));
       } catch (err) {
-        console.error("Error adding ICE candidate:", err);
+        console.error("Error al agregar ICE candidate:", err);
       }
     });
 
     socket.on("peer-disconnected", (payload: { socketId: string }) => {
-      console.log("[WebRTC] peer-disconnected:", payload.socketId);
+      console.log("[WebRTC] peer desconectado:", payload.socketId);
       closePeerConnection(payload.socketId, null, false);
     });
   }
