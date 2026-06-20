@@ -33,6 +33,10 @@ import { AnimatePresence, motion } from "motion/react";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+};
+
 interface RoomParticipant {
   uid: string;
   username?: string;
@@ -44,6 +48,7 @@ interface RoomParticipant {
   cameraEnabled?: boolean;
   microphoneEnabled?: boolean;
   screenSharing?: boolean;
+  socketId?: string;
 }
 
 interface ChatMessage {
@@ -523,6 +528,8 @@ export function ActiveRoom() {
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const socketIdByUidRef = useRef<Map<string, string>>(new Map());
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -545,6 +552,7 @@ export function ActiveRoom() {
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
   }>({ audio: "prompt", video: "prompt" });
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -733,6 +741,68 @@ export function ActiveRoom() {
     void loadRoom();
   }, [roomId, user]);
 
+  function createPeerConnection(socketId: string): RTCPeerConnection {
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+
+    localStreamRef.current?.getTracks().forEach((track) => {
+      pc.addTrack(track, localStreamRef.current!);
+    });
+
+    pc.ontrack = ({ streams }) => {
+      setRemoteStreams((prev) => {
+        const next = new Map(prev);
+        next.set(socketId, streams[0]);
+        return next;
+      });
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socketRef.current?.emit("send-ice-candidate", {
+          to: socketId,
+          candidate: e.candidate.toJSON(),
+        });
+      }
+    };
+
+    pc.onnegotiationneeded = async () => {
+      try {
+        await pc.setLocalDescription(await pc.createOffer());
+        socketRef.current?.emit("send-offer", {
+          to: socketId,
+          sdp: pc.localDescription,
+        });
+      } catch (err) {
+        console.error("Error creating offer:", err);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        closePeerConnection(socketId);
+      }
+    };
+
+    peerConnectionsRef.current.set(socketId, pc);
+    return pc;
+  }
+
+  function closePeerConnection(socketId: string, notifyPeer = true) {
+    const pc = peerConnectionsRef.current.get(socketId);
+    if (pc) {
+      pc.close();
+      peerConnectionsRef.current.delete(socketId);
+    }
+    setRemoteStreams((prev) => {
+      const next = new Map(prev);
+      next.delete(socketId);
+      return next;
+    });
+    if (notifyPeer) {
+      socketRef.current?.emit("peer-closed", { to: socketId });
+    }
+  }
+
   useEffect(() => {
     if (!roomId || !user || !room) return;
 
@@ -905,6 +975,12 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
+            currentParticipants.forEach((p) => {
+              if (p.socketId && p.uid) {
+                socketIdByUidRef.current.set(p.uid, p.socketId);
+              }
+            });
+
             setParticipants((previousParticipants) =>
               currentParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
@@ -1073,6 +1149,59 @@ export function ActiveRoom() {
             )
           );
         });
+
+        socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
+          socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
+          if (payload.user.uid === user.uid) return;
+          if (peerConnectionsRef.current.has(payload.socketId)) return;
+          createPeerConnection(payload.socketId);
+        });
+
+        socket.on("user-left", (payload: { socketId: string }) => {
+          closePeerConnection(payload.socketId);
+        });
+
+        socket.on("receive-offer", async (payload: { from: string; sdp: unknown }) => {
+          let pc = peerConnectionsRef.current.get(payload.from);
+          if (!pc) {
+            pc = createPeerConnection(payload.from);
+          }
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socketRef.current?.emit("send-answer", {
+              to: payload.from,
+              sdp: pc.localDescription,
+            });
+          } catch (err) {
+            console.error("Error handling offer:", err);
+          }
+        });
+
+        socket.on("receive-answer", async (payload: { from: string; sdp: unknown }) => {
+          const pc = peerConnectionsRef.current.get(payload.from);
+          if (!pc) return;
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
+          } catch (err) {
+            console.error("Error handling answer:", err);
+          }
+        });
+
+        socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
+          const pc = peerConnectionsRef.current.get(payload.from);
+          if (!pc || !pc.remoteDescription) return;
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate as RTCIceCandidateInit));
+          } catch (err) {
+            console.error("Error adding ICE candidate:", err);
+          }
+        });
+
+        socket.on("peer-disconnected", (payload: { socketId: string }) => {
+          closePeerConnection(payload.socketId, false);
+        });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -1084,6 +1213,10 @@ export function ActiveRoom() {
     void connectSocket();
 
     return () => {
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
+      socketIdByUidRef.current.clear();
+
       if (socket) {
         socket.emit("leave-room");
         socket.disconnect();
@@ -1291,6 +1424,20 @@ export function ActiveRoom() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    peerConnectionsRef.current.forEach((pc) => {
+      const kinds = pc.getSenders().map((s) => s.track?.kind);
+      stream.getTracks().forEach((track) => {
+        if (!kinds.includes(track.kind)) {
+          pc.addTrack(track, stream);
+        }
+      });
+    });
+  }, [mediaPerms]);
 
   useEffect(() => {
     if (!isChatOpen) return;
