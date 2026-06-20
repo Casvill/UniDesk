@@ -62,5 +62,5 @@ temp/
 *.tsbuildinfo
 
 # Docs
-docs/
+# docs/
 .env*.local
