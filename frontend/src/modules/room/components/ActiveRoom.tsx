@@ -1021,6 +1021,38 @@ export function ActiveRoom() {
             setUnreadCount((prev) => prev + 1);
           }
         });
+
+        socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: false } : p
+            )
+          );
+        });
+
+        socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: false } : p
+            )
+          );
+        });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -1141,6 +1173,12 @@ export function ActiveRoom() {
           : participant
       )
     );
+
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    socket.emit(isMicOn ? "user-unmuted" : "user-muted");
+    socket.emit(isCameraOn ? "camera-on" : "camera-off");
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
