@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMediaQuery } from "@mui/material";
 import {
@@ -522,6 +522,7 @@ export function ActiveRoom() {
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -543,6 +544,7 @@ export function ActiveRoom() {
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
   }>({ audio: "prompt", video: "prompt" });
+  const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -617,6 +619,19 @@ export function ActiveRoom() {
         style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
         aria-label={`${name}${p.isSpeaking ? " - hablando" : ""}`}
       >
+        {isCurrent && camOn && localStreamRef.current?.getVideoTracks().length ? (
+          <video
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+            ref={(el) => {
+              if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                el.srcObject = localStreamRef.current;
+              }
+            }}
+          />
+        ) : null}
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
           <div className="text-center">
             {p.photoURL ? (
@@ -1188,6 +1203,10 @@ export function ActiveRoom() {
 
   useEffect(() => {
     let cancelled = false;
+    let audioDone = false;
+    let videoDone = false;
+
+    setMediaInitStatus("initializing");
 
     async function requestDevice(kind: "audio" | "video") {
       try {
@@ -1203,6 +1222,8 @@ export function ActiveRoom() {
           localStreamRef.current = stream;
         }
         setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
+        if (kind === "audio") audioDone = true;
+        else videoDone = true;
       } catch (err) {
         if (cancelled) return;
         if (err instanceof DOMException) {
@@ -1216,6 +1237,8 @@ export function ActiveRoom() {
         } else {
           setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
         }
+        if (kind === "audio") audioDone = true;
+        else videoDone = true;
       }
     }
 
@@ -1223,6 +1246,8 @@ export function ActiveRoom() {
       await requestDevice("audio");
       if (cancelled) return;
       await requestDevice("video");
+      if (cancelled) return;
+      setMediaInitStatus(audioDone && videoDone ? "ready" : "error");
     }
 
     init();
@@ -1232,6 +1257,39 @@ export function ActiveRoom() {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     };
+  }, []);
+
+  const retryMedia = useCallback(async (kind: "audio" | "video") => {
+    const constraints = kind === "audio" ? { audio: true } : { video: true };
+
+    const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
+    oldTracks.forEach((t) => {
+      t.stop();
+      localStreamRef.current?.removeTrack(t);
+    });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (localStreamRef.current) {
+        stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
+      } else {
+        localStreamRef.current = stream;
+      }
+      setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
+      setMediaInitStatus("ready");
+    } catch (err) {
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
+        } else if (err.name === "NotFoundError") {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+        } else {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
+        }
+      } else {
+        setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
+      }
+    }
   }, []);
 
   useEffect(() => {
