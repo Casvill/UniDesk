@@ -142,8 +142,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
       const pc = peerConnectionsRef.current.get(payload.from);
-      if (!pc) return;
-      if (!pc.remoteDescription) {
+      if (!pc || !pc.remoteDescription) {
         const pending = pendingIceCandidatesRef.current;
         if (!pending.has(payload.from)) {
           pending.set(payload.from, []);

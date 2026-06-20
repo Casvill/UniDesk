@@ -50,6 +50,7 @@ import {
   shouldFetchParticipantProfile,
   upsertParticipant,
 } from "@/utils/room";
+import { showToast } from "@/shared/components/ui/toast";
 import { useMedia } from "@/hooks/useMedia";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useChat } from "@/hooks/useChat";
@@ -688,6 +689,13 @@ export function ActiveRoom() {
     if (isCameraOn) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
+        if (mediaPerms.video === "denied") {
+          showToast.warning("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
+        } else if (mediaPerms.video === "unavailable") {
+          showToast.warning("No se detectó ninguna cámara en este dispositivo.");
+        } else if (mediaPerms.video === "error") {
+          showToast.warning("Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.");
+        }
         if (!retryingMediaRef.current.has("video")) {
           retryingMediaRef.current.add("video");
           retryMedia("video").finally(() => retryingMediaRef.current.delete("video"));
@@ -702,6 +710,13 @@ export function ActiveRoom() {
     if (isMicOn) {
       const audioTracks = localStreamRef.current?.getAudioTracks();
       if (!audioTracks || audioTracks.length === 0) {
+        if (mediaPerms.audio === "denied") {
+          showToast.warning("Permiso de micrófono denegado. Concede el permiso desde la configuración del navegador para usar el micrófono.");
+        } else if (mediaPerms.audio === "unavailable") {
+          showToast.warning("No se detectó ningún micrófono en este dispositivo.");
+        } else if (mediaPerms.audio === "error") {
+          showToast.warning("Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.");
+        }
         if (!retryingMediaRef.current.has("audio")) {
           retryingMediaRef.current.add("audio");
           retryMedia("audio").finally(() => retryingMediaRef.current.delete("audio"));
