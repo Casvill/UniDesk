@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMediaQuery } from "@mui/material";
 import {
@@ -17,505 +17,44 @@ import {
   ScreenShareOff,
   Phone,
   Send,
-  Settings as SettingsIcon,
-  X,
   Users,
   Video,
   VideoOff,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
 import { AnimatePresence, motion } from "motion/react";
+import type {
+  ChatMessage,
+  NewMessagePayload,
+  RoomParticipant,
+  UserProfileSummary,
+} from "@/utils/room";
+import {
+  extractPresenceUsers,
+  fetchUserProfileSummary,
+  formatMessageTime,
+  getInitials,
+  getParticipantGradient,
+  getParticipantName,
+  getPresenceAction,
+  getRoomErrorMessage,
+  mapPresenceUserToParticipant,
+  mergeProfileIntoMessage,
+  mergeProfileIntoParticipant,
+  shouldFetchMessageProfile,
+  shouldFetchParticipantProfile,
+  upsertParticipant,
+} from "@/utils/room";
+import { useMedia } from "@/hooks/useMedia";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import { useChat } from "@/hooks/useChat";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-};
-
-interface RoomParticipant {
-  uid: string;
-  username?: string;
-  displayName?: string;
-  photoURL?: string;
-  avatar?: string;
-  isHost?: boolean;
-  isSpeaking?: boolean;
-  cameraEnabled?: boolean;
-  microphoneEnabled?: boolean;
-  screenSharing?: boolean;
-  socketId?: string;
-}
-
-interface ChatMessage {
-  id: string;
-  roomId?: string;
-  senderUid: string;
-  senderName: string;
-  senderPhotoURL?: string;
-  message: string;
-  createdAt?: string;
-}
-
-type ChatStatus = "loading" | "empty" | "error" | "success";
-
-type ChatHistoryPayload = {
-  roomId?: string;
-  messages?: NewMessagePayload[];
-};
-
-type ChatHistoryErrorPayload = {
-  roomId?: string;
-  message?: string;
-};
-
-type ChatHistoryResponse = NewMessagePayload[] | ChatHistoryPayload;
-
-function extractHistoryMessages(payload: ChatHistoryResponse): NewMessagePayload[] {
-  if (Array.isArray(payload)) return payload;
-
-  return payload.messages || [];
-}
-
-type ApiError = Error & {
-  code?: string;
-  status?: number;
-};
-
-type PresenceUser = {
-  uid?: string;
-  userId?: string;
-  id?: string;
-  username?: string;
-  displayName?: string;
-  name?: string;
-  photoURL?: string;
-  picture?: string;
-  avatar?: string;
-};
-
-type PresencePayload = {
-  users?: unknown;
-  participants?: unknown;
-  onlineUsers?: unknown;
-  presence?: unknown;
-  connectedUsers?: unknown;
-  members?: unknown;
-  uid?: string;
-  userId?: string;
-  id?: string;
-  username?: string;
-  displayName?: string;
-  name?: string;
-  action?: string;
-  type?: string;
-  event?: string;
-};
-
-type NewMessagePayload = {
-  id?: string;
-  uid?: string;
-  senderUid?: string;
-  senderUsername?: string;
-  username?: string;
-  senderName?: string;
-  senderPhotoURL?: string;
-  photoURL?: string;
-  picture?: string;
-  avatar?: string;
-  content?: string;
-  message?: string;
-  createdAt?: string;
-};
-
-type UserProfileSummary = {
-  uid: string;
-  username?: string;
-  displayName?: string;
-  photoURL?: string;
-};
-
-function getStringValue(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : undefined;
-}
-
-function normalizeUserProfileResponse(
-  payload: unknown,
-  fallbackUid: string
-): UserProfileSummary | null {
-  if (!isObject(payload)) return null;
-
-  const possiblePayloads = [
-    payload,
-    payload.user,
-    payload.profile,
-    payload.data,
-  ];
-
-  for (const item of possiblePayloads) {
-    if (!isObject(item)) continue;
-
-    const uid =
-      getStringValue(item.uid) ||
-      getStringValue(item.id) ||
-      getStringValue(item.userId) ||
-      fallbackUid;
-
-    const username =
-      getStringValue(item.username) ||
-      getStringValue(item.name);
-
-    const displayName =
-      getStringValue(item.displayName) ||
-      getStringValue(item.fullName) ||
-      getStringValue(item.name) ||
-      username;
-
-    const photoURL =
-      getStringValue(item.photoURL) ||
-      getStringValue(item.photoUrl) ||
-      getStringValue(item.avatarURL) ||
-      getStringValue(item.avatarUrl) ||
-      getStringValue(item.picture) ||
-      getStringValue(item.photo);
-
-    if (username || displayName || photoURL) {
-      return {
-        uid,
-        username,
-        displayName,
-        photoURL,
-      };
-    }
-  }
-
-  return null;
-}
-
-async function fetchUserProfileSummary(uid: string, token: string) {
-  const response = await fetch(`${API_URL}/users/${encodeURIComponent(uid)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`No se pudo cargar el perfil ${uid}`);
-  }
-
-  const payload = await response.json();
-
-  return normalizeUserProfileResponse(payload, uid);
-}
-
-function shouldFetchParticipantProfile(participant: RoomParticipant) {
-  // El backend realtime puede enviar username como nombre completo.
-  // Por eso se intenta cargar una vez el perfil real por uid para priorizar el username guardado.
-  return Boolean(participant.uid);
-}
-
-function shouldFetchMessageProfile(message: ChatMessage) {
-  // Aunque el mensaje ya tenga senderUsername, puede venir como nombre completo desde Firebase Auth.
-  // Se consulta el perfil por uid para mostrar el username real en el chat.
-  return Boolean(message.senderUid);
-}
-
-function mergeProfileIntoParticipant(
-  participant: RoomParticipant,
-  userProfile?: UserProfileSummary
-): RoomParticipant {
-  if (!userProfile) return participant;
-
-  return {
-    ...participant,
-    // Siempre se prioriza el username del perfil, porque el backend puede mandar name/displayName.
-    username: userProfile.username || participant.username || userProfile.displayName,
-    displayName:
-      participant.displayName && participant.displayName !== "Usuario conectado"
-        ? participant.displayName
-        : userProfile.displayName ||
-          userProfile.username ||
-          participant.displayName,
-    photoURL: participant.photoURL || userProfile.photoURL,
-  };
-}
-
-function mergeProfileIntoMessage(
-  message: ChatMessage,
-  userProfile?: UserProfileSummary
-): ChatMessage {
-  if (!userProfile) return message;
-
-  return {
-    ...message,
-    // En el chat debe verse el username, no el nombre completo.
-    senderName:
-      userProfile.username ||
-      message.senderName ||
-      userProfile.displayName ||
-      "Usuario",
-    senderPhotoURL: message.senderPhotoURL || userProfile.photoURL,
-  };
-}
-
-function mapPayloadToChatMessage(
-  msg: NewMessagePayload,
-  fallbackRoomId?: string
-): ChatMessage | null {
-  const messageText = msg.content || msg.message || "";
-
-  if (!messageText.trim()) return null;
-
-  return {
-    id: msg.id || crypto.randomUUID(),
-    roomId: fallbackRoomId,
-    senderUid: msg.senderUid || msg.uid || "",
-    senderName:
-      msg.senderUsername ||
-      msg.username ||
-      msg.senderName ||
-      "Usuario",
-    senderPhotoURL: msg.senderPhotoURL || msg.photoURL || msg.picture || msg.avatar,
-    message: messageText,
-    createdAt: msg.createdAt || new Date().toISOString(),
-  };
-}
-
-function sortMessagesChronologically(messages: ChatMessage[]) {
-  return [...messages].sort((a, b) => {
-    const dateA = new Date(a.createdAt || "").getTime();
-    const dateB = new Date(b.createdAt || "").getTime();
-
-    return dateA - dateB;
-  });
-}
-
-function getRoomErrorMessage(error: unknown) {
-  const apiError = error as ApiError;
-
-  if (
-    apiError.code === "backend/room-not-found" ||
-    apiError.status === 404
-  ) {
-    return "No encontramos esta sala. Verifica el ID e inténtalo nuevamente.";
-  }
-
-  if (
-    apiError.code === "backend/unauthorized" ||
-    apiError.status === 401
-  ) {
-    return "Tu sesión expiró. Inicia sesión nuevamente para ingresar a la sala.";
-  }
-
-  if (apiError.code === "backend/network-error") {
-    return "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.";
-  }
-
-  return "No pudimos cargar la información de la sala.";
-}
-
-function getParticipantName(participant: RoomParticipant) {
-  return participant.username || participant.displayName || "Usuario conectado";
-}
-
-function getInitials(name: string) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return initials || "U";
-}
-
-function getParticipantGradient(index: number) {
-  const gradients = [
-    "from-blue-500 to-cyan-500",
-    "from-purple-500 to-pink-500",
-    "from-green-500 to-emerald-500",
-    "from-orange-500 to-red-500",
-    "from-primary-500 to-purple-500",
-  ];
-
-  return gradients[index % gradients.length];
-}
-
-function upsertParticipant(
-  participants: RoomParticipant[],
-  participant: RoomParticipant
-) {
-  const exists = participants.some((item) => item.uid === participant.uid);
-
-  if (exists) {
-    return participants.map((item) =>
-      item.uid === participant.uid ? { ...item, ...participant } : item
-    );
-  }
-
-  return [...participants, participant];
-}
-
-function formatMessageTime(value?: string) {
-  const date = value ? new Date(value) : new Date();
-
-  return new Intl.DateTimeFormat("es-CO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getArrayFromValue(value: unknown): unknown[] {
-  if (Array.isArray(value)) return value;
-
-  if (isObject(value)) {
-    return Object.values(value);
-  }
-
-  return [];
-}
-
-function getPresenceUsersFromObject(value: unknown): PresenceUser[] {
-  if (!isObject(value)) return [];
-
-  return Object.entries(value)
-    .map(([uid, item]) => {
-      if (typeof item === "string") {
-        return {
-          uid,
-          username: item,
-          displayName: item,
-        };
-      }
-
-      if (isObject(item)) {
-        return {
-          uid,
-          ...item,
-        } as PresenceUser;
-      }
-
-      return null;
-    })
-    .filter(Boolean) as PresenceUser[];
-}
-
-function extractPresenceUsers(data: unknown): PresenceUser[] {
-  if (Array.isArray(data)) {
-    return data.filter(isObject) as PresenceUser[];
-  }
-
-  if (!isObject(data)) return [];
-
-  const payload = data as PresencePayload;
-
-  const possibleLists = [
-    payload.users,
-    payload.participants,
-    payload.onlineUsers,
-    payload.presence,
-    payload.connectedUsers,
-    payload.members,
-  ];
-
-  for (const list of possibleLists) {
-    if (Array.isArray(list)) {
-      return list.filter(isObject) as PresenceUser[];
-    }
-
-    const usersFromObject = getPresenceUsersFromObject(list);
-
-    if (usersFromObject.length > 0) {
-      return usersFromObject;
-    }
-
-    const users = getArrayFromValue(list);
-
-    if (users.length > 0) {
-      return users.filter(isObject) as PresenceUser[];
-    }
-  }
-
-  if ("uid" in data || "userId" in data || "id" in data) {
-    return [data as PresenceUser];
-  }
-
-  return [];
-}
-
-function getPresenceAction(data: unknown) {
-  if (!isObject(data)) return "snapshot";
-
-  const payload = data as PresencePayload;
-  const action = String(payload.action || payload.type || payload.event || "")
-    .toLowerCase()
-    .trim();
-
-  if (
-    action.includes("leave") ||
-    action.includes("left") ||
-    action.includes("disconnect") ||
-    action.includes("offline")
-  ) {
-    return "leave";
-  }
-
-  if (
-    action.includes("join") ||
-    action.includes("joined") ||
-    action.includes("connect") ||
-    action.includes("online")
-  ) {
-    return "join";
-  }
-
-  if (
-    payload.users ||
-    payload.participants ||
-    payload.onlineUsers ||
-    payload.presence ||
-    payload.connectedUsers ||
-    payload.members ||
-    Array.isArray(data)
-  ) {
-    return "snapshot";
-  }
-
-  return "join";
-}
-
-function mapPresenceUserToParticipant(
-  item: PresenceUser,
-  ownerUid?: string
-): RoomParticipant | null {
-  const uid = item.uid || item.userId || item.id;
-
-  if (!uid) return null;
-
-  return {
-    uid,
-    username: item.username || item.name || item.displayName,
-    displayName:
-      item.displayName || item.username || item.name || "Usuario conectado",
-    photoURL: item.photoURL || item.picture || item.avatar,
-    isHost: ownerUid ? uid === ownerUid : false,
-    cameraEnabled: false,
-    microphoneEnabled: true,
-    screenSharing: false,
-    isSpeaking: false,
-  };
-}
 
 export function ActiveRoom() {
   const navigate = useNavigate();
@@ -526,38 +65,39 @@ export function ActiveRoom() {
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const socketIdByUidRef = useRef<Map<string, string>>(new Map());
+  const isChatOpenRef = useRef(true);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatStatus, setChatStatus] = useState<ChatStatus>("loading");
-  const [chatHistoryError, setChatHistoryError] = useState("");
-  const [message, setMessage] = useState("");
-
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState("");
   const [socketError, setSocketError] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Conectando...");
-
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [mediaPerms, setMediaPerms] = useState<{
-    audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
-    video: "prompt" | "granted" | "denied" | "unavailable" | "error";
-  }>({ audio: "prompt", video: "prompt" });
-  const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const isChatOpenRef = useRef(isChatOpen);
   isChatOpenRef.current = isChatOpen;
+
+  const {
+    localStreamRef,
+    localVideoRef,
+    mediaPerms,
+    mediaInitStatus,
+    retryMedia,
+  } = useMedia(
+    () =>
+      new Map(
+        Array.from(
+          webRTC.peerConnectionsRef.current.entries()
+        )
+      )
+  );
+
+  const webRTC = useWebRTC(localStreamRef);
+  const chat = useChat(userProfilesCacheRef);
 
   const isSm = useMediaQuery("(min-width: 640px)");
   const isLg = useMediaQuery("(min-width: 1024px)");
@@ -741,75 +281,6 @@ export function ActiveRoom() {
     void loadRoom();
   }, [roomId, user]);
 
-  function createPeerConnection(socketId: string): RTCPeerConnection {
-    console.log("[WebRTC] createPeerConnection for", socketId);
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-
-    localStreamRef.current?.getTracks().forEach((track) => {
-      console.log("[WebRTC] adding local track", track.kind, "to", socketId);
-      pc.addTrack(track, localStreamRef.current!);
-    });
-
-    pc.ontrack = ({ streams }) => {
-      console.log("[WebRTC] ontrack from", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
-      setRemoteStreams((prev) => {
-        const next = new Map(prev);
-        next.set(socketId, streams[0]);
-        return next;
-      });
-    };
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        console.log("[WebRTC] ICE candidate from", socketId);
-        socketRef.current?.emit("send-ice-candidate", {
-          to: socketId,
-          candidate: e.candidate.toJSON(),
-        });
-      }
-    };
-
-    pc.onnegotiationneeded = async () => {
-      console.log("[WebRTC] negotiationneeded for", socketId);
-      try {
-        await pc.setLocalDescription(await pc.createOffer());
-        console.log("[WebRTC] sending offer to", socketId);
-        socketRef.current?.emit("send-offer", {
-          to: socketId,
-          sdp: pc.localDescription,
-        });
-      } catch (err) {
-        console.error("Error creating offer:", err);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("[WebRTC] connection state for", socketId, ":", pc.connectionState);
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-        closePeerConnection(socketId);
-      }
-    };
-
-    peerConnectionsRef.current.set(socketId, pc);
-    return pc;
-  }
-
-  function closePeerConnection(socketId: string, notifyPeer = true) {
-    const pc = peerConnectionsRef.current.get(socketId);
-    if (pc) {
-      pc.close();
-      peerConnectionsRef.current.delete(socketId);
-    }
-    setRemoteStreams((prev) => {
-      const next = new Map(prev);
-      next.delete(socketId);
-      return next;
-    });
-    if (notifyPeer) {
-      socketRef.current?.emit("peer-closed", { to: socketId });
-    }
-  }
-
   useEffect(() => {
     if (!roomId || !user || !room) return;
 
@@ -820,9 +291,7 @@ export function ActiveRoom() {
         const token = await user.getIdToken();
 
         socket = io(SOCKET_URL, {
-          auth: {
-            token,
-          },
+          auth: { token },
           reconnection: true,
           reconnectionAttempts: 8,
           reconnectionDelay: 1000,
@@ -857,8 +326,8 @@ export function ActiveRoom() {
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
-          setChatStatus("loading");
-          setChatHistoryError("");
+          chat.setChatStatus("loading");
+          chat.setChatHistoryError("");
 
           const localParticipant: RoomParticipant = {
             uid: user.uid,
@@ -984,7 +453,7 @@ export function ActiveRoom() {
 
             currentParticipants.forEach((p) => {
               if (p.socketId && p.uid) {
-                socketIdByUidRef.current.set(p.uid, p.socketId);
+                webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
               }
             });
 
@@ -1043,87 +512,11 @@ export function ActiveRoom() {
           }
         );
 
-        const handleChatHistory = (payload: ChatHistoryResponse) => {
-          const history = extractHistoryMessages(payload)
-            .map((msg) =>
-              mapPayloadToChatMessage(
-                msg,
-                Array.isArray(payload) ? roomId : payload.roomId || roomId
-              )
-            )
-            .filter(Boolean)
-            .map((msg) => {
-              const message = msg as ChatMessage;
-              const cachedProfile = userProfilesCacheRef.current.get(
-                message.senderUid
-              );
+        chat.registerChatEventHandlers(socket, roomId, isChatOpenRef, (err) =>
+          setSocketError(err)
+        );
 
-              return mergeProfileIntoMessage(message, cachedProfile);
-            }) as ChatMessage[];
-
-          const orderedHistory = sortMessagesChronologically(history);
-
-          setChatMessages(orderedHistory);
-          setChatHistoryError("");
-          setChatStatus(orderedHistory.length === 0 ? "empty" : "success");
-        };
-
-        socket.on("chat-history", handleChatHistory);
-        socket.on("chat-history-success", handleChatHistory);
-
-        socket.on("chat-history-error", (payload: ChatHistoryErrorPayload) => {
-          setChatHistoryError(
-            payload?.message || "No se pudo cargar el historial del chat."
-          );
-          setChatStatus("error");
-        });
-
-        socket.on("error", (payload: { message?: string }) => {
-          const errorMessage = payload?.message || "Ocurrió un error en la sala.";
-
-          setSocketError(errorMessage);
-
-          if (chatStatus === "loading") {
-            setChatHistoryError(errorMessage);
-            setChatStatus("error");
-          }
-        });
-
-        socket.on("send-message-error", (payload: { message?: string }) => {
-          setSocketError(payload?.message || "No se pudo enviar el mensaje.");
-        });
-
-        socket.on("new-message", (msg: NewMessagePayload) => {
-          console.log("Nuevo mensaje:", msg);
-
-          const mappedMessage = mapPayloadToChatMessage(msg, roomId);
-
-          if (!mappedMessage) return;
-
-          const cachedProfile = userProfilesCacheRef.current.get(
-            mappedMessage.senderUid
-          );
-          const newMessage = mergeProfileIntoMessage(
-            mappedMessage,
-            cachedProfile
-          );
-
-          setChatMessages((currentMessages) => {
-            const exists = currentMessages.some(
-              (item) => item.id === newMessage.id
-            );
-
-            if (exists) return currentMessages;
-
-            return sortMessagesChronologically([...currentMessages, newMessage]);
-          });
-
-          setChatStatus("success");
-
-          if (!isChatOpenRef.current) {
-            setUnreadCount((prev) => prev + 1);
-          }
-        });
+        webRTC.registerWebRTCEventHandlers(socket, user.uid);
 
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
@@ -1156,64 +549,6 @@ export function ActiveRoom() {
             )
           );
         });
-
-        socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
-          console.log("[WebRTC] user-joined:", payload.socketId, payload.user.uid);
-          socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
-          if (payload.user.uid === user.uid) return;
-          if (peerConnectionsRef.current.has(payload.socketId)) return;
-          createPeerConnection(payload.socketId);
-        });
-
-        socket.on("user-left", (payload: { socketId: string }) => {
-          closePeerConnection(payload.socketId);
-        });
-
-        socket.on("receive-offer", async (payload: { from: string; sdp: unknown }) => {
-          console.log("[WebRTC] receive-offer from", payload.from);
-          let pc = peerConnectionsRef.current.get(payload.from);
-          if (!pc) {
-            pc = createPeerConnection(payload.from);
-          }
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socketRef.current?.emit("send-answer", {
-              to: payload.from,
-              sdp: pc.localDescription,
-            });
-          } catch (err) {
-            console.error("Error handling offer:", err);
-          }
-        });
-
-        socket.on("receive-answer", async (payload: { from: string; sdp: unknown }) => {
-          console.log("[WebRTC] receive-answer from", payload.from);
-          const pc = peerConnectionsRef.current.get(payload.from);
-          if (!pc) return;
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
-          } catch (err) {
-            console.error("Error handling answer:", err);
-          }
-        });
-
-        socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
-          const pc = peerConnectionsRef.current.get(payload.from);
-          if (!pc || !pc.remoteDescription) return;
-          console.log("[WebRTC] receive-ice-candidate from", payload.from);
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate as RTCIceCandidateInit));
-          } catch (err) {
-            console.error("Error adding ICE candidate:", err);
-          }
-        });
-
-        socket.on("peer-disconnected", (payload: { socketId: string }) => {
-          console.log("[WebRTC] peer-disconnected:", payload.socketId);
-          closePeerConnection(payload.socketId, false);
-        });
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -1225,9 +560,9 @@ export function ActiveRoom() {
     void connectSocket();
 
     return () => {
-      peerConnectionsRef.current.forEach((pc) => pc.close());
-      peerConnectionsRef.current.clear();
-      socketIdByUidRef.current.clear();
+      webRTC.peerConnectionsRef.current.forEach((pc) => pc.close());
+      webRTC.peerConnectionsRef.current.clear();
+      webRTC.socketIdByUidRef.current.clear();
 
       if (socket) {
         socket.emit("leave-room");
@@ -1264,7 +599,7 @@ export function ActiveRoom() {
       }
     });
 
-    chatMessages.forEach((chatMessage) => {
+    chat.chatMessages.forEach((chatMessage) => {
       if (
         chatMessage.senderUid &&
         chatMessage.senderUid !== user.uid &&
@@ -1301,7 +636,7 @@ export function ActiveRoom() {
                 )
               );
 
-              setChatMessages((currentMessages) =>
+              chat.setChatMessages((currentMessages) =>
                 currentMessages.map((chatMessage) =>
                   chatMessage.senderUid === uid
                     ? mergeProfileIntoMessage(chatMessage, userProfile)
@@ -1321,7 +656,7 @@ export function ActiveRoom() {
     };
 
     void loadMissingProfiles();
-  }, [participants, chatMessages, user]);
+  }, [participants, chat.chatMessages, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1347,111 +682,6 @@ export function ActiveRoom() {
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
-    let cancelled = false;
-    let audioDone = false;
-    let videoDone = false;
-
-    setMediaInitStatus("initializing");
-
-    async function requestDevice(kind: "audio" | "video") {
-      try {
-        const constraints = kind === "audio" ? { audio: true } : { video: true };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        if (localStreamRef.current) {
-          stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
-        } else {
-          localStreamRef.current = stream;
-        }
-        setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
-        if (kind === "audio") audioDone = true;
-        else videoDone = true;
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof DOMException) {
-          if (err.name === "NotAllowedError") {
-            setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
-          } else if (err.name === "NotFoundError") {
-            setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
-          } else {
-            setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
-          }
-        } else {
-          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
-        }
-        if (kind === "audio") audioDone = true;
-        else videoDone = true;
-      }
-    }
-
-    async function init() {
-      await requestDevice("audio");
-      if (cancelled) return;
-      await requestDevice("video");
-      if (cancelled) return;
-      setMediaInitStatus(audioDone && videoDone ? "ready" : "error");
-    }
-
-    init();
-
-    return () => {
-      cancelled = true;
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-    };
-  }, []);
-
-  const retryMedia = useCallback(async (kind: "audio" | "video") => {
-    const constraints = kind === "audio" ? { audio: true } : { video: true };
-
-    const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
-    oldTracks.forEach((t) => {
-      t.stop();
-      localStreamRef.current?.removeTrack(t);
-    });
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      if (localStreamRef.current) {
-        stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
-      } else {
-        localStreamRef.current = stream;
-      }
-      setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
-      setMediaInitStatus("ready");
-    } catch (err) {
-      if (err instanceof DOMException) {
-        if (err.name === "NotAllowedError") {
-          setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
-        } else if (err.name === "NotFoundError") {
-          setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
-        } else {
-          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
-        }
-      } else {
-        setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-
-    peerConnectionsRef.current.forEach((pc) => {
-      const kinds = pc.getSenders().map((s) => s.track?.kind);
-      stream.getTracks().forEach((track) => {
-        if (!kinds.includes(track.kind)) {
-          pc.addTrack(track, stream);
-        }
-      });
-    });
-  }, [mediaPerms]);
-
-  useEffect(() => {
     if (!isChatOpen) return;
 
     const chatContainer = chatMessagesContainerRef.current;
@@ -1466,7 +696,7 @@ export function ActiveRoom() {
       top: chatContainer.scrollHeight,
       behavior: prefersReducedMotion ? "auto" : "smooth",
     });
-  }, [chatMessages.length, isChatOpen]);
+  }, [chat.chatMessages.length, isChatOpen]);
 
   const handleCopyId = async () => {
     if (!roomId) return;
@@ -1474,66 +704,6 @@ export function ActiveRoom() {
     await navigator.clipboard.writeText(roomId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRetryChatHistory = () => {
-    if (!socketRef.current || !roomId) return;
-
-    setChatStatus("loading");
-    setChatHistoryError("");
-
-    socketRef.current.emit("join-room", {
-      roomId,
-    });
-  };
-
-  const getMessageUsername = (msg: ChatMessage) => {
-    const participant = participants.find((item) => item.uid === msg.senderUid);
-    const cachedProfile = msg.senderUid
-      ? userProfilesCacheRef.current.get(msg.senderUid)
-      : undefined;
-
-    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
-      return currentUsername;
-    }
-
-    return (
-      cachedProfile?.username ||
-      participant?.username ||
-      msg.senderName ||
-      "Usuario"
-    );
-  };
-
-  const getMessageAvatar = (msg: ChatMessage) => {
-    const participant = participants.find((item) => item.uid === msg.senderUid);
-
-    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
-      return profile?.photoURL;
-    }
-
-    return msg.senderPhotoURL || participant?.photoURL;
-  };
-
-  const handleSendMessage = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const cleanMessage = message.trim();
-
-    if (!cleanMessage || !user || !roomId) return;
-
-    if (!socketRef.current || !isConnected) {
-      setSocketError(
-        "No estás conectado a la sala en tiempo real. Intenta nuevamente."
-      );
-      return;
-    }
-
-    socketRef.current.emit("send-message", {
-      content: cleanMessage,
-    });
-
-    setMessage("");
   };
 
   const handleLeaveRoom = () => {
@@ -1562,7 +732,7 @@ export function ActiveRoom() {
         aria-relevant="additions text"
         aria-label="Mensajes del chat de la sala"
       >
-        {chatStatus === "loading" ? (
+        {chat.chatStatus === "loading" ? (
           <div className="flex h-full min-h-[220px] items-center justify-center">
             <div
               className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
@@ -1583,7 +753,7 @@ export function ActiveRoom() {
               </p>
             </div>
           </div>
-        ) : chatStatus === "error" ? (
+        ) : chat.chatStatus === "error" ? (
           <div className="flex h-full min-h-[220px] items-center justify-center">
             <div
               className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
@@ -1599,19 +769,22 @@ export function ActiveRoom() {
               </p>
 
               <p className="mt-1 text-sm text-gray-500">
-                {chatHistoryError}
+                {chat.chatHistoryError}
               </p>
 
               <button
                 type="button"
-                onClick={handleRetryChatHistory}
+                onClick={() => {
+                  if (socketRef.current && roomId)
+                    chat.handleRetryChatHistory(socketRef.current, roomId);
+                }}
                 className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
               >
                 Reintentar
               </button>
             </div>
           </div>
-        ) : chatStatus === "empty" ? (
+        ) : chat.chatStatus === "empty" ? (
           <div className="flex h-full min-h-[220px] items-center justify-center">
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
               <div
@@ -1632,12 +805,23 @@ export function ActiveRoom() {
           </div>
         ) : (
           <ul className="space-y-4">
-            {chatMessages.map((msg) => {
+            {chat.chatMessages.map((msg) => {
               const isOwnMessage =
                 msg.senderUid === user?.uid ||
                 msg.senderName === currentUsername;
-              const messageUsername = getMessageUsername(msg);
-              const messageAvatar = getMessageAvatar(msg);
+              const messageUsername = chat.getMessageUsername(
+                msg,
+                participants,
+                user,
+                currentUsername
+              );
+              const messageAvatar = chat.getMessageAvatar(
+                msg,
+                participants,
+                user,
+                currentUsername,
+                profile
+              );
               const avatar = messageAvatar ? (
                 <img
                   src={messageAvatar}
@@ -1701,7 +885,16 @@ export function ActiveRoom() {
       </div>
 
       <form
-        onSubmit={handleSendMessage}
+        onSubmit={(event) =>
+          chat.handleSendMessage(
+            event,
+            socketRef.current!,
+            isConnected,
+            user,
+            roomId,
+            (err) => setSocketError(err)
+          )
+        }
         className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
         aria-label="Formulario para enviar mensajes"
       >
@@ -1717,8 +910,8 @@ export function ActiveRoom() {
           <input
             type="text"
             id="chat-message"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            value={chat.message}
+            onChange={(event) => chat.setMessage(event.target.value)}
             placeholder="Escribe un mensaje..."
             aria-describedby="chat-message-help"
             disabled={!isConnected}
@@ -1727,11 +920,11 @@ export function ActiveRoom() {
 
           <button
             type="submit"
-            disabled={!message.trim() || !isConnected}
+            disabled={!chat.message.trim() || !isConnected}
             className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             aria-label={
               isConnected
-                ? message.trim()
+                ? chat.message.trim()
                   ? "Enviar mensaje"
                   : "Escribe un mensaje antes de enviar"
                 : "Conecta a la sala antes de enviar mensajes"
@@ -2001,7 +1194,7 @@ export function ActiveRoom() {
               <div className="relative lg:hidden">
                 <button
                   type="button"
-                  onClick={() => { setIsChatOpen((value) => !value); setUnreadCount(0); }}
+                  onClick={() => { setIsChatOpen((value) => !value); chat.setUnreadCount(0); }}
                   className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                     isChatOpen
                       ? "bg-primary-600 text-white hover:bg-primary-700"
@@ -2012,9 +1205,9 @@ export function ActiveRoom() {
                 >
                   <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
-                {unreadCount > 0 && !isChatOpen && (
+                {chat.unreadCount > 0 && !isChatOpen && (
                   <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white sm:h-6 sm:w-6 sm:text-sm">
-                    {unreadCount > 9 ? "9+" : unreadCount}
+                    {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
                   </span>
                 )}
               </div>
@@ -2043,7 +1236,7 @@ export function ActiveRoom() {
             className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
               isChatOpen ? "opacity-100" : "opacity-0"
             }`}
-            onClick={() => { setIsChatOpen(false); setUnreadCount(0); }}
+            onClick={() => { setIsChatOpen(false); chat.setUnreadCount(0); }}
             aria-hidden="true"
           />
           <div
@@ -2068,7 +1261,7 @@ export function ActiveRoom() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setIsChatOpen(false); setUnreadCount(0); }}
+                    onClick={() => { setIsChatOpen(false); chat.setUnreadCount(0); }}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
                     aria-label="Cerrar chat"
                   >
