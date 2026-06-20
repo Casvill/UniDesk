@@ -521,6 +521,7 @@ export function ActiveRoom() {
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -538,6 +539,10 @@ export function ActiveRoom() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [mediaPerms, setMediaPerms] = useState<{
+    audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
+    video: "prompt" | "granted" | "denied" | "unavailable" | "error";
+  }>({ audio: "prompt", video: "prompt" });
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -1180,6 +1185,54 @@ export function ActiveRoom() {
     socket.emit(isMicOn ? "user-unmuted" : "user-muted");
     socket.emit(isCameraOn ? "camera-on" : "camera-off");
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function requestDevice(kind: "audio" | "video") {
+      try {
+        const constraints = kind === "audio" ? { audio: true } : { video: true };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        if (localStreamRef.current) {
+          stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
+        } else {
+          localStreamRef.current = stream;
+        }
+        setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof DOMException) {
+          if (err.name === "NotAllowedError") {
+            setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
+          } else if (err.name === "NotFoundError") {
+            setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+          } else {
+            setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
+          }
+        } else {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
+        }
+      }
+    }
+
+    async function init() {
+      await requestDevice("audio");
+      if (cancelled) return;
+      await requestDevice("video");
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isChatOpen) return;
