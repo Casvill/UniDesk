@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection>) {
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-
+export function useMedia(
+  localStreamRef: React.MutableRefObject<MediaStream | null>,
+  getPeerConnections: () => Map<string, RTCPeerConnection>,
+  isMicOn: boolean,
+  isCameraOn: boolean
+) {
   const [mediaPerms, setMediaPerms] = useState<{
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
@@ -19,8 +21,16 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
     setMediaInitStatus("initializing");
 
     async function requestDevice(kind: "audio" | "video") {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+        if (kind === "audio") audioDone = true;
+        else videoDone = true;
+        return;
+      }
       try {
-        const constraints = kind === "audio" ? { audio: true } : { video: true };
+        const constraints = kind === "audio"
+          ? { audio: true }
+          : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -31,6 +41,8 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
         } else {
           localStreamRef.current = stream;
         }
+        const shouldEnable = kind === "audio" ? isMicOn : isCameraOn;
+        stream.getTracks().forEach((t) => { t.enabled = shouldEnable; });
         setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
         if (kind === "audio") audioDone = true;
         else videoDone = true;
@@ -41,6 +53,8 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
             setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
           } else if (err.name === "NotFoundError") {
             setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+          } else if (err.name === "NotReadableError") {
+            setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
           } else {
             setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
           }
@@ -70,7 +84,14 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
   }, []);
 
   const retryMedia = useCallback(async (kind: "audio" | "video") => {
-    const constraints = kind === "audio" ? { audio: true } : { video: true };
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+      return;
+    }
+
+    const constraints = kind === "audio"
+      ? { audio: true }
+      : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
 
     const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
     oldTracks.forEach((t) => {
@@ -85,6 +106,8 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
       } else {
         localStreamRef.current = stream;
       }
+      const shouldEnable = kind === "audio" ? isMicOn : isCameraOn;
+      stream.getTracks().forEach((t) => { t.enabled = shouldEnable; });
       setMediaPerms((prev) => ({ ...prev, [kind]: "granted" }));
       setMediaInitStatus("ready");
     } catch (err) {
@@ -93,6 +116,8 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
           setMediaPerms((prev) => ({ ...prev, [kind]: "denied" }));
         } else if (err.name === "NotFoundError") {
           setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
+        } else if (err.name === "NotReadableError") {
+          setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
         } else {
           setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
         }
@@ -100,7 +125,7 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
         setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
       }
     }
-  }, []);
+  }, [isMicOn, isCameraOn]);
 
   useEffect(() => {
     const stream = localStreamRef.current;
@@ -117,5 +142,5 @@ export function useMedia(getPeerConnections: () => Map<string, RTCPeerConnection
     });
   }, [mediaPerms, getPeerConnections]);
 
-  return { localStreamRef, localVideoRef, mediaPerms, mediaInitStatus, retryMedia };
+  return { localStreamRef, mediaPerms, mediaInitStatus, retryMedia };
 }

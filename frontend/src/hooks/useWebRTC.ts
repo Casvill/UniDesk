@@ -8,7 +8,23 @@ const RTC_CONFIG: RTCConfiguration = {
 export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const socketIdByUidRef = useRef<Map<string, string>>(new Map());
+  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+
+  async function flushPendingIceCandidates(socketId: string) {
+    const pending = pendingIceCandidatesRef.current.get(socketId);
+    if (!pending) return;
+    const pc = peerConnectionsRef.current.get(socketId);
+    if (!pc) return;
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error("Error al agregar ICE candidate pendiente:", err);
+      }
+    }
+    pendingIceCandidatesRef.current.delete(socketId);
+  }
 
   function closePeerConnection(socketId: string, socket: Socket | null, notifyPeer = true) {
     const pc = peerConnectionsRef.current.get(socketId);
@@ -70,7 +86,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     pc.onconnectionstatechange = () => {
       console.log("[WebRTC] estado de conexión para", socketId, ":", pc.connectionState);
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+      if (pc.connectionState === "failed") {
         closePeerConnection(socketId, socket);
       }
     };
@@ -100,6 +116,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
       }
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
+        await flushPendingIceCandidates(payload.from);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit("send-answer", {
@@ -117,6 +134,7 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
       if (!pc) return;
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp as RTCSessionDescriptionInit));
+        await flushPendingIceCandidates(payload.from);
       } catch (err) {
         console.error("Error al procesar answer:", err);
       }
@@ -124,7 +142,15 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
     socket.on("receive-ice-candidate", async (payload: { from: string; candidate: unknown }) => {
       const pc = peerConnectionsRef.current.get(payload.from);
-      if (!pc || !pc.remoteDescription) return;
+      if (!pc) return;
+      if (!pc.remoteDescription) {
+        const pending = pendingIceCandidatesRef.current;
+        if (!pending.has(payload.from)) {
+          pending.set(payload.from, []);
+        }
+        pending.get(payload.from)!.push(payload.candidate as RTCIceCandidateInit);
+        return;
+      }
       console.log("[WebRTC] ICE candidate recibido de", payload.from);
       try {
         await pc.addIceCandidate(new RTCIceCandidate(payload.candidate as RTCIceCandidateInit));
@@ -136,6 +162,10 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     socket.on("peer-disconnected", (payload: { socketId: string }) => {
       console.log("[WebRTC] peer desconectado:", payload.socketId);
       closePeerConnection(payload.socketId, null, false);
+    });
+
+    socket.on("signaling-error", (payload: { event: string; reason: string; target?: string }) => {
+      console.error("[WebRTC] Error de señalización:", payload);
     });
   }
 
