@@ -247,7 +247,9 @@ export function ActiveRoom() {
                     el.srcObject = remoteStream;
                   }
                   el.play().catch((err) => {
-                    console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                    if (err.name !== "AbortError") {
+                      console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                    }
                   });
                 }
               }}
@@ -358,13 +360,23 @@ export function ActiveRoom() {
             )}
           </span>
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
-              micOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg transition-all duration-300 ${
+              p.isSpeaking 
+                ? "bg-green-500 text-white animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" 
+                : micOn 
+                  ? "bg-green-600 text-white" 
+                  : "bg-black/60 text-gray-400"
             }`}
-            aria-label={micOn ? "Micrófono activado" : "Micrófono silenciado"}
+            aria-label={
+              p.isSpeaking 
+                ? "Micrófono transmitiendo voz" 
+                : micOn 
+                  ? "Micrófono activado" 
+                  : "Micrófono silenciado"
+            }
           >
             {micOn ? (
-              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+              <Mic className={`h-3.5 w-3.5 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
             ) : (
               <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
             )}
@@ -994,7 +1006,7 @@ export function ActiveRoom() {
         const rms = Math.sqrt(sum / inputBuffer.length);
         const volume = rms * 100;
 
-        const threshold = 4; // Umbral de detección
+        const threshold = 2; // Umbral de detección
 
         if (volume > threshold) {
           if (silenceTimeout) {
@@ -1034,6 +1046,64 @@ export function ActiveRoom() {
       }
     };
   }, [isMicOn, mediaInitStatus, user?.uid, isConnected]);
+
+  // Efecto para monitorear el nivel de audio remoto vía getStats de WebRTC
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const intervalId = setInterval(async () => {
+      const pcs = webRTC.peerConnectionsRef.current;
+      if (pcs.size === 0) return;
+
+      const speakingUids = new Set<string>();
+
+      for (const [socketId, pc] of pcs.entries()) {
+        if (pc.connectionState !== "connected") continue;
+
+        try {
+          const stats = await pc.getStats();
+          let isSpeakingRemote = false;
+
+          stats.forEach((report) => {
+            if (report.type === "inbound-rtp" && report.kind === "audio") {
+              // audioLevel en inbound-rtp es una métrica normalizada de 0.0 a 1.0
+              if (typeof report.audioLevel === "number" && report.audioLevel > 0.015) {
+                isSpeakingRemote = true;
+              }
+            }
+          });
+
+          if (isSpeakingRemote) {
+            const uid = Array.from(webRTC.socketIdByUidRef.current.entries())
+              .find(([_, sid]) => sid === socketId)?.[0];
+            if (uid) {
+              speakingUids.add(uid);
+            }
+          }
+        } catch (err) {
+          // Ignorar errores silenciosamente para evitar spam en consola
+        }
+      }
+
+      setParticipants((prev) => {
+        let changed = false;
+        const next = prev.map((p) => {
+          const isCurrentUser = p.uid === user?.uid;
+          if (isCurrentUser) return p; // El usuario local tiene su propio analizador de micrófono directo
+
+          const shouldBeSpeaking = speakingUids.has(p.uid);
+          if (p.isSpeaking !== shouldBeSpeaking) {
+            changed = true;
+            return { ...p, isSpeaking: shouldBeSpeaking };
+          }
+          return p;
+        });
+        return changed ? next : prev;
+      });
+    }, 200);
+
+    return () => clearInterval(intervalId);
+  }, [isConnected, user?.uid, webRTC.peerConnectionsRef, webRTC.socketIdByUidRef]);
 
   const isCameraBlocked =
     mediaPerms.video === "denied" ||
