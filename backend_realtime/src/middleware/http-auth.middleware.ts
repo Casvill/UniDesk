@@ -19,6 +19,10 @@ export async function httpAuthMiddleware(req: AuthenticatedRequest, res: Respons
   }
 
   const token = authHeader.split(" ")[1];
+  if (!token) {
+    console.error(`HTTP Request: Token mal formado`);
+    return res.status(401).json({ error: "Authentication error: Token malformed" });
+  }
 
   try {
     const decodedToken = await auth.verifyIdToken(token);

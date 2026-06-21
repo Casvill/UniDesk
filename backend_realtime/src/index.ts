@@ -3,7 +3,7 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
-import { db, auth } from "./config/firebase";
+import { db, auth } from "./config/firebase.js";
 import { Timestamp } from "firebase-admin/firestore";
 import { socketAuthMiddleware, AuthenticatedSocket } from "./middleware/auth.middleware.js";
 import {
@@ -83,14 +83,14 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       .where("roomId", "==", roomId)
       .orderBy("createdAt", "asc")
       .get()
-      .then((snapshot) => {
-        const messages = snapshot.docs.map((doc) => ({
+      .then((snapshot: any) => {
+        const messages = snapshot.docs.map((doc: any) => ({
           ...doc.data(),
           createdAt: doc.data().createdAt.toDate().toISOString(),
         }));
         socket.emit("chat-history", messages);
       })
-      .catch((err) => console.error("Error fetching chat history:", err));
+      .catch((err: any) => console.error("Error fetching chat history:", err));
 
     // Notify EXISTING participants that a new peer joined — they initiate offers.
     const joinerInfo: UserInfo = rooms.get(roomId)!.get(socket.id)!;
@@ -149,7 +149,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
 
     messageRef.set(messageData)
       .then(() => console.log(`Mensaje ${messageRef.id} guardado en Firestore`))
-      .catch((err) => console.error("Error al guardar mensaje en Firestore:", err));
+      .catch((err: any) => console.error("Error al guardar mensaje en Firestore:", err));
 
     // Broadcast message to the room
     io.to(roomId).emit("new-message", {
@@ -403,7 +403,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   };
 
   socket.on("leave-room", () => {
-    socket.leaveAll(); // Ensure they leave all socket rooms
+    socket.rooms.forEach((room) => {
+      if (room !== socket.id) {
+        socket.leave(room);
+      }
+    });
     handleLeaveRoom(socket.id);
   });
 
