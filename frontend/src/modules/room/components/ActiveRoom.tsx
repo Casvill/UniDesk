@@ -198,6 +198,15 @@ export function ActiveRoom() {
     const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
     const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
 
+    const hasMediaError = isCurrent && (
+      mediaPerms.audio === "denied" ||
+      mediaPerms.video === "denied" ||
+      mediaPerms.audio === "error" ||
+      mediaPerms.video === "error" ||
+      mediaPerms.audio === "unavailable" ||
+      mediaPerms.video === "unavailable"
+    );
+
     return (
       <motion.div
         key={p.uid}
@@ -205,12 +214,15 @@ export function ActiveRoom() {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="relative overflow-hidden rounded-2xl bg-gray-800 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
+          p.isSpeaking 
+            ? "ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
+            : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+        }`}
         style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
-        aria-label={name}
+        aria-label={hasMediaError ? `Error en transmisión de ${name}.` : p.isSpeaking ? `${name} hablando.` : name}
       >
-        {isCurrent && camOn && localStreamRef.current?.getVideoTracks().length ? (
+        {isCurrent && camOn && mediaInitStatus === "ready" && localStreamRef.current?.getVideoTracks().length ? (
           <video
             autoPlay
             muted
@@ -222,7 +234,7 @@ export function ActiveRoom() {
               }
             }}
           />
-        ) : !isCurrent && remoteStream ? (
+        ) : !isCurrent && remoteStream && remoteStream.getVideoTracks().length > 0 ? (
           <>
             <video
               autoPlay
@@ -265,10 +277,45 @@ export function ActiveRoom() {
           </>
         ) : null}
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
-          {isCurrent && mediaInitStatus === "initializing" ? (
-            <div className="text-center">
-              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" />
-              <p className="text-xs text-gray-400">Accediendo a dispositivos...</p>
+          {hasMediaError ? (
+            <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
+              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2 animate-pulse" aria-hidden="true" />
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Acceso Denegado</p>
+              <p className="text-[11px] text-gray-300 leading-normal">
+                {mediaPerms.video === "denied" || mediaPerms.audio === "denied"
+                  ? "Permiso de cámara/micrófono bloqueado. Concedelo en tu navegador para transmitir."
+                  : mediaPerms.video === "unavailable" || mediaPerms.audio === "unavailable"
+                    ? "Cámara/micrófono no detectados. Conecta un dispositivo multimedia."
+                    : "No pudimos acceder a los dispositivos de captura. Revisa que no estén en uso."}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await retryMedia("audio");
+                    await retryMedia("video");
+                    showToast.success("Reintentando acceder a dispositivos multimedia...");
+                  } catch (err) {
+                    console.warn("Reintento fallido de medios:", err);
+                  }
+                }}
+                className="mt-3 cursor-pointer rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-amber-500 transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                aria-label="Reintentar conectar cámara y micrófono"
+              >
+                Reintentar conexión
+              </button>
+            </div>
+          ) : isCurrent && mediaInitStatus === "initializing" ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-gray-300">Solicitando acceso...</p>
+              <p className="text-[10px] text-gray-500 mt-1">Concede los permisos en el navegador para comenzar.</p>
+            </div>
+          ) : !isCurrent && camOn && (!remoteStream || remoteStream.getVideoTracks().length === 0) ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-white">{name}</p>
+              <p className="text-[10px] text-primary-200 mt-1 animate-pulse">Conectando transmisión...</p>
             </div>
           ) : (
             <div className="text-center">
@@ -583,6 +630,14 @@ export function ActiveRoom() {
 
         webRTC.registerWebRTCEventHandlers(socket, user.uid);
 
+        socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, isSpeaking: payload.speaking } : p
+            )
+          );
+        });
+
         socket.on("user-joined", async (payload: { socketId: string; user: { uid: string; username?: string; displayName?: string; name?: string } }) => {
           if (payload.user && payload.user.uid !== user.uid) {
             const fallbackName = payload.user.username || "compañero";
@@ -896,6 +951,89 @@ export function ActiveRoom() {
     });
     setIsAudioAutoplayBlocked(false);
   };
+
+  // Efecto para detectar si el usuario local está hablando y sincronizarlo con el socket
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!isMicOn || !localStreamRef.current || !socket || mediaInitStatus !== "ready") {
+      setParticipants((prev) =>
+        prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+      );
+      return;
+    }
+
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let scriptProcessor: ScriptProcessorNode | null = null;
+    let isSpeaking = false;
+    let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      if (audioTracks.length === 0) return;
+
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      
+      const audioStream = new MediaStream([audioTracks[0]]);
+      source = audioContext.createMediaStreamSource(audioStream);
+      scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+      
+      source.connect(analyser);
+      analyser.connect(scriptProcessor);
+      scriptProcessor.connect(audioContext.destination);
+
+      scriptProcessor.onaudioprocess = (event) => {
+        const inputBuffer = event.inputBuffer.getChannelData(0);
+        let sum = 0;
+        for (let i = 0; i < inputBuffer.length; i++) {
+          sum += inputBuffer[i] * inputBuffer[i];
+        }
+        const rms = Math.sqrt(sum / inputBuffer.length);
+        const volume = rms * 100;
+
+        const threshold = 4; // Umbral de detección
+
+        if (volume > threshold) {
+          if (silenceTimeout) {
+            clearTimeout(silenceTimeout);
+            silenceTimeout = null;
+          }
+          if (!isSpeaking) {
+            isSpeaking = true;
+            socket.emit("user-speaking", { speaking: true });
+            setParticipants((prev) =>
+              prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: true } : p))
+            );
+          }
+        } else {
+          if (isSpeaking && !silenceTimeout) {
+            silenceTimeout = setTimeout(() => {
+              isSpeaking = false;
+              socket.emit("user-speaking", { speaking: false });
+              setParticipants((prev) =>
+                prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+              );
+              silenceTimeout = null;
+            }, 400);
+          }
+        }
+      };
+    } catch (err) {
+      console.warn("No se pudo iniciar el detector local de habla:", err);
+    }
+
+    return () => {
+      if (silenceTimeout) clearTimeout(silenceTimeout);
+      if (scriptProcessor) scriptProcessor.disconnect();
+      if (source) source.disconnect();
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+      }
+    };
+  }, [isMicOn, mediaInitStatus, user?.uid, isConnected]);
 
   const isCameraBlocked =
     mediaPerms.video === "denied" ||

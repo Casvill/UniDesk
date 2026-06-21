@@ -344,6 +344,19 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     }
   });
 
+  socket.on("user-speaking", (data: { speaking: boolean }) => {
+    try {
+      const roomId = findRoomOf(rooms, socket.id);
+      if (!roomId) return;
+      const user = rooms.get(roomId)?.get(socket.id);
+      if (user) {
+        socket.to(roomId).emit("user-speaking", { socketId: socket.id, uid: user.uid, speaking: data.speaking });
+      }
+    } catch (err) {
+      console.error(`[signaling] Error en user-speaking de ${socket.id}:`, err);
+    }
+  });
+
   const handleLeaveRoom = (socketId: string) => {
     // ponytail: Wrap in try-catch to prevent a single peer leave failure from crashing the server
     try {
