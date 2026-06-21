@@ -66,6 +66,7 @@ export function ActiveRoom() {
 
   const socketRef = useRef<Socket | null>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileChatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
@@ -884,18 +885,20 @@ export function ActiveRoom() {
   useEffect(() => {
     if (!isChatOpen) return;
 
-    const chatContainer = chatMessagesContainerRef.current;
-    if (!chatContainer) return;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    const scrollTimer = setTimeout(() => {
-      chatContainer.scrollTo({
-        top: chatContainer.scrollHeight,
+    const scrollContainer = (container: HTMLDivElement | null) => {
+      if (!container) return;
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      container.scrollTo({
+        top: container.scrollHeight,
         behavior: prefersReducedMotion ? "auto" : "smooth",
       });
+    };
+
+    const scrollTimer = setTimeout(() => {
+      scrollContainer(chatMessagesContainerRef.current);
+      scrollContainer(mobileChatMessagesContainerRef.current);
     }, 50);
 
     return () => clearTimeout(scrollTimer);
@@ -1370,10 +1373,10 @@ export function ActiveRoom() {
     navigate("/dashboard");
   };
 
-  const renderChatContent = () => (
+  const renderChatContent = (containerRef: React.RefObject<HTMLDivElement | null>) => (
     <>
       <div
-        ref={chatMessagesContainerRef}
+        ref={containerRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
         role="log"
         aria-live="polite"
@@ -2015,7 +2018,7 @@ export function ActiveRoom() {
                   </button>
                 </div>
               </div>
-              {renderChatContent()}
+              {renderChatContent(mobileChatMessagesContainerRef)}
             </div>
           </div>
 
@@ -2029,7 +2032,10 @@ export function ActiveRoom() {
         >
           <button
             type="button"
-            onClick={() => setIsChatOpen((value) => !value)}
+            onClick={() => {
+              setIsChatOpen((value) => !value);
+              chat.setUnreadCount(0);
+            }}
             className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-1xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
             aria-label={
               isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
@@ -2048,6 +2054,12 @@ export function ActiveRoom() {
               <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
               <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
+            )}
+
+            {chat.unreadCount > 0 && !isChatOpen && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-bounce">
+                {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+              </span>
             )}
           </button>
 
@@ -2091,7 +2103,7 @@ export function ActiveRoom() {
                     </div>
                   </div>
                 </div>
-                {renderChatContent()}
+                {renderChatContent(chatMessagesContainerRef)}
               </>
             )}
           </aside>
