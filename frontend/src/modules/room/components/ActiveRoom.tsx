@@ -17,9 +17,11 @@ import {
   ScreenShareOff,
   Phone,
   Send,
+  Settings,
   Users,
   Video,
   VideoOff,
+  Volume2,
   Wifi,
   WifiOff,
   X,
@@ -84,12 +86,49 @@ export function ActiveRoom() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>("");
+  const [micLevel, setMicLevel] = useState<number>(0);
+  const [settingsTab, setSettingsTab] = useState<"devices" | "room">("devices");
+  const [editingRoomName, setEditingRoomName] = useState<string>("");
+  const [isSavingRoom, setIsSavingRoom] = useState(false);
+  
+  // Estados para sincronización de WebRTC y accesibilidad de audio
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
+  const [isAudioAutoplayBlocked, setIsAudioAutoplayBlocked] = useState(false);
+
   const webRTC = useWebRTC(localStreamRef);
+
+  const getRealUsername = async (uid: string, fallback: string): Promise<string> => {
+    const cached = userProfilesCacheRef.current.get(uid);
+    if (cached?.username) return cached.username;
+
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        const profile = await fetchUserProfileSummary(uid, token);
+        if (profile?.username) {
+          userProfilesCacheRef.current.set(uid, profile);
+          return profile.username;
+        }
+      } catch (err) {
+        console.warn("Error resolving username for toast:", err);
+      }
+    }
+    return fallback;
+  };
 
   const {
     mediaPerms,
     mediaInitStatus,
     retryMedia,
+    selectedAudioId,
+    setSelectedAudioId,
+    selectedVideoId,
+    setSelectedVideoId,
   } = useMedia(
     localStreamRef,
     () =>
@@ -109,13 +148,15 @@ export function ActiveRoom() {
   const mobileCols = participants.length <= 3 ? 1 : 2;
 
   const desktopCols =
-    participants.length <= 2
-      ? participants.length
-      : participants.length === 3
-        ? 3
-        : participants.length === 4
-          ? 2
-          : 3;
+    participants.length === 1
+      ? 2 // Show local user tile + placeholder waiting card side-by-side
+      : participants.length === 2
+        ? 2
+        : participants.length === 3
+          ? 3
+          : participants.length === 4
+            ? 2
+            : 3;
 
   const gridCols = isSm ? desktopCols : mobileCols;
   const effectiveGridCols = isSm && participants.length === 5 ? 6 : gridCols;
@@ -182,42 +223,79 @@ export function ActiveRoom() {
             }}
           />
         ) : !isCurrent && remoteStream ? (
-          <video
-            autoPlay
-            playsInline
-            className={`absolute inset-0 h-full w-full object-cover ${!camOn ? "hidden" : ""}`}
-            ref={(el) => {
-              if (el && remoteStream && el.srcObject !== remoteStream) {
-                el.srcObject = remoteStream;
-              }
-            }}
-          />
+          <>
+            <video
+              autoPlay
+              playsInline
+              muted
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${!camOn ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+              ref={(el) => {
+                if (el) {
+                  if (remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                  }
+                  el.play().catch((err) => {
+                    console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                  });
+                }
+              }}
+            />
+            <audio
+              autoPlay
+              playsInline
+              ref={(el) => {
+                if (el) {
+                  if (remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                  }
+                  if (selectedSpeakerId && typeof (el as any).setSinkId === "function") {
+                    (el as any).setSinkId(selectedSpeakerId).catch((err: any) =>
+                      console.warn("[WebRTC] Error al aplicar setSinkId al audio remoto:", err)
+                    );
+                  }
+                  el.play().catch((err) => {
+                    console.warn("[WebRTC] Autoplay del audio remoto bloqueado por el navegador:", err);
+                    if (err.name === "NotAllowedError") {
+                      setIsAudioAutoplayBlocked(true);
+                    }
+                  });
+                }
+              }}
+            />
+          </>
         ) : null}
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
-          <div className="text-center">
-            {p.photoURL ? (
-              <img
-                src={p.photoURL}
-                alt=""
-                className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
-              />
-            ) : (
-              <div
-                className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
-                aria-hidden="true"
-              >
-                <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
-                  {getInitials(name)}
-                </span>
-              </div>
-            )}
-            <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
-              {isCurrent ? "Tú" : name}
-            </p>
-            {p.isHost && (
-              <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
-            )}
-          </div>
+          {isCurrent && mediaInitStatus === "initializing" ? (
+            <div className="text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" />
+              <p className="text-xs text-gray-400">Accediendo a dispositivos...</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              {p.photoURL ? (
+                <img
+                  src={p.photoURL}
+                  alt=""
+                  className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+                />
+              ) : (
+                <div
+                  className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                  aria-hidden="true"
+                >
+                  <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                    {getInitials(name)}
+                  </span>
+                </div>
+              )}
+              <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+                {isCurrent ? "Tú" : name}
+              </p>
+              {p.isHost && (
+                <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="absolute right-3 top-3 flex gap-1.5">
           <span
@@ -335,30 +413,6 @@ export function ActiveRoom() {
           setSocketError("");
           chat.setChatStatus("loading");
           chat.setChatHistoryError("");
-
-          const localParticipant: RoomParticipant = {
-            uid: user.uid,
-            username: currentUsername,
-            displayName: currentUserName,
-            photoURL: profile?.photoURL,
-            isHost: room.ownerUid === user.uid,
-            cameraEnabled: isCameraOn,
-            microphoneEnabled: isMicOn,
-            screenSharing: isScreenSharing,
-            isSpeaking: false,
-          };
-
-          socket?.emit("join-room", {
-            roomId,
-            uid: user.uid,
-            username: currentUsername,
-            microphoneEnabled: isMicOn,
-            cameraEnabled: isCameraOn,
-          });
-
-          setParticipants((currentParticipants) =>
-            upsertParticipant(currentParticipants, localParticipant)
-          );
         });
 
         socket.on("connect_error", (error) => {
@@ -529,6 +583,32 @@ export function ActiveRoom() {
 
         webRTC.registerWebRTCEventHandlers(socket, user.uid);
 
+        socket.on("user-joined", async (payload: { socketId: string; user: { uid: string; username?: string; displayName?: string; name?: string } }) => {
+          if (payload.user && payload.user.uid !== user.uid) {
+            const fallbackName = payload.user.username || "compañero";
+            const name = await getRealUsername(payload.user.uid, fallbackName);
+            showToast.info(`${name} ha entrado a la sala.`);
+          }
+        });
+
+        socket.on("user-left", async (payload: { socketId: string; uid: string }) => {
+          if (payload.uid !== user.uid) {
+            const cached = userProfilesCacheRef.current.get(payload.uid);
+            let name = cached?.username || "";
+            
+            if (!name) {
+              const currentParticipant = participants.find(p => p.uid === payload.uid);
+              name = currentParticipant?.username || "";
+            }
+            
+            if (!name) {
+              name = await getRealUsername(payload.uid, "compañero");
+            }
+            
+            showToast.info(`${name} ha salido de la sala.`);
+          }
+        });
+
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
@@ -583,6 +663,7 @@ export function ActiveRoom() {
 
       socketRef.current = null;
       setIsConnected(false);
+      setHasJoinedRoom(false);
     };
   }, [
     roomId,
@@ -689,16 +770,15 @@ export function ActiveRoom() {
     if (isCameraOn) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
-        if (mediaPerms.video === "denied") {
-          showToast.warning("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
-        } else if (mediaPerms.video === "unavailable") {
-          showToast.warning("No se detectó ninguna cámara en este dispositivo.");
-        } else if (mediaPerms.video === "error") {
-          showToast.warning("Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.");
-        }
-        if (!retryingMediaRef.current.has("video")) {
-          retryingMediaRef.current.add("video");
-          retryMedia("video").finally(() => retryingMediaRef.current.delete("video"));
+        if (mediaPerms.video !== "prompt") {
+          setIsCameraOn(false);
+          if (mediaPerms.video === "denied") {
+            showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
+          } else if (mediaPerms.video === "unavailable") {
+            showToast.error("No se detectó ninguna cámara en este dispositivo.");
+          } else if (mediaPerms.video === "error") {
+            showToast.error("Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.");
+          }
         }
       } else {
         videoTracks.forEach((t) => { t.enabled = true; });
@@ -710,16 +790,15 @@ export function ActiveRoom() {
     if (isMicOn) {
       const audioTracks = localStreamRef.current?.getAudioTracks();
       if (!audioTracks || audioTracks.length === 0) {
-        if (mediaPerms.audio === "denied") {
-          showToast.warning("Permiso de micrófono denegado. Concede el permiso desde la configuración del navegador para usar el micrófono.");
-        } else if (mediaPerms.audio === "unavailable") {
-          showToast.warning("No se detectó ningún micrófono en este dispositivo.");
-        } else if (mediaPerms.audio === "error") {
-          showToast.warning("Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.");
-        }
-        if (!retryingMediaRef.current.has("audio")) {
-          retryingMediaRef.current.add("audio");
-          retryMedia("audio").finally(() => retryingMediaRef.current.delete("audio"));
+        if (mediaPerms.audio !== "prompt") {
+          setIsMicOn(false);
+          if (mediaPerms.audio === "denied") {
+            showToast.error("Permiso de micrófono denegado. Concede el permiso desde la configuración del navegador para usar el micrófono.");
+          } else if (mediaPerms.audio === "unavailable") {
+            showToast.error("No se detectó ningún micrófono en este dispositivo.");
+          } else if (mediaPerms.audio === "error") {
+            showToast.error("Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.");
+          }
         }
       } else {
         audioTracks.forEach((t) => { t.enabled = true; });
@@ -739,18 +818,325 @@ export function ActiveRoom() {
     if (!isChatOpen) return;
 
     const chatContainer = chatMessagesContainerRef.current;
-
     if (!chatContainer) return;
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    chatContainer.scrollTo({
-      top: chatContainer.scrollHeight,
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
+    const scrollTimer = setTimeout(() => {
+      chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
+    }, 50);
+
+    return () => clearTimeout(scrollTimer);
   }, [chat.chatMessages.length, isChatOpen]);
+
+  // Sincronizar unión a la sala cuando el socket esté conectado y los medios inicializados
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom) return;
+
+    // Esperar a que la inicialización de medios haya concluido (ready o error)
+    if (mediaInitStatus === "initializing" || mediaInitStatus === "idle") {
+      return;
+    }
+
+    const localParticipant: RoomParticipant = {
+      uid: user.uid,
+      username: currentUsername,
+      displayName: currentUserName,
+      photoURL: profile?.photoURL,
+      isHost: room.ownerUid === user.uid,
+      cameraEnabled: isCameraOn,
+      microphoneEnabled: isMicOn,
+      screenSharing: isScreenSharing,
+      isSpeaking: false,
+    };
+
+    console.log("[ActiveRoom] Uniendo a la sala vía socket. Medios listos. Username:", currentUsername);
+    socket.emit("join-room", {
+      roomId,
+      uid: user.uid,
+      username: currentUsername,
+      microphoneEnabled: isMicOn,
+      cameraEnabled: isCameraOn,
+    });
+
+    setParticipants((currentParticipants) =>
+      upsertParticipant(currentParticipants, localParticipant)
+    );
+    setHasJoinedRoom(true);
+  }, [
+    isConnected,
+    mediaInitStatus,
+    user,
+    room,
+    roomId,
+    currentUsername,
+    currentUserName,
+    profile?.photoURL,
+    isCameraOn,
+    isMicOn,
+    isScreenSharing,
+    hasJoinedRoom,
+  ]);
+
+  const handleUnblockAudio = () => {
+    document.querySelectorAll("audio").forEach((el) => {
+      el.play()
+        .then(() => {
+          console.log("Audio reproducido con éxito tras la interacción del usuario.");
+        })
+        .catch((err) => {
+          console.error("No se pudo reproducir el audio remoto:", err);
+        });
+    });
+    setIsAudioAutoplayBlocked(false);
+  };
+
+  const isCameraBlocked =
+    mediaPerms.video === "denied" ||
+    mediaPerms.video === "unavailable" ||
+    mediaPerms.video === "error";
+
+  const isMicBlocked =
+    mediaPerms.audio === "denied" ||
+    mediaPerms.audio === "unavailable" ||
+    mediaPerms.audio === "error";
+
+  const handleCameraClick = async () => {
+    if (isCameraBlocked) {
+      if (mediaPerms.video === "denied") {
+        showToast.error(
+          "No es posible acceder a la cámara. Por favor, concede los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
+        );
+      } else if (mediaPerms.video === "unavailable") {
+        showToast.error("No se detectó ninguna cámara en este dispositivo.");
+      } else {
+        showToast.error(
+          "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación."
+        );
+      }
+      
+      try {
+        await retryMedia("video");
+        const videoTracks = localStreamRef.current?.getVideoTracks() ?? [];
+        if (videoTracks.length > 0) {
+          setIsCameraOn(true);
+          showToast.success("¡Cámara activada correctamente!");
+        }
+      } catch (err) {
+        console.warn("Reintento de cámara fallido:", err);
+      }
+      return;
+    }
+    setIsCameraOn((value) => !value);
+  };
+
+  const handleMicClick = async () => {
+    if (isMicBlocked) {
+      if (mediaPerms.audio === "denied") {
+        showToast.error(
+          "No es posible acceder al micrófono. Por favor, concede los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
+        );
+      } else if (mediaPerms.audio === "unavailable") {
+        showToast.error("No se detectó ningún micrófono en este dispositivo.");
+      } else {
+        showToast.error(
+          "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación."
+        );
+      }
+      
+      try {
+        await retryMedia("audio");
+        const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
+        if (audioTracks.length > 0) {
+          setIsMicOn(true);
+          showToast.success("¡Micrófono activado correctamente!");
+        }
+      } catch (err) {
+        console.warn("Reintento de micrófono fallido:", err);
+      }
+      return;
+    }
+    setIsMicOn((value) => !value);
+  };
+
+  const handleDeviceChange = async (kind: "audio" | "video", deviceId: string) => {
+    if (kind === "audio") {
+      setSelectedAudioId(deviceId);
+      if (isMicOn) {
+        await retryMedia("audio", deviceId);
+      }
+    } else {
+      setSelectedVideoId(deviceId);
+      if (isCameraOn) {
+        await retryMedia("video", deviceId);
+      }
+    }
+  };
+
+  const handleSpeakerChange = (deviceId: string) => {
+    setSelectedSpeakerId(deviceId);
+    document.querySelectorAll("video, audio").forEach((el) => {
+      if (typeof (el as any).setSinkId === "function") {
+        (el as any).setSinkId(deviceId).catch((err: any) => 
+          console.warn("Error al redireccionar salida de audio para el elemento:", err)
+        );
+      }
+    });
+  };
+
+  const playTestSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      if (selectedSpeakerId && typeof (audioCtx as any).setSinkId === "function") {
+        (audioCtx as any).setSinkId(selectedSpeakerId).catch((err: any) => 
+          console.warn("No se pudo establecer el dispositivo de salida en el contexto de audio:", err)
+        );
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5 chime
+      
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8); // decay
+      
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+      
+      showToast.success("Reproduciendo sonido de prueba...");
+    } catch (err) {
+      console.error("Error al reproducir sonido de prueba:", err);
+      showToast.error("No se pudo reproducir el sonido de prueba.");
+    }
+  };
+
+  const handleSaveRoomName = async () => {
+    if (!roomId || !editingRoomName.trim() || !user) return;
+    try {
+      setIsSavingRoom(true);
+      const token = await user.getIdToken();
+      const updated = await api.updateRoom(roomId, { name: editingRoomName.trim() }, token);
+      setRoom(updated);
+      showToast.success("¡Nombre de la sala actualizado correctamente!");
+    } catch (err) {
+      console.error("Error al actualizar la sala:", err);
+      showToast.error("No se pudo actualizar el nombre de la sala.");
+    } finally {
+      setIsSavingRoom(false);
+    }
+  };
+
+  useEffect(() => {
+    async function getDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const video = devices.filter(d => d.kind === "videoinput");
+        const audioIn = devices.filter(d => d.kind === "audioinput");
+        const audioOut = devices.filter(d => d.kind === "audiooutput");
+
+        setVideoDevices(video);
+        setAudioInputDevices(audioIn);
+        setAudioOutputDevices(audioOut);
+
+        if (!selectedSpeakerId && audioOut.length > 0) {
+          const defaultSpk = audioOut.find(d => d.deviceId === "default") || audioOut[0];
+          setSelectedSpeakerId(defaultSpk.deviceId);
+        }
+      } catch (err) {
+        console.error("Error al obtener la lista de dispositivos:", err);
+      }
+    }
+    
+    if (isSettingsOpen) {
+      getDevices();
+    }
+  }, [isSettingsOpen, mediaPerms]);
+
+  useEffect(() => {
+    if (!isSettingsOpen || !selectedAudioId || mediaPerms.audio !== "granted") {
+      setMicLevel(0);
+      return;
+    }
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let stream: MediaStream | null = null;
+    let animationFrameId = 0;
+
+    async function startAnalyser() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: selectedAudioId } }
+        });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        const updateLevel = () => {
+          if (!analyser) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          const level = Math.min(100, Math.round((average / 120) * 100));
+          setMicLevel(level);
+          animationFrameId = requestAnimationFrame(updateLevel);
+        };
+        
+        updateLevel();
+      } catch (err) {
+        console.warn("No se pudo iniciar el analizador de volumen del micrófono:", err);
+      }
+    }
+
+    startAnalyser();
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+      }
+    };
+  }, [isSettingsOpen, selectedAudioId, mediaPerms.audio]);
+
+  useEffect(() => {
+    if (!selectedSpeakerId) return;
+    document.querySelectorAll("video, audio").forEach((el) => {
+      if (typeof (el as any).setSinkId === "function") {
+        (el as any).setSinkId(selectedSpeakerId).catch((err: any) => 
+          console.warn("Error al redireccionar salida de audio para el elemento:", err)
+        );
+      }
+    });
+  }, [selectedSpeakerId, webRTC.remoteStreams]);
+
+  useEffect(() => {
+    if (isSettingsOpen && room) {
+      setEditingRoomName(room.name);
+    }
+  }, [isSettingsOpen, room]);
 
   const handleCopyId = async () => {
     if (!roomId) return;
@@ -1102,14 +1488,55 @@ export function ActiveRoom() {
         </div>
       </header>
 
-      {socketError && (
-        <p
-          className="flex-shrink-0 bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white"
+      {!isConnected && (
+        <div 
+          className="flex-shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-amber-200 text-sm shadow-md flex items-center justify-between gap-3"
           role="alert"
           aria-live="assertive"
         >
-          {socketError}
-        </p>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 animate-pulse" />
+            <span>
+              <span className="font-semibold text-amber-400">Sin conexión en tiempo real:</span>{" "}
+              {socketError || "Intentando establecer la conexión con la sala. Verifica tu red."}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (socketRef.current) {
+                socketRef.current.connect();
+              }
+            }}
+            className="text-xs bg-amber-500 text-gray-950 font-bold px-3 py-1.5 rounded-lg hover:bg-amber-400 transition cursor-pointer"
+          >
+            Reconectar
+          </button>
+        </div>
+      )}
+
+      {isAudioAutoplayBlocked && (
+        <div 
+          className="flex-shrink-0 bg-red-500/10 border-b border-red-500/20 px-4 py-3 text-red-200 text-sm shadow-md flex items-center justify-between gap-3"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 animate-pulse" aria-hidden="true" />
+            <span>
+              <span className="font-semibold text-red-400">Audio bloqueado:</span>{" "}
+              El navegador ha silenciado el audio de la sala. Presiona el botón para activar el audio de los participantes.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleUnblockAudio}
+            className="text-xs bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-red-500 transition cursor-pointer focus:ring-2 focus:ring-red-400"
+            aria-label="Activar audio de los participantes"
+          >
+            Activar audio
+          </button>
+        </div>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-visible lg:flex-row">
@@ -1124,21 +1551,10 @@ export function ActiveRoom() {
             }}
           >
             {participants.length === 0 ? (
-              <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
-                <div>
-                  <Users
-                    className="mx-auto h-10 w-10 text-gray-400"
-                    aria-hidden="true"
-                  />
-
-                  <p className="mt-4 font-semibold text-white">
-                    Aún no hay participantes conectados
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-400">
-                    Cuando alguien entre a la sala aparecerá aquí.
-                  </p>
-                </div>
+              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
+                <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
+                <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
+                <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
               </div>
             ) : (
               <AnimatePresence mode="popLayout">
@@ -1148,6 +1564,43 @@ export function ActiveRoom() {
                     : undefined;
                   return renderParticipantTile(p, i, gridColumn);
                 })}
+
+                {participants.length === 1 && (
+                  <motion.div
+                    key="waiting-placeholder"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
+                  >
+                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                      <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                    </div>
+                    <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                    <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                      Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCopyId}
+                      className="mt-4 flex items-center gap-1.5 rounded-lg bg-gray-700/80 px-4 py-2.5 text-xs font-semibold text-white hover:bg-gray-600 transition cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-green-400" />
+                          <span>¡ID copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Copiar ID</span>
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
+
                 {showOverflow && (
                   <motion.div
                     key="overflow"
@@ -1190,16 +1643,26 @@ export function ActiveRoom() {
               {/* Camera */}
               <button
                 type="button"
-                onClick={() => setIsCameraOn((value) => !value)}
+                onClick={handleCameraClick}
                 className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
-                  isCameraOn
-                    ? "bg-primary-600 text-white hover:bg-primary-700"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  isCameraBlocked
+                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    : isCameraOn
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isCameraOn}
-                aria-label={isCameraOn ? "Apagar cámara" : "Encender cámara"}
+                aria-label={
+                  isCameraBlocked
+                    ? "Cámara bloqueada por permisos"
+                    : isCameraOn
+                      ? "Apagar cámara"
+                      : "Encender cámara"
+                }
               >
-                {isCameraOn ? (
+                {isCameraBlocked ? (
+                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
+                ) : isCameraOn ? (
                   <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
                   <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
@@ -1209,16 +1672,26 @@ export function ActiveRoom() {
               {/* Mic */}
               <button
                 type="button"
-                onClick={() => setIsMicOn((value) => !value)}
+                onClick={handleMicClick}
                 className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
-                  isMicOn
-                    ? "bg-primary-600 text-white hover:bg-primary-700"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  isMicBlocked
+                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    : isMicOn
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isMicOn}
-                aria-label={isMicOn ? "Silenciar micrófono" : "Activar micrófono"}
+                aria-label={
+                  isMicBlocked
+                    ? "Micrófono bloqueado por permisos"
+                    : isMicOn
+                      ? "Silenciar micrófono"
+                      : "Activar micrófono"
+                }
               >
-                {isMicOn ? (
+                {isMicBlocked ? (
+                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
+                ) : isMicOn ? (
                   <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
                   <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
@@ -1242,6 +1715,17 @@ export function ActiveRoom() {
                 ) : (
                   <ScreenShareOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
+              </button>
+
+              {/* Settings */}
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14"
+                aria-label="Configuración de la sala"
+                title="Configuración"
+              >
+                <Settings className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
               </button>
 
               {/* Chat — mobile only */}
@@ -1405,6 +1889,241 @@ export function ActiveRoom() {
           </aside>
         </div>
       </div>
+
+      {/* Modal de Configuración */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="settings-dialog-title"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative z-10 w-full max-w-lg rounded-2xl bg-gray-900 border border-gray-800 text-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+                <h2 id="settings-dialog-title" className="text-lg font-bold flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-primary-400" />
+                  Configuración de la Sala
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition cursor-pointer"
+                  aria-label="Cerrar configuración"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Navigation Tabs */}
+              {room?.ownerUid === user?.uid && (
+                <div className="flex border-b border-gray-800 px-6 bg-gray-950" role="tablist" aria-label="Secciones de configuración">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "devices"}
+                    aria-controls="settings-panel-devices"
+                    onClick={() => setSettingsTab("devices")}
+                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition cursor-pointer ${
+                      settingsTab === "devices"
+                        ? "border-primary-500 text-primary-400"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Dispositivos
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "room"}
+                    aria-controls="settings-panel-room"
+                    onClick={() => setSettingsTab("room")}
+                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition cursor-pointer ${
+                      settingsTab === "room"
+                        ? "border-primary-500 text-primary-400"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Gestión de Sala (Anfitrión)
+                  </button>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {settingsTab === "devices" ? (
+                  <div id="settings-panel-devices" role="tabpanel" className="space-y-6">
+                    {/* Selector de Cámara */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-camera-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Cámara de video
+                      </label>
+                      <select
+                        id="settings-camera-select"
+                        value={selectedVideoId}
+                        onChange={(e) => handleDeviceChange("video", e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {videoDevices.length === 0 ? (
+                          <option value="">Cámara por defecto / No detectada</option>
+                        ) : (
+                          videoDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Cámara (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Selector de Micrófono */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-mic-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Micrófono (Entrada)
+                      </label>
+                      <select
+                        id="settings-mic-select"
+                        value={selectedAudioId}
+                        onChange={(e) => handleDeviceChange("audio", e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {audioInputDevices.length === 0 ? (
+                          <option value="">Micrófono por defecto / No detectado</option>
+                        ) : (
+                          audioInputDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Micrófono (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Medidor de Micrófono */}
+                    <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                      <span className="text-xs font-semibold text-gray-400 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Prueba de voz en vivo
+                      </span>
+                      <div 
+                        className="h-3 w-full rounded-full bg-gray-800 overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={micLevel}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Nivel de entrada del micrófono"
+                      >
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-cyan-500 transition-all duration-75 ease-out"
+                          style={{ width: `${micLevel}%` }}
+                        />
+                      </div>
+                      <span className="sr-only">Nivel actual del micrófono: {micLevel} por ciento.</span>
+                    </div>
+
+                    {/* Selector de Parlantes */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-speaker-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Salida de audio (Altavoces / Auriculares)
+                      </label>
+                      <select
+                        id="settings-speaker-select"
+                        value={selectedSpeakerId}
+                        onChange={(e) => handleSpeakerChange(e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {audioOutputDevices.length === 0 ? (
+                          <option value="">Sistema por defecto</option>
+                        ) : (
+                          audioOutputDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Altavoces (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Botón Probar Sonido */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={playTestSound}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-800 border border-gray-700 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-750 transition cursor-pointer"
+                        aria-label="Probar sonido de salida. Reproducirá un tono de prueba en el altavoz seleccionado."
+                      >
+                        <Volume2 className="h-4.5 w-4.5 text-primary-400" />
+                        Probar sonido de salida
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Room management (Host only) */
+                  <div id="settings-panel-room" role="tabpanel" className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="settings-room-name-input" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Nombre de la sala
+                      </label>
+                      <input
+                        id="settings-room-name-input"
+                        type="text"
+                        value={editingRoomName}
+                        onChange={(e) => setEditingRoomName(e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="Ej. Clase de Matemáticas"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSavingRoom || !editingRoomName.trim() || editingRoomName === room?.name}
+                      onClick={handleSaveRoomName}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:bg-gray-800 disabled:text-gray-500 transition cursor-pointer"
+                    >
+                      {isSavingRoom ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Guardando cambios...
+                        </>
+                      ) : (
+                        "Guardar cambios de la sala"
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-gray-950 border-t border-gray-800 px-6 py-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

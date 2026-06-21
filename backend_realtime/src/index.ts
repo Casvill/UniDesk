@@ -53,14 +53,14 @@ function getParticipantsInRoom(roomId: string): (UserInfo & { socketId: string }
 io.on("connection", (socket: AuthenticatedSocket) => {
   console.log("Usuario conectado:", socket.id, "UID:", socket.user?.uid);
 
-  socket.on("join-room", (data: { roomId: string; microphoneEnabled?: boolean; cameraEnabled?: boolean }) => {
+  socket.on("join-room", (data: { roomId: string; username?: string; microphoneEnabled?: boolean; cameraEnabled?: boolean }) => {
     if (!socket.user) {
       return;
     }
 
-    const { roomId, microphoneEnabled, cameraEnabled } = data;
+    const { roomId, username: clientUsername, microphoneEnabled, cameraEnabled } = data;
     const { uid, name, email } = socket.user;
-    const username = name || email || "Anonymous";
+    const username = clientUsername || name || email || "Anonymous";
     
     // Track user
     if (!rooms.has(roomId)) {
