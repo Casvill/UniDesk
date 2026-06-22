@@ -66,6 +66,7 @@ export function ActiveRoom() {
 
   const socketRef = useRef<Socket | null>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileChatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
@@ -129,6 +130,7 @@ export function ActiveRoom() {
     setSelectedAudioId,
     selectedVideoId,
     setSelectedVideoId,
+    localAudioTrackId,
   } = useMedia(
     localStreamRef,
     () =>
@@ -198,6 +200,15 @@ export function ActiveRoom() {
     const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
     const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
 
+    const hasMediaError = isCurrent && (
+      mediaPerms.audio === "denied" ||
+      mediaPerms.video === "denied" ||
+      mediaPerms.audio === "error" ||
+      mediaPerms.video === "error" ||
+      mediaPerms.audio === "unavailable" ||
+      mediaPerms.video === "unavailable"
+    );
+
     return (
       <motion.div
         key={p.uid}
@@ -205,12 +216,15 @@ export function ActiveRoom() {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="relative overflow-hidden rounded-2xl bg-gray-800 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
+          p.isSpeaking 
+            ? "ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
+            : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+        }`}
         style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
-        aria-label={name}
+        aria-label={hasMediaError ? `Error en transmisión de ${name}.` : p.isSpeaking ? `${name} hablando.` : name}
       >
-        {isCurrent && camOn && localStreamRef.current?.getVideoTracks().length ? (
+        {isCurrent && camOn && mediaInitStatus === "ready" && localStreamRef.current?.getVideoTracks().length ? (
           <video
             autoPlay
             muted
@@ -222,7 +236,7 @@ export function ActiveRoom() {
               }
             }}
           />
-        ) : !isCurrent && remoteStream ? (
+        ) : !isCurrent && remoteStream && remoteStream.getVideoTracks().length > 0 ? (
           <>
             <video
               autoPlay
@@ -235,7 +249,9 @@ export function ActiveRoom() {
                     el.srcObject = remoteStream;
                   }
                   el.play().catch((err) => {
-                    console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                    if (err.name !== "AbortError") {
+                      console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                    }
                   });
                 }
               }}
@@ -265,10 +281,45 @@ export function ActiveRoom() {
           </>
         ) : null}
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
-          {isCurrent && mediaInitStatus === "initializing" ? (
-            <div className="text-center">
-              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" />
-              <p className="text-xs text-gray-400">Accediendo a dispositivos...</p>
+          {hasMediaError ? (
+            <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
+              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2 animate-pulse" aria-hidden="true" />
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Acceso Denegado</p>
+              <p className="text-[11px] text-gray-300 leading-normal">
+                {mediaPerms.video === "denied" || mediaPerms.audio === "denied"
+                  ? "Permiso de cámara/micrófono bloqueado. Concedelo en tu navegador para transmitir."
+                  : mediaPerms.video === "unavailable" || mediaPerms.audio === "unavailable"
+                    ? "Cámara/micrófono no detectados. Conecta un dispositivo multimedia."
+                    : "No pudimos acceder a los dispositivos de captura. Revisa que no estén en uso."}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await retryMedia("audio");
+                    await retryMedia("video");
+                    showToast.success("Reintentando acceder a dispositivos multimedia...");
+                  } catch (err) {
+                    console.warn("Reintento fallido de medios:", err);
+                  }
+                }}
+                className="mt-3 cursor-pointer rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-amber-500 transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                aria-label="Reintentar conectar cámara y micrófono"
+              >
+                Reintentar conexión
+              </button>
+            </div>
+          ) : isCurrent && mediaInitStatus === "initializing" ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-gray-300">Solicitando acceso...</p>
+              <p className="text-[10px] text-gray-500 mt-1">Concede los permisos en el navegador para comenzar.</p>
+            </div>
+          ) : !isCurrent && camOn && (!remoteStream || remoteStream.getVideoTracks().length === 0) ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-white">{name}</p>
+              <p className="text-[10px] text-primary-200 mt-1 animate-pulse">Conectando transmisión...</p>
             </div>
           ) : (
             <div className="text-center">
@@ -311,13 +362,23 @@ export function ActiveRoom() {
             )}
           </span>
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
-              micOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg transition-all duration-300 ${
+              p.isSpeaking 
+                ? "bg-green-500 text-white animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" 
+                : micOn 
+                  ? "bg-green-600 text-white" 
+                  : "bg-black/60 text-gray-400"
             }`}
-            aria-label={micOn ? "Micrófono activado" : "Micrófono silenciado"}
+            aria-label={
+              p.isSpeaking 
+                ? "Micrófono transmitiendo voz" 
+                : micOn 
+                  ? "Micrófono activado" 
+                  : "Micrófono silenciado"
+            }
           >
             {micOn ? (
-              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+              <Mic className={`h-3.5 w-3.5 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
             ) : (
               <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
             )}
@@ -583,6 +644,14 @@ export function ActiveRoom() {
 
         webRTC.registerWebRTCEventHandlers(socket, user.uid);
 
+        socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, isSpeaking: payload.speaking } : p
+            )
+          );
+        });
+
         socket.on("user-joined", async (payload: { socketId: string; user: { uid: string; username?: string; displayName?: string; name?: string } }) => {
           if (payload.user && payload.user.uid !== user.uid) {
             const fallbackName = payload.user.username || "compañero";
@@ -817,18 +886,20 @@ export function ActiveRoom() {
   useEffect(() => {
     if (!isChatOpen) return;
 
-    const chatContainer = chatMessagesContainerRef.current;
-    if (!chatContainer) return;
-
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    const scrollTimer = setTimeout(() => {
-      chatContainer.scrollTo({
-        top: chatContainer.scrollHeight,
+    const scrollContainer = (container: HTMLDivElement | null) => {
+      if (!container) return;
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      container.scrollTo({
+        top: container.scrollHeight,
         behavior: prefersReducedMotion ? "auto" : "smooth",
       });
+    };
+
+    const scrollTimer = setTimeout(() => {
+      scrollContainer(chatMessagesContainerRef.current);
+      scrollContainer(mobileChatMessagesContainerRef.current);
     }, 50);
 
     return () => clearTimeout(scrollTimer);
@@ -896,6 +967,149 @@ export function ActiveRoom() {
     });
     setIsAudioAutoplayBlocked(false);
   };
+
+  // Efecto para detectar si el usuario local está hablando y sincronizarlo con el socket
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!isMicOn || !localStreamRef.current || !socket || mediaInitStatus !== "ready") {
+      setParticipants((prev) =>
+        prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+      );
+      return;
+    }
+
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let isSpeaking = false;
+    let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      if (audioTracks.length === 0) return;
+
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      
+      const audioStream = new MediaStream([audioTracks[0]]);
+      source = audioContext.createMediaStreamSource(audioStream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      intervalId = setInterval(() => {
+        if (!analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        const volume = (average / 255) * 100; // Normalizado de 0 a 100
+
+        const threshold = 1.5; // Umbral de detección de volumen para frecuencia
+
+        if (volume > threshold) {
+          if (silenceTimeout) {
+            clearTimeout(silenceTimeout);
+            silenceTimeout = null;
+          }
+          if (!isSpeaking) {
+            isSpeaking = true;
+            socket.emit("user-speaking", { speaking: true });
+            setParticipants((prev) =>
+              prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: true } : p))
+            );
+          }
+        } else {
+          if (isSpeaking && !silenceTimeout) {
+            silenceTimeout = setTimeout(() => {
+              isSpeaking = false;
+              socket.emit("user-speaking", { speaking: false });
+              setParticipants((prev) =>
+                prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+              );
+              silenceTimeout = null;
+            }, 400);
+          }
+        }
+      }, 100);
+
+    } catch (err) {
+      console.warn("No se pudo iniciar el detector local de habla:", err);
+    }
+
+    return () => {
+      if (silenceTimeout) clearTimeout(silenceTimeout);
+      if (intervalId) clearInterval(intervalId);
+      if (source) source.disconnect();
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+      }
+    };
+  }, [isMicOn, mediaInitStatus, user?.uid, isConnected, localAudioTrackId]);
+
+  // Efecto para monitorear el nivel de audio remoto vía getStats de WebRTC
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const intervalId = setInterval(async () => {
+      const pcs = webRTC.peerConnectionsRef.current;
+      if (pcs.size === 0) return;
+
+      const speakingUids = new Set<string>();
+
+      for (const [socketId, pc] of pcs.entries()) {
+        if (pc.connectionState !== "connected") continue;
+
+        try {
+          const stats = await pc.getStats();
+          let isSpeakingRemote = false;
+
+          stats.forEach((report) => {
+            if (report.type === "inbound-rtp" && report.kind === "audio") {
+              // audioLevel en inbound-rtp es una métrica normalizada de 0.0 a 1.0
+              if (typeof report.audioLevel === "number" && report.audioLevel > 0.015) {
+                isSpeakingRemote = true;
+              }
+            }
+          });
+
+          if (isSpeakingRemote) {
+            const uid = Array.from(webRTC.socketIdByUidRef.current.entries())
+              .find(([_, sid]) => sid === socketId)?.[0];
+            if (uid) {
+              speakingUids.add(uid);
+            }
+          }
+        } catch (err) {
+          // Ignorar errores silenciosamente para evitar spam en consola
+        }
+      }
+
+      setParticipants((prev) => {
+        let changed = false;
+        const next = prev.map((p) => {
+          const isCurrentUser = p.uid === user?.uid;
+          if (isCurrentUser) return p; // El usuario local tiene su propio analizador de micrófono directo
+
+          const shouldBeSpeaking = speakingUids.has(p.uid);
+          if (p.isSpeaking !== shouldBeSpeaking) {
+            changed = true;
+            return { ...p, isSpeaking: shouldBeSpeaking };
+          }
+          return p;
+        });
+        return changed ? next : prev;
+      });
+    }, 200);
+
+    return () => clearInterval(intervalId);
+  }, [isConnected, user?.uid, webRTC.peerConnectionsRef, webRTC.socketIdByUidRef]);
 
   const isCameraBlocked =
     mediaPerms.video === "denied" ||
@@ -1162,10 +1376,10 @@ export function ActiveRoom() {
     navigate("/dashboard");
   };
 
-  const renderChatContent = () => (
+  const renderChatContent = (containerRef: React.RefObject<HTMLDivElement | null>) => (
     <>
       <div
-        ref={chatMessagesContainerRef}
+        ref={containerRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
         role="log"
         aria-live="polite"
@@ -1807,7 +2021,7 @@ export function ActiveRoom() {
                   </button>
                 </div>
               </div>
-              {renderChatContent()}
+              {renderChatContent(mobileChatMessagesContainerRef)}
             </div>
           </div>
 
@@ -1821,7 +2035,10 @@ export function ActiveRoom() {
         >
           <button
             type="button"
-            onClick={() => setIsChatOpen((value) => !value)}
+            onClick={() => {
+              setIsChatOpen((value) => !value);
+              chat.setUnreadCount(0);
+            }}
             className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-1xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
             aria-label={
               isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
@@ -1840,6 +2057,12 @@ export function ActiveRoom() {
               <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
               <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
+            )}
+
+            {chat.unreadCount > 0 && !isChatOpen && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-bounce">
+                {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+              </span>
             )}
           </button>
 
@@ -1883,7 +2106,7 @@ export function ActiveRoom() {
                     </div>
                   </div>
                 </div>
-                {renderChatContent()}
+                {renderChatContent(chatMessagesContainerRef)}
               </>
             )}
           </aside>

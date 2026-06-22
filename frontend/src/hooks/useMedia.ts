@@ -13,6 +13,8 @@ export function useMedia(
 
   const [selectedAudioId, setSelectedAudioId] = useState<string>("");
   const [selectedVideoId, setSelectedVideoId] = useState<string>("");
+  const [localAudioTrackId, setLocalAudioTrackId] = useState<string>("");
+  const [localVideoTrackId, setLocalVideoTrackId] = useState<string>("");
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
 
   useEffect(() => {
@@ -53,6 +55,8 @@ export function useMedia(
             if (kind === "audio") setSelectedAudioId(actualId);
             else setSelectedVideoId(actualId);
           }
+          if (kind === "audio") setLocalAudioTrackId(tracks[0].id);
+          else setLocalVideoTrackId(tracks[0].id);
         }
 
         if (localStreamRef.current) {
@@ -134,6 +138,8 @@ export function useMedia(
           if (kind === "audio") setSelectedAudioId(actualId);
           else setSelectedVideoId(actualId);
         }
+        if (kind === "audio") setLocalAudioTrackId(tracks[0].id);
+        else setLocalVideoTrackId(tracks[0].id);
       }
 
       if (localStreamRef.current) {
@@ -183,7 +189,7 @@ export function useMedia(
         }
       });
     });
-  }, [mediaPerms, getPeerConnections]);
+  }, [localAudioTrackId, localVideoTrackId, getPeerConnections]);
 
   return { 
     localStreamRef, 
@@ -193,6 +199,8 @@ export function useMedia(
     selectedAudioId,
     setSelectedAudioId,
     selectedVideoId,
-    setSelectedVideoId
+    setSelectedVideoId,
+    localAudioTrackId,
+    localVideoTrackId
   };
 }
