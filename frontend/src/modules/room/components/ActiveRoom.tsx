@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useMediaQuery } from "@mui/material";
 import {
   AlertCircle,
   Check,
@@ -9,505 +10,54 @@ import {
   ChevronUp,
   Copy,
   Loader2,
-  LogOut,
   MessageSquare,
   Mic,
   MicOff,
-  Monitor,
-  MonitorOff,
+  ScreenShare,
+  ScreenShareOff,
+  Phone,
   Send,
-  Settings as SettingsIcon,
+  Settings,
   Users,
   Video,
   VideoOff,
+  Volume2,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
+import { AnimatePresence, motion } from "motion/react";
+import type {
+  ChatMessage,
+  NewMessagePayload,
+  RoomParticipant,
+  UserProfileSummary,
+} from "@/utils/room";
+import {
+  extractPresenceUsers,
+  fetchUserProfileSummary,
+  formatMessageTime,
+  getInitials,
+  getParticipantGradient,
+  getParticipantName,
+  getPresenceAction,
+  getRoomErrorMessage,
+  mapPresenceUserToParticipant,
+  mergeProfileIntoMessage,
+  mergeProfileIntoParticipant,
+  shouldFetchMessageProfile,
+  shouldFetchParticipantProfile,
+  upsertParticipant,
+} from "@/utils/room";
+import { showToast } from "@/shared/components/ui/toast";
+import { useMedia } from "@/hooks/useMedia";
+import { useWebRTC } from "@/hooks/useWebRTC";
+import { useChat } from "@/hooks/useChat";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-interface RoomParticipant {
-  uid: string;
-  username?: string;
-  displayName?: string;
-  photoURL?: string;
-  avatar?: string;
-  isHost?: boolean;
-  isSpeaking?: boolean;
-  cameraEnabled?: boolean;
-  microphoneEnabled?: boolean;
-  screenSharing?: boolean;
-}
-
-interface ChatMessage {
-  id: string;
-  roomId?: string;
-  senderUid: string;
-  senderName: string;
-  senderPhotoURL?: string;
-  message: string;
-  createdAt?: string;
-}
-
-type ChatStatus = "loading" | "empty" | "error" | "success";
-
-type ChatHistoryPayload = {
-  roomId?: string;
-  messages?: NewMessagePayload[];
-};
-
-type ChatHistoryErrorPayload = {
-  roomId?: string;
-  message?: string;
-};
-
-type ChatHistoryResponse = NewMessagePayload[] | ChatHistoryPayload;
-
-function extractHistoryMessages(payload: ChatHistoryResponse): NewMessagePayload[] {
-  if (Array.isArray(payload)) return payload;
-
-  return payload.messages || [];
-}
-
-type ApiError = Error & {
-  code?: string;
-  status?: number;
-};
-
-type PresenceUser = {
-  uid?: string;
-  userId?: string;
-  id?: string;
-  username?: string;
-  displayName?: string;
-  name?: string;
-  photoURL?: string;
-  picture?: string;
-  avatar?: string;
-};
-
-type PresencePayload = {
-  users?: unknown;
-  participants?: unknown;
-  onlineUsers?: unknown;
-  presence?: unknown;
-  connectedUsers?: unknown;
-  members?: unknown;
-  uid?: string;
-  userId?: string;
-  id?: string;
-  username?: string;
-  displayName?: string;
-  name?: string;
-  action?: string;
-  type?: string;
-  event?: string;
-};
-
-type NewMessagePayload = {
-  id?: string;
-  uid?: string;
-  senderUid?: string;
-  senderUsername?: string;
-  username?: string;
-  senderName?: string;
-  senderPhotoURL?: string;
-  photoURL?: string;
-  picture?: string;
-  avatar?: string;
-  content?: string;
-  message?: string;
-  createdAt?: string;
-};
-
-type UserProfileSummary = {
-  uid: string;
-  username?: string;
-  displayName?: string;
-  photoURL?: string;
-};
-
-function getStringValue(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : undefined;
-}
-
-function normalizeUserProfileResponse(
-  payload: unknown,
-  fallbackUid: string
-): UserProfileSummary | null {
-  if (!isObject(payload)) return null;
-
-  const possiblePayloads = [
-    payload,
-    payload.user,
-    payload.profile,
-    payload.data,
-  ];
-
-  for (const item of possiblePayloads) {
-    if (!isObject(item)) continue;
-
-    const uid =
-      getStringValue(item.uid) ||
-      getStringValue(item.id) ||
-      getStringValue(item.userId) ||
-      fallbackUid;
-
-    const username =
-      getStringValue(item.username) ||
-      getStringValue(item.name);
-
-    const displayName =
-      getStringValue(item.displayName) ||
-      getStringValue(item.fullName) ||
-      getStringValue(item.name) ||
-      username;
-
-    const photoURL =
-      getStringValue(item.photoURL) ||
-      getStringValue(item.photoUrl) ||
-      getStringValue(item.avatarURL) ||
-      getStringValue(item.avatarUrl) ||
-      getStringValue(item.picture) ||
-      getStringValue(item.photo);
-
-    if (username || displayName || photoURL) {
-      return {
-        uid,
-        username,
-        displayName,
-        photoURL,
-      };
-    }
-  }
-
-  return null;
-}
-
-async function fetchUserProfileSummary(uid: string, token: string) {
-  const response = await fetch(`${API_URL}/users/${encodeURIComponent(uid)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`No se pudo cargar el perfil ${uid}`);
-  }
-
-  const payload = await response.json();
-
-  return normalizeUserProfileResponse(payload, uid);
-}
-
-function shouldFetchParticipantProfile(participant: RoomParticipant) {
-  // El backend realtime puede enviar username como nombre completo.
-  // Por eso se intenta cargar una vez el perfil real por uid para priorizar el username guardado.
-  return Boolean(participant.uid);
-}
-
-function shouldFetchMessageProfile(message: ChatMessage) {
-  // Aunque el mensaje ya tenga senderUsername, puede venir como nombre completo desde Firebase Auth.
-  // Se consulta el perfil por uid para mostrar el username real en el chat.
-  return Boolean(message.senderUid);
-}
-
-function mergeProfileIntoParticipant(
-  participant: RoomParticipant,
-  userProfile?: UserProfileSummary
-): RoomParticipant {
-  if (!userProfile) return participant;
-
-  return {
-    ...participant,
-    // Siempre se prioriza el username del perfil, porque el backend puede mandar name/displayName.
-    username: userProfile.username || participant.username || userProfile.displayName,
-    displayName:
-      participant.displayName && participant.displayName !== "Usuario conectado"
-        ? participant.displayName
-        : userProfile.displayName ||
-          userProfile.username ||
-          participant.displayName,
-    photoURL: participant.photoURL || userProfile.photoURL,
-  };
-}
-
-function mergeProfileIntoMessage(
-  message: ChatMessage,
-  userProfile?: UserProfileSummary
-): ChatMessage {
-  if (!userProfile) return message;
-
-  return {
-    ...message,
-    // En el chat debe verse el username, no el nombre completo.
-    senderName:
-      userProfile.username ||
-      message.senderName ||
-      userProfile.displayName ||
-      "Usuario",
-    senderPhotoURL: message.senderPhotoURL || userProfile.photoURL,
-  };
-}
-
-function mapPayloadToChatMessage(
-  msg: NewMessagePayload,
-  fallbackRoomId?: string
-): ChatMessage | null {
-  const messageText = msg.content || msg.message || "";
-
-  if (!messageText.trim()) return null;
-
-  return {
-    id: msg.id || crypto.randomUUID(),
-    roomId: fallbackRoomId,
-    senderUid: msg.senderUid || msg.uid || "",
-    senderName:
-      msg.senderUsername ||
-      msg.username ||
-      msg.senderName ||
-      "Usuario",
-    senderPhotoURL: msg.senderPhotoURL || msg.photoURL || msg.picture || msg.avatar,
-    message: messageText,
-    createdAt: msg.createdAt || new Date().toISOString(),
-  };
-}
-
-function sortMessagesChronologically(messages: ChatMessage[]) {
-  return [...messages].sort((a, b) => {
-    const dateA = new Date(a.createdAt || "").getTime();
-    const dateB = new Date(b.createdAt || "").getTime();
-
-    return dateA - dateB;
-  });
-}
-
-function getRoomErrorMessage(error: unknown) {
-  const apiError = error as ApiError;
-
-  if (
-    apiError.code === "backend/room-not-found" ||
-    apiError.status === 404
-  ) {
-    return "No encontramos esta sala. Verifica el ID e inténtalo nuevamente.";
-  }
-
-  if (
-    apiError.code === "backend/unauthorized" ||
-    apiError.status === 401
-  ) {
-    return "Tu sesión expiró. Inicia sesión nuevamente para ingresar a la sala.";
-  }
-
-  if (apiError.code === "backend/network-error") {
-    return "No pudimos conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.";
-  }
-
-  return "No pudimos cargar la información de la sala.";
-}
-
-function getParticipantName(participant: RoomParticipant) {
-  return participant.username || participant.displayName || "Usuario conectado";
-}
-
-function getInitials(name: string) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return initials || "U";
-}
-
-function getParticipantGradient(index: number) {
-  const gradients = [
-    "from-blue-500 to-cyan-500",
-    "from-purple-500 to-pink-500",
-    "from-green-500 to-emerald-500",
-    "from-orange-500 to-red-500",
-    "from-primary-500 to-purple-500",
-  ];
-
-  return gradients[index % gradients.length];
-}
-
-function upsertParticipant(
-  participants: RoomParticipant[],
-  participant: RoomParticipant
-) {
-  const exists = participants.some((item) => item.uid === participant.uid);
-
-  if (exists) {
-    return participants.map((item) =>
-      item.uid === participant.uid ? { ...item, ...participant } : item
-    );
-  }
-
-  return [...participants, participant];
-}
-
-function formatMessageTime(value?: string) {
-  const date = value ? new Date(value) : new Date();
-
-  return new Intl.DateTimeFormat("es-CO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getArrayFromValue(value: unknown): unknown[] {
-  if (Array.isArray(value)) return value;
-
-  if (isObject(value)) {
-    return Object.values(value);
-  }
-
-  return [];
-}
-
-function getPresenceUsersFromObject(value: unknown): PresenceUser[] {
-  if (!isObject(value)) return [];
-
-  return Object.entries(value)
-    .map(([uid, item]) => {
-      if (typeof item === "string") {
-        return {
-          uid,
-          username: item,
-          displayName: item,
-        };
-      }
-
-      if (isObject(item)) {
-        return {
-          uid,
-          ...item,
-        } as PresenceUser;
-      }
-
-      return null;
-    })
-    .filter(Boolean) as PresenceUser[];
-}
-
-function extractPresenceUsers(data: unknown): PresenceUser[] {
-  if (Array.isArray(data)) {
-    return data.filter(isObject) as PresenceUser[];
-  }
-
-  if (!isObject(data)) return [];
-
-  const payload = data as PresencePayload;
-
-  const possibleLists = [
-    payload.users,
-    payload.participants,
-    payload.onlineUsers,
-    payload.presence,
-    payload.connectedUsers,
-    payload.members,
-  ];
-
-  for (const list of possibleLists) {
-    if (Array.isArray(list)) {
-      return list.filter(isObject) as PresenceUser[];
-    }
-
-    const usersFromObject = getPresenceUsersFromObject(list);
-
-    if (usersFromObject.length > 0) {
-      return usersFromObject;
-    }
-
-    const users = getArrayFromValue(list);
-
-    if (users.length > 0) {
-      return users.filter(isObject) as PresenceUser[];
-    }
-  }
-
-  if ("uid" in data || "userId" in data || "id" in data) {
-    return [data as PresenceUser];
-  }
-
-  return [];
-}
-
-function getPresenceAction(data: unknown) {
-  if (!isObject(data)) return "snapshot";
-
-  const payload = data as PresencePayload;
-  const action = String(payload.action || payload.type || payload.event || "")
-    .toLowerCase()
-    .trim();
-
-  if (
-    action.includes("leave") ||
-    action.includes("left") ||
-    action.includes("disconnect") ||
-    action.includes("offline")
-  ) {
-    return "leave";
-  }
-
-  if (
-    action.includes("join") ||
-    action.includes("joined") ||
-    action.includes("connect") ||
-    action.includes("online")
-  ) {
-    return "join";
-  }
-
-  if (
-    payload.users ||
-    payload.participants ||
-    payload.onlineUsers ||
-    payload.presence ||
-    payload.connectedUsers ||
-    payload.members ||
-    Array.isArray(data)
-  ) {
-    return "snapshot";
-  }
-
-  return "join";
-}
-
-function mapPresenceUserToParticipant(
-  item: PresenceUser,
-  ownerUid?: string
-): RoomParticipant | null {
-  const uid = item.uid || item.userId || item.id;
-
-  if (!uid) return null;
-
-  return {
-    uid,
-    username: item.username || item.name || item.displayName,
-    displayName:
-      item.displayName || item.username || item.name || "Usuario conectado",
-    photoURL: item.photoURL || item.picture || item.avatar,
-    isHost: ownerUid ? uid === ownerUid : false,
-    cameraEnabled: false,
-    microphoneEnabled: true,
-    screenSharing: false,
-    isSpeaking: false,
-  };
-}
 
 export function ActiveRoom() {
   const navigate = useNavigate();
@@ -516,27 +66,327 @@ export function ActiveRoom() {
 
   const socketRef = useRef<Socket | null>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileChatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
+  const isChatOpenRef = useRef(true);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatStatus, setChatStatus] = useState<ChatStatus>("loading");
-  const [chatHistoryError, setChatHistoryError] = useState("");
-  const [message, setMessage] = useState("");
-
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState("");
   const [socketError, setSocketError] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("Conectando...");
-
   const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isMicOn, setIsMicOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  isChatOpenRef.current = isChatOpen;
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>("");
+  const [micLevel, setMicLevel] = useState<number>(0);
+  const [settingsTab, setSettingsTab] = useState<"devices" | "room">("devices");
+  const [editingRoomName, setEditingRoomName] = useState<string>("");
+  const [isSavingRoom, setIsSavingRoom] = useState(false);
+  
+  // Estados para sincronización de WebRTC y accesibilidad de audio
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
+  const [isAudioAutoplayBlocked, setIsAudioAutoplayBlocked] = useState(false);
+
+  const webRTC = useWebRTC(localStreamRef);
+
+  const getRealUsername = async (uid: string, fallback: string): Promise<string> => {
+    const cached = userProfilesCacheRef.current.get(uid);
+    if (cached?.username) return cached.username;
+
+    if (user) {
+      try {
+        const token = await user.getIdToken();
+        const profile = await fetchUserProfileSummary(uid, token);
+        if (profile?.username) {
+          userProfilesCacheRef.current.set(uid, profile);
+          return profile.username;
+        }
+      } catch (err) {
+        console.warn("Error resolving username for toast:", err);
+      }
+    }
+    return fallback;
+  };
+
+  const {
+    mediaPerms,
+    mediaInitStatus,
+    retryMedia,
+    selectedAudioId,
+    setSelectedAudioId,
+    selectedVideoId,
+    setSelectedVideoId,
+    localAudioTrackId,
+  } = useMedia(
+    localStreamRef,
+    () =>
+      new Map(
+        Array.from(
+          webRTC.peerConnectionsRef.current.entries()
+        )
+      ),
+    isMicOn,
+    isCameraOn
+  );
+  const chat = useChat(userProfilesCacheRef);
+
+  const isSm = useMediaQuery("(min-width: 640px)");
+  const isLg = useMediaQuery("(min-width: 1024px)");
+
+  const mobileCols = participants.length <= 3 ? 1 : 2;
+
+  const desktopCols =
+    participants.length === 1
+      ? 2 // Show local user tile + placeholder waiting card side-by-side
+      : participants.length === 2
+        ? 2
+        : participants.length === 3
+          ? 3
+          : participants.length === 4
+            ? 2
+            : 3;
+
+  const gridCols = isSm ? desktopCols : mobileCols;
+  const effectiveGridCols = isSm && participants.length === 5 ? 6 : gridCols;
+
+  const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
+  const overflowVisibleCount = gridCols * 2 - 1;
+
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.uid === user?.uid) return -1;
+    if (b.uid === user?.uid) return 1;
+    return 0;
+  });
+  const visibleParticipants = sortedParticipants.slice(
+    0,
+    showOverflow ? overflowVisibleCount : sortedParticipants.length
+  );
+
+  const renderOverflowAvatar = (p: RoomParticipant, idx: number) => (
+    <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-gray-800 shadow-lg sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+      {p.photoURL ? (
+        <img src={p.photoURL} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div
+          className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${getParticipantGradient(idx)}`}
+        >
+          <span className="text-xs font-bold text-white sm:text-sm">
+            {getInitials(getParticipantName(p))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
+    const name = getParticipantName(p);
+    const isCurrent = p.uid === user?.uid;
+    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? false;
+    const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
+    const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
+    const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
+
+    const hasMediaError = isCurrent && (
+      mediaPerms.audio === "denied" ||
+      mediaPerms.video === "denied" ||
+      mediaPerms.audio === "error" ||
+      mediaPerms.video === "error" ||
+      mediaPerms.audio === "unavailable" ||
+      mediaPerms.video === "unavailable"
+    );
+
+    return (
+      <motion.div
+        key={p.uid}
+        layout
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        className={`relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
+          p.isSpeaking 
+            ? "ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
+            : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+        }`}
+        style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
+        aria-label={hasMediaError ? `Error en transmisión de ${name}.` : p.isSpeaking ? `${name} hablando.` : name}
+      >
+        {isCurrent && camOn && mediaInitStatus === "ready" && localStreamRef.current?.getVideoTracks().length ? (
+          <video
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+            ref={(el) => {
+              if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                el.srcObject = localStreamRef.current;
+              }
+            }}
+          />
+        ) : !isCurrent && remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+          <>
+            <video
+              autoPlay
+              playsInline
+              muted
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${!camOn ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+              ref={(el) => {
+                if (el) {
+                  if (remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                  }
+                  el.play().catch((err) => {
+                    if (err.name !== "AbortError") {
+                      console.warn("[WebRTC] Autoplay del video remoto bloqueado u omitido:", err);
+                    }
+                  });
+                }
+              }}
+            />
+            <audio
+              autoPlay
+              playsInline
+              ref={(el) => {
+                if (el) {
+                  if (remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                  }
+                  if (selectedSpeakerId && typeof (el as any).setSinkId === "function") {
+                    (el as any).setSinkId(selectedSpeakerId).catch((err: any) =>
+                      console.warn("[WebRTC] Error al aplicar setSinkId al audio remoto:", err)
+                    );
+                  }
+                  el.play().catch((err) => {
+                    console.warn("[WebRTC] Autoplay del audio remoto bloqueado por el navegador:", err);
+                    if (err.name === "NotAllowedError") {
+                      setIsAudioAutoplayBlocked(true);
+                    }
+                  });
+                }
+              }}
+            />
+          </>
+        ) : null}
+        <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+          {hasMediaError ? (
+            <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
+              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2 animate-pulse" aria-hidden="true" />
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Acceso Denegado</p>
+              <p className="text-[11px] text-gray-300 leading-normal">
+                {mediaPerms.video === "denied" || mediaPerms.audio === "denied"
+                  ? "Permiso de cámara/micrófono bloqueado. Concedelo en tu navegador para transmitir."
+                  : mediaPerms.video === "unavailable" || mediaPerms.audio === "unavailable"
+                    ? "Cámara/micrófono no detectados. Conecta un dispositivo multimedia."
+                    : "No pudimos acceder a los dispositivos de captura. Revisa que no estén en uso."}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await retryMedia("audio");
+                    await retryMedia("video");
+                    showToast.success("Reintentando acceder a dispositivos multimedia...");
+                  } catch (err) {
+                    console.warn("Reintento fallido de medios:", err);
+                  }
+                }}
+                className="mt-3 cursor-pointer rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-md hover:bg-amber-500 transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                aria-label="Reintentar conectar cámara y micrófono"
+              >
+                Reintentar conexión
+              </button>
+            </div>
+          ) : isCurrent && mediaInitStatus === "initializing" ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-gray-300">Solicitando acceso...</p>
+              <p className="text-[10px] text-gray-500 mt-1">Concede los permisos en el navegador para comenzar.</p>
+            </div>
+          ) : !isCurrent && camOn && (!remoteStream || remoteStream.getVideoTracks().length === 0) ? (
+            <div className="text-center px-4" role="status" aria-live="polite">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-400 mb-2" aria-hidden="true" />
+              <p className="text-xs font-semibold text-white">{name}</p>
+              <p className="text-[10px] text-primary-200 mt-1 animate-pulse">Conectando transmisión...</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              {p.photoURL ? (
+                <img
+                  src={p.photoURL}
+                  alt=""
+                  className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+                />
+              ) : (
+                <div
+                  className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                  aria-hidden="true"
+                >
+                  <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                    {getInitials(name)}
+                  </span>
+                </div>
+              )}
+              <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+                {isCurrent ? "Tú" : name}
+              </p>
+              {p.isHost && (
+                <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="absolute right-3 top-3 flex gap-1.5">
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+              camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={camOn ? "Cámara encendida" : "Cámara apagada"}
+          >
+            {camOn ? (
+              <Video className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+          <span
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg transition-all duration-300 ${
+              p.isSpeaking 
+                ? "bg-green-500 text-white animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" 
+                : micOn 
+                  ? "bg-green-600 text-white" 
+                  : "bg-black/60 text-gray-400"
+            }`}
+            aria-label={
+              p.isSpeaking 
+                ? "Micrófono transmitiendo voz" 
+                : micOn 
+                  ? "Micrófono activado" 
+                  : "Micrófono silenciado"
+            }
+          >
+            {micOn ? (
+              <Mic className={`h-3.5 w-3.5 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
+            ) : (
+              <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -587,9 +437,7 @@ export function ActiveRoom() {
         const token = await user.getIdToken();
 
         socket = io(SOCKET_URL, {
-          auth: {
-            token,
-          },
+          auth: { token },
           reconnection: true,
           reconnectionAttempts: 8,
           reconnectionDelay: 1000,
@@ -624,30 +472,8 @@ export function ActiveRoom() {
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
-          setChatStatus("loading");
-          setChatHistoryError("");
-
-          const localParticipant: RoomParticipant = {
-            uid: user.uid,
-            username: currentUsername,
-            displayName: currentUserName,
-            photoURL: profile?.photoURL,
-            isHost: room.ownerUid === user.uid,
-            cameraEnabled: isCameraOn,
-            microphoneEnabled: isMicOn,
-            screenSharing: isScreenSharing,
-            isSpeaking: false,
-          };
-
-          socket?.emit("join-room", {
-            roomId,
-            uid: user.uid,
-            username: currentUsername,
-          });
-
-          setParticipants((currentParticipants) =>
-            upsertParticipant(currentParticipants, localParticipant)
-          );
+          chat.setChatStatus("loading");
+          chat.setChatHistoryError("");
         });
 
         socket.on("connect_error", (error) => {
@@ -749,6 +575,14 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
+            console.log("[Sync] room-participants-update received:", currentParticipants.map(p => ({ uid: p.uid, cam: p.cameraEnabled, mic: p.microphoneEnabled })));
+
+            currentParticipants.forEach((p) => {
+              if (p.socketId && p.uid) {
+                webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
+              }
+            });
+
             setParticipants((previousParticipants) =>
               currentParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
@@ -785,9 +619,9 @@ export function ActiveRoom() {
                       previousParticipant?.cameraEnabled ??
                       false,
                     microphoneEnabled:
-                      participant.microphoneEnabled ??
-                      previousParticipant?.microphoneEnabled ??
-                      true,
+                       participant.microphoneEnabled ??
+                       previousParticipant?.microphoneEnabled ??
+                       false,
                     screenSharing:
                       participant.screenSharing ??
                       previousParticipant?.screenSharing ??
@@ -804,83 +638,78 @@ export function ActiveRoom() {
           }
         );
 
-        const handleChatHistory = (payload: ChatHistoryResponse) => {
-          const history = extractHistoryMessages(payload)
-            .map((msg) =>
-              mapPayloadToChatMessage(
-                msg,
-                Array.isArray(payload) ? roomId : payload.roomId || roomId
-              )
+        chat.registerChatEventHandlers(socket, roomId, isChatOpenRef, (err) =>
+          setSocketError(err)
+        );
+
+        webRTC.registerWebRTCEventHandlers(socket, user.uid);
+
+        socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, isSpeaking: payload.speaking } : p
             )
-            .filter(Boolean)
-            .map((msg) => {
-              const message = msg as ChatMessage;
-              const cachedProfile = userProfilesCacheRef.current.get(
-                message.senderUid
-              );
-
-              return mergeProfileIntoMessage(message, cachedProfile);
-            }) as ChatMessage[];
-
-          const orderedHistory = sortMessagesChronologically(history);
-
-          setChatMessages(orderedHistory);
-          setChatHistoryError("");
-          setChatStatus(orderedHistory.length === 0 ? "empty" : "success");
-        };
-
-        socket.on("chat-history", handleChatHistory);
-        socket.on("chat-history-success", handleChatHistory);
-
-        socket.on("chat-history-error", (payload: ChatHistoryErrorPayload) => {
-          setChatHistoryError(
-            payload?.message || "No se pudo cargar el historial del chat."
           );
-          setChatStatus("error");
         });
 
-        socket.on("error", (payload: { message?: string }) => {
-          const errorMessage = payload?.message || "Ocurrió un error en la sala.";
-
-          setSocketError(errorMessage);
-
-          if (chatStatus === "loading") {
-            setChatHistoryError(errorMessage);
-            setChatStatus("error");
+        socket.on("user-joined", async (payload: { socketId: string; user: { uid: string; username?: string; displayName?: string; name?: string } }) => {
+          if (payload.user && payload.user.uid !== user.uid) {
+            const fallbackName = payload.user.username || "compañero";
+            const name = await getRealUsername(payload.user.uid, fallbackName);
+            showToast.info(`${name} ha entrado a la sala.`);
           }
         });
 
-        socket.on("send-message-error", (payload: { message?: string }) => {
-          setSocketError(payload?.message || "No se pudo enviar el mensaje.");
+        socket.on("user-left", async (payload: { socketId: string; uid: string }) => {
+          if (payload.uid !== user.uid) {
+            const cached = userProfilesCacheRef.current.get(payload.uid);
+            let name = cached?.username || "";
+            
+            if (!name) {
+              const currentParticipant = participants.find(p => p.uid === payload.uid);
+              name = currentParticipant?.username || "";
+            }
+            
+            if (!name) {
+              name = await getRealUsername(payload.uid, "compañero");
+            }
+            
+            showToast.info(`${name} ha salido de la sala.`);
+          }
         });
 
-        socket.on("new-message", (msg: NewMessagePayload) => {
-          console.log("Nuevo mensaje:", msg);
-
-          const mappedMessage = mapPayloadToChatMessage(msg, roomId);
-
-          if (!mappedMessage) return;
-
-          const cachedProfile = userProfilesCacheRef.current.get(
-            mappedMessage.senderUid
+        socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: false } : p
+            )
           );
-          const newMessage = mergeProfileIntoMessage(
-            mappedMessage,
-            cachedProfile
-          );
-
-          setChatMessages((currentMessages) => {
-            const exists = currentMessages.some(
-              (item) => item.id === newMessage.id
-            );
-
-            if (exists) return currentMessages;
-
-            return sortMessagesChronologically([...currentMessages, newMessage]);
-          });
-
-          setChatStatus("success");
         });
+
+        socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, microphoneEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: true } : p
+            )
+          );
+        });
+
+        socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.uid ? { ...p, cameraEnabled: false } : p
+            )
+          );
+        });
+
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -892,6 +721,10 @@ export function ActiveRoom() {
     void connectSocket();
 
     return () => {
+      webRTC.peerConnectionsRef.current.forEach((pc) => pc.close());
+      webRTC.peerConnectionsRef.current.clear();
+      webRTC.socketIdByUidRef.current.clear();
+
       if (socket) {
         socket.emit("leave-room");
         socket.disconnect();
@@ -899,6 +732,7 @@ export function ActiveRoom() {
 
       socketRef.current = null;
       setIsConnected(false);
+      setHasJoinedRoom(false);
     };
   }, [
     roomId,
@@ -927,7 +761,7 @@ export function ActiveRoom() {
       }
     });
 
-    chatMessages.forEach((chatMessage) => {
+    chat.chatMessages.forEach((chatMessage) => {
       if (
         chatMessage.senderUid &&
         chatMessage.senderUid !== user.uid &&
@@ -964,7 +798,7 @@ export function ActiveRoom() {
                 )
               );
 
-              setChatMessages((currentMessages) =>
+              chat.setChatMessages((currentMessages) =>
                 currentMessages.map((chatMessage) =>
                   chatMessage.senderUid === uid
                     ? mergeProfileIntoMessage(chatMessage, userProfile)
@@ -984,7 +818,7 @@ export function ActiveRoom() {
     };
 
     void loadMissingProfiles();
-  }, [participants, chatMessages, user]);
+  }, [participants, chat.chatMessages, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1001,24 +835,522 @@ export function ActiveRoom() {
           : participant
       )
     );
+
+    if (isCameraOn) {
+      const videoTracks = localStreamRef.current?.getVideoTracks();
+      if (!videoTracks || videoTracks.length === 0) {
+        if (mediaPerms.video !== "prompt") {
+          setIsCameraOn(false);
+          if (mediaPerms.video === "denied") {
+            showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
+          } else if (mediaPerms.video === "unavailable") {
+            showToast.error("No se detectó ninguna cámara en este dispositivo.");
+          } else if (mediaPerms.video === "error") {
+            showToast.error("Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.");
+          }
+        }
+      } else {
+        videoTracks.forEach((t) => { t.enabled = true; });
+      }
+    } else {
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = false; });
+    }
+
+    if (isMicOn) {
+      const audioTracks = localStreamRef.current?.getAudioTracks();
+      if (!audioTracks || audioTracks.length === 0) {
+        if (mediaPerms.audio !== "prompt") {
+          setIsMicOn(false);
+          if (mediaPerms.audio === "denied") {
+            showToast.error("Permiso de micrófono denegado. Concede el permiso desde la configuración del navegador para usar el micrófono.");
+          } else if (mediaPerms.audio === "unavailable") {
+            showToast.error("No se detectó ningún micrófono en este dispositivo.");
+          } else if (mediaPerms.audio === "error") {
+            showToast.error("Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.");
+          }
+        }
+      } else {
+        audioTracks.forEach((t) => { t.enabled = true; });
+      }
+    } else {
+      localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = false; });
+    }
+
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    socket.emit(isMicOn ? "user-unmuted" : "user-muted");
+    socket.emit(isCameraOn ? "camera-on" : "camera-off");
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
     if (!isChatOpen) return;
 
-    const chatContainer = chatMessagesContainerRef.current;
+    const scrollContainer = (container: HTMLDivElement | null) => {
+      if (!container) return;
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
+    };
 
-    if (!chatContainer) return;
+    const scrollTimer = setTimeout(() => {
+      scrollContainer(chatMessagesContainerRef.current);
+      scrollContainer(mobileChatMessagesContainerRef.current);
+    }, 50);
 
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    return () => clearTimeout(scrollTimer);
+  }, [chat.chatMessages.length, isChatOpen]);
 
-    chatContainer.scrollTo({
-      top: chatContainer.scrollHeight,
-      behavior: prefersReducedMotion ? "auto" : "smooth",
+  // Sincronizar unión a la sala cuando el socket esté conectado y los medios inicializados
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom) return;
+
+    // Esperar a que la inicialización de medios haya concluido (ready o error)
+    if (mediaInitStatus === "initializing" || mediaInitStatus === "idle") {
+      return;
+    }
+
+    const localParticipant: RoomParticipant = {
+      uid: user.uid,
+      username: currentUsername,
+      displayName: currentUserName,
+      photoURL: profile?.photoURL,
+      isHost: room.ownerUid === user.uid,
+      cameraEnabled: isCameraOn,
+      microphoneEnabled: isMicOn,
+      screenSharing: isScreenSharing,
+      isSpeaking: false,
+    };
+
+    console.log("[ActiveRoom] Uniendo a la sala vía socket. Medios listos. Username:", currentUsername);
+    socket.emit("join-room", {
+      roomId,
+      uid: user.uid,
+      username: currentUsername,
+      microphoneEnabled: isMicOn,
+      cameraEnabled: isCameraOn,
     });
-  }, [chatMessages.length, isChatOpen]);
+
+    setParticipants((currentParticipants) =>
+      upsertParticipant(currentParticipants, localParticipant)
+    );
+    setHasJoinedRoom(true);
+  }, [
+    isConnected,
+    mediaInitStatus,
+    user,
+    room,
+    roomId,
+    currentUsername,
+    currentUserName,
+    profile?.photoURL,
+    isCameraOn,
+    isMicOn,
+    isScreenSharing,
+    hasJoinedRoom,
+  ]);
+
+  const handleUnblockAudio = () => {
+    document.querySelectorAll("audio").forEach((el) => {
+      el.play()
+        .then(() => {
+          console.log("Audio reproducido con éxito tras la interacción del usuario.");
+        })
+        .catch((err) => {
+          console.error("No se pudo reproducir el audio remoto:", err);
+        });
+    });
+    setIsAudioAutoplayBlocked(false);
+  };
+
+  // Efecto para detectar si el usuario local está hablando y sincronizarlo con el socket
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!isMicOn || !localStreamRef.current || !socket || mediaInitStatus !== "ready") {
+      setParticipants((prev) =>
+        prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+      );
+      return;
+    }
+
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let isSpeaking = false;
+    let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    try {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      if (audioTracks.length === 0) return;
+
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      
+      const audioStream = new MediaStream([audioTracks[0]]);
+      source = audioContext.createMediaStreamSource(audioStream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      intervalId = setInterval(() => {
+        if (!analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        const volume = (average / 255) * 100; // Normalizado de 0 a 100
+
+        const threshold = 1.5; // Umbral de detección de volumen para frecuencia
+
+        if (volume > threshold) {
+          if (silenceTimeout) {
+            clearTimeout(silenceTimeout);
+            silenceTimeout = null;
+          }
+          if (!isSpeaking) {
+            isSpeaking = true;
+            socket.emit("user-speaking", { speaking: true });
+            setParticipants((prev) =>
+              prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: true } : p))
+            );
+          }
+        } else {
+          if (isSpeaking && !silenceTimeout) {
+            silenceTimeout = setTimeout(() => {
+              isSpeaking = false;
+              socket.emit("user-speaking", { speaking: false });
+              setParticipants((prev) =>
+                prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+              );
+              silenceTimeout = null;
+            }, 400);
+          }
+        }
+      }, 100);
+
+    } catch (err) {
+      console.warn("No se pudo iniciar el detector local de habla:", err);
+    }
+
+    return () => {
+      if (silenceTimeout) clearTimeout(silenceTimeout);
+      if (intervalId) clearInterval(intervalId);
+      if (source) source.disconnect();
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+      }
+    };
+  }, [isMicOn, mediaInitStatus, user?.uid, isConnected, localAudioTrackId]);
+
+  // Efecto para monitorear el nivel de audio remoto vía getStats de WebRTC
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const intervalId = setInterval(async () => {
+      const pcs = webRTC.peerConnectionsRef.current;
+      if (pcs.size === 0) return;
+
+      const speakingUids = new Set<string>();
+
+      for (const [socketId, pc] of pcs.entries()) {
+        if (pc.connectionState !== "connected") continue;
+
+        try {
+          const stats = await pc.getStats();
+          let isSpeakingRemote = false;
+
+          stats.forEach((report) => {
+            if (report.type === "inbound-rtp" && report.kind === "audio") {
+              // audioLevel en inbound-rtp es una métrica normalizada de 0.0 a 1.0
+              if (typeof report.audioLevel === "number" && report.audioLevel > 0.015) {
+                isSpeakingRemote = true;
+              }
+            }
+          });
+
+          if (isSpeakingRemote) {
+            const uid = Array.from(webRTC.socketIdByUidRef.current.entries())
+              .find(([_, sid]) => sid === socketId)?.[0];
+            if (uid) {
+              speakingUids.add(uid);
+            }
+          }
+        } catch (err) {
+          // Ignorar errores silenciosamente para evitar spam en consola
+        }
+      }
+
+      setParticipants((prev) => {
+        let changed = false;
+        const next = prev.map((p) => {
+          const isCurrentUser = p.uid === user?.uid;
+          if (isCurrentUser) return p; // El usuario local tiene su propio analizador de micrófono directo
+
+          const shouldBeSpeaking = speakingUids.has(p.uid);
+          if (p.isSpeaking !== shouldBeSpeaking) {
+            changed = true;
+            return { ...p, isSpeaking: shouldBeSpeaking };
+          }
+          return p;
+        });
+        return changed ? next : prev;
+      });
+    }, 200);
+
+    return () => clearInterval(intervalId);
+  }, [isConnected, user?.uid, webRTC.peerConnectionsRef, webRTC.socketIdByUidRef]);
+
+  const isCameraBlocked =
+    mediaPerms.video === "denied" ||
+    mediaPerms.video === "unavailable" ||
+    mediaPerms.video === "error";
+
+  const isMicBlocked =
+    mediaPerms.audio === "denied" ||
+    mediaPerms.audio === "unavailable" ||
+    mediaPerms.audio === "error";
+
+  const handleCameraClick = async () => {
+    if (isCameraBlocked) {
+      if (mediaPerms.video === "denied") {
+        showToast.error(
+          "No es posible acceder a la cámara. Por favor, concede los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
+        );
+      } else if (mediaPerms.video === "unavailable") {
+        showToast.error("No se detectó ninguna cámara en este dispositivo.");
+      } else {
+        showToast.error(
+          "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación."
+        );
+      }
+      
+      try {
+        await retryMedia("video");
+        const videoTracks = localStreamRef.current?.getVideoTracks() ?? [];
+        if (videoTracks.length > 0) {
+          setIsCameraOn(true);
+          showToast.success("¡Cámara activada correctamente!");
+        }
+      } catch (err) {
+        console.warn("Reintento de cámara fallido:", err);
+      }
+      return;
+    }
+    setIsCameraOn((value) => !value);
+  };
+
+  const handleMicClick = async () => {
+    if (isMicBlocked) {
+      if (mediaPerms.audio === "denied") {
+        showToast.error(
+          "No es posible acceder al micrófono. Por favor, concede los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
+        );
+      } else if (mediaPerms.audio === "unavailable") {
+        showToast.error("No se detectó ningún micrófono en este dispositivo.");
+      } else {
+        showToast.error(
+          "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación."
+        );
+      }
+      
+      try {
+        await retryMedia("audio");
+        const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
+        if (audioTracks.length > 0) {
+          setIsMicOn(true);
+          showToast.success("¡Micrófono activado correctamente!");
+        }
+      } catch (err) {
+        console.warn("Reintento de micrófono fallido:", err);
+      }
+      return;
+    }
+    setIsMicOn((value) => !value);
+  };
+
+  const handleDeviceChange = async (kind: "audio" | "video", deviceId: string) => {
+    if (kind === "audio") {
+      setSelectedAudioId(deviceId);
+      if (isMicOn) {
+        await retryMedia("audio", deviceId);
+      }
+    } else {
+      setSelectedVideoId(deviceId);
+      if (isCameraOn) {
+        await retryMedia("video", deviceId);
+      }
+    }
+  };
+
+  const handleSpeakerChange = (deviceId: string) => {
+    setSelectedSpeakerId(deviceId);
+    document.querySelectorAll("video, audio").forEach((el) => {
+      if (typeof (el as any).setSinkId === "function") {
+        (el as any).setSinkId(deviceId).catch((err: any) => 
+          console.warn("Error al redireccionar salida de audio para el elemento:", err)
+        );
+      }
+    });
+  };
+
+  const playTestSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      if (selectedSpeakerId && typeof (audioCtx as any).setSinkId === "function") {
+        (audioCtx as any).setSinkId(selectedSpeakerId).catch((err: any) => 
+          console.warn("No se pudo establecer el dispositivo de salida en el contexto de audio:", err)
+        );
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5 chime
+      
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8); // decay
+      
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+      
+      showToast.success("Reproduciendo sonido de prueba...");
+    } catch (err) {
+      console.error("Error al reproducir sonido de prueba:", err);
+      showToast.error("No se pudo reproducir el sonido de prueba.");
+    }
+  };
+
+  const handleSaveRoomName = async () => {
+    if (!roomId || !editingRoomName.trim() || !user) return;
+    try {
+      setIsSavingRoom(true);
+      const token = await user.getIdToken();
+      const updated = await api.updateRoom(roomId, { name: editingRoomName.trim() }, token);
+      setRoom(updated);
+      showToast.success("¡Nombre de la sala actualizado correctamente!");
+    } catch (err) {
+      console.error("Error al actualizar la sala:", err);
+      showToast.error("No se pudo actualizar el nombre de la sala.");
+    } finally {
+      setIsSavingRoom(false);
+    }
+  };
+
+  useEffect(() => {
+    async function getDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const video = devices.filter(d => d.kind === "videoinput");
+        const audioIn = devices.filter(d => d.kind === "audioinput");
+        const audioOut = devices.filter(d => d.kind === "audiooutput");
+
+        setVideoDevices(video);
+        setAudioInputDevices(audioIn);
+        setAudioOutputDevices(audioOut);
+
+        if (!selectedSpeakerId && audioOut.length > 0) {
+          const defaultSpk = audioOut.find(d => d.deviceId === "default") || audioOut[0];
+          setSelectedSpeakerId(defaultSpk.deviceId);
+        }
+      } catch (err) {
+        console.error("Error al obtener la lista de dispositivos:", err);
+      }
+    }
+    
+    if (isSettingsOpen) {
+      getDevices();
+    }
+  }, [isSettingsOpen, mediaPerms]);
+
+  useEffect(() => {
+    if (!isSettingsOpen || !selectedAudioId || mediaPerms.audio !== "granted") {
+      setMicLevel(0);
+      return;
+    }
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let stream: MediaStream | null = null;
+    let animationFrameId = 0;
+
+    async function startAnalyser() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: selectedAudioId } }
+        });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        const updateLevel = () => {
+          if (!analyser) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          const level = Math.min(100, Math.round((average / 120) * 100));
+          setMicLevel(level);
+          animationFrameId = requestAnimationFrame(updateLevel);
+        };
+        
+        updateLevel();
+      } catch (err) {
+        console.warn("No se pudo iniciar el analizador de volumen del micrófono:", err);
+      }
+    }
+
+    startAnalyser();
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close();
+      }
+    };
+  }, [isSettingsOpen, selectedAudioId, mediaPerms.audio]);
+
+  useEffect(() => {
+    if (!selectedSpeakerId) return;
+    document.querySelectorAll("video, audio").forEach((el) => {
+      if (typeof (el as any).setSinkId === "function") {
+        (el as any).setSinkId(selectedSpeakerId).catch((err: any) => 
+          console.warn("Error al redireccionar salida de audio para el elemento:", err)
+        );
+      }
+    });
+  }, [selectedSpeakerId, webRTC.remoteStreams]);
+
+  useEffect(() => {
+    if (isSettingsOpen && room) {
+      setEditingRoomName(room.name);
+    }
+  }, [isSettingsOpen, room]);
 
   const handleCopyId = async () => {
     if (!roomId) return;
@@ -1026,66 +1358,6 @@ export function ActiveRoom() {
     await navigator.clipboard.writeText(roomId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRetryChatHistory = () => {
-    if (!socketRef.current || !roomId) return;
-
-    setChatStatus("loading");
-    setChatHistoryError("");
-
-    socketRef.current.emit("join-room", {
-      roomId,
-    });
-  };
-
-  const getMessageUsername = (msg: ChatMessage) => {
-    const participant = participants.find((item) => item.uid === msg.senderUid);
-    const cachedProfile = msg.senderUid
-      ? userProfilesCacheRef.current.get(msg.senderUid)
-      : undefined;
-
-    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
-      return currentUsername;
-    }
-
-    return (
-      cachedProfile?.username ||
-      participant?.username ||
-      msg.senderName ||
-      "Usuario"
-    );
-  };
-
-  const getMessageAvatar = (msg: ChatMessage) => {
-    const participant = participants.find((item) => item.uid === msg.senderUid);
-
-    if (msg.senderUid === user?.uid || msg.senderName === currentUsername) {
-      return profile?.photoURL;
-    }
-
-    return msg.senderPhotoURL || participant?.photoURL;
-  };
-
-  const handleSendMessage = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const cleanMessage = message.trim();
-
-    if (!cleanMessage || !user || !roomId) return;
-
-    if (!socketRef.current || !isConnected) {
-      setSocketError(
-        "No estás conectado a la sala en tiempo real. Intenta nuevamente."
-      );
-      return;
-    }
-
-    socketRef.current.emit("send-message", {
-      content: cleanMessage,
-    });
-
-    setMessage("");
   };
 
   const handleLeaveRoom = () => {
@@ -1103,6 +1375,221 @@ export function ActiveRoom() {
 
     navigate("/dashboard");
   };
+
+  const renderChatContent = (containerRef: React.RefObject<HTMLDivElement | null>) => (
+    <>
+      <div
+        ref={containerRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Mensajes del chat de la sala"
+      >
+        {chat.chatStatus === "loading" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div
+              className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2
+                className="mx-auto h-8 w-8 animate-spin text-primary"
+                aria-hidden="true"
+              />
+
+              <p className="mt-4 font-semibold text-gray-800">
+                Cargando historial del chat...
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Estamos recuperando los mensajes anteriores de la sala.
+              </p>
+            </div>
+          </div>
+        ) : chat.chatStatus === "error" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div
+              className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
+              role="alert"
+            >
+              <AlertCircle
+                className="mx-auto h-8 w-8 text-red-600"
+                aria-hidden="true"
+              />
+
+              <p className="mt-4 font-semibold text-gray-800">
+                No pudimos cargar el historial
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                {chat.chatHistoryError}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (socketRef.current && roomId)
+                    chat.handleRetryChatHistory(socketRef.current, roomId);
+                }}
+                className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
+        ) : chat.chatStatus === "empty" ? (
+          <div className="flex h-full min-h-[220px] items-center justify-center">
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
+              <div
+                className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
+                aria-hidden="true"
+              >
+                <MessageSquare className="h-6 w-6" />
+              </div>
+
+              <p className="mt-4 font-semibold text-gray-800">
+                Aún no hay mensajes
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                Escribe el primer mensaje para iniciar la conversación.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-4">
+            {chat.chatMessages.map((msg) => {
+              const isOwnMessage =
+                msg.senderUid === user?.uid ||
+                msg.senderName === currentUsername;
+              const messageUsername = chat.getMessageUsername(
+                msg,
+                participants,
+                user,
+                currentUsername
+              );
+              const messageAvatar = chat.getMessageAvatar(
+                msg,
+                participants,
+                user,
+                currentUsername,
+                profile
+              );
+              const avatar = messageAvatar ? (
+                <img
+                  src={messageAvatar}
+                  alt=""
+                  className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover shadow-md"
+                />
+              ) : (
+                <div
+                  className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
+                  aria-hidden="true"
+                >
+                  <span className="text-xs font-bold text-white">
+                    {getInitials(messageUsername)}
+                  </span>
+                </div>
+              );
+
+              return (
+                <li
+                  key={msg.id}
+                  className={`flex gap-3 ${
+                    isOwnMessage ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  {!isOwnMessage && avatar}
+
+                  <div
+                    className={`flex max-w-[82%] flex-col ${
+                      isOwnMessage
+                        ? "items-end text-right"
+                        : "items-start text-left"
+                    }`}
+                  >
+                    <div className="mb-1 flex max-w-full items-center gap-2">
+                      <span className="truncate text-xs font-semibold text-gray-700">
+                        {messageUsername}
+                      </span>
+
+                      <span className="text-[11px] text-gray-500">
+                        {formatMessageTime(msg.createdAt)}
+                      </span>
+                    </div>
+
+                    <p
+                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
+                        isOwnMessage
+                          ? "rounded-br-sm bg-primary text-white"
+                          : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
+                      }`}
+                    >
+                      {msg.message}
+                    </p>
+                  </div>
+
+                  {isOwnMessage && avatar}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <form
+        onSubmit={(event) =>
+          chat.handleSendMessage(
+            event,
+            socketRef.current!,
+            isConnected,
+            user,
+            roomId,
+            (err) => setSocketError(err)
+          )
+        }
+        className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
+        aria-label="Formulario para enviar mensajes"
+      >
+        <label htmlFor="chat-message" className="sr-only">
+          Escribe un mensaje para enviarlo al chat de la sala
+        </label>
+
+        <p id="chat-message-help" className="sr-only">
+          Escribe tu mensaje y presiona Enter o el botón enviar.
+        </p>
+
+        <div className="flex items-end gap-2">
+          <input
+            type="text"
+            id="chat-message"
+            value={chat.message}
+            onChange={(event) => chat.setMessage(event.target.value)}
+            placeholder="Escribe un mensaje..."
+            aria-describedby="chat-message-help"
+            disabled={!isConnected}
+            className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+          />
+
+          <button
+            type="submit"
+            disabled={!chat.message.trim() || !isConnected}
+            className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={
+              isConnected
+                ? chat.message.trim()
+                  ? "Enviar mensaje"
+                  : "Escribe un mensaje antes de enviar"
+                : "Conecta a la sala antes de enviar mensajes"
+            }
+          >
+            <Send className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      </form>
+    </>
+  );
 
   if (isLoadingRoom) {
     return (
@@ -1154,14 +1641,14 @@ export function ActiveRoom() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
       <header className="flex-shrink-0 border-b border-gray-700 bg-gray-900/90 shadow-lg backdrop-blur-sm">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-10 sm:py-6 lg:px-12">
           <div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-white sm:text-2xl">
               {room?.name || "Sala de estudio"}
             </h1>
 
-            <div className="mt-1 flex flex-wrap items-center gap-4">
-              <p className="text-sm text-gray-400">ID: {roomId}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 sm:mt-1.5 sm:gap-4">
+              <p className="text-sm font-medium text-gray-400">ID: {roomId}</p>
 
               <button
                 type="button"
@@ -1176,23 +1663,23 @@ export function ActiveRoom() {
                 {copied ? (
                   <>
                     <Check className="h-4 w-4" aria-hidden="true" />
-                    ID copiado
+                    <span className="hidden sm:inline">ID copiado</span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-4 w-4" aria-hidden="true" />
-                    Copiar ID
+                    <span className="hidden sm:inline">Copiar ID</span>
                   </>
                 )}
               </button>
 
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="flex items-center gap-1.5 text-sm text-gray-400 sm:gap-2">
                 <Users className="h-4 w-4" aria-hidden="true" />
-                <span>{participants.length} participantes</span>
+                <span>{participants.length}<span className="hidden sm:inline"> participantes</span></span>
               </div>
 
               <div
-                className={`flex items-center gap-2 text-sm ${
+                className={`flex items-center gap-1.5 text-sm sm:gap-2 ${
                   isConnected ? "text-green-400" : "text-gray-400"
                 }`}
                 role="status"
@@ -1201,243 +1688,358 @@ export function ActiveRoom() {
                 {isConnected ? (
                   <>
                     <Wifi className="h-4 w-4" aria-hidden="true" />
-                    {connectionStatus}
+                    <span className="hidden sm:inline">{connectionStatus}</span>
                   </>
                 ) : (
                   <>
                     <WifiOff className="h-4 w-4" aria-hidden="true" />
-                    {connectionStatus}
+                    <span className="hidden sm:inline">{connectionStatus}</span>
                   </>
                 )}
               </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleLeaveRoom}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-2.5 font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:w-auto"
-            aria-label="Salir de la sala"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            Salir
-          </button>
         </div>
       </header>
 
-      {socketError && (
-        <p
-          className="flex-shrink-0 bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white"
+      {!isConnected && (
+        <div 
+          className="flex-shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-amber-200 text-sm shadow-md flex items-center justify-between gap-3"
           role="alert"
           aria-live="assertive"
         >
-          {socketError}
-        </p>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 animate-pulse" />
+            <span>
+              <span className="font-semibold text-amber-400">Sin conexión en tiempo real:</span>{" "}
+              {socketError || "Intentando establecer la conexión con la sala. Verifica tu red."}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (socketRef.current) {
+                socketRef.current.connect();
+              }
+            }}
+            className="text-xs bg-amber-500 text-gray-950 font-bold px-3 py-1.5 rounded-lg hover:bg-amber-400 transition cursor-pointer"
+          >
+            Reconectar
+          </button>
+        </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      {isAudioAutoplayBlocked && (
+        <div 
+          className="flex-shrink-0 bg-red-500/10 border-b border-red-500/20 px-4 py-3 text-red-200 text-sm shadow-md flex items-center justify-between gap-3"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 animate-pulse" aria-hidden="true" />
+            <span>
+              <span className="font-semibold text-red-400">Audio bloqueado:</span>{" "}
+              El navegador ha silenciado el audio de la sala. Presiona el botón para activar el audio de los participantes.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleUnblockAudio}
+            className="text-xs bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-red-500 transition cursor-pointer focus:ring-2 focus:ring-red-400"
+            aria-label="Activar audio de los participantes"
+          >
+            Activar audio
+          </button>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-visible lg:flex-row">
         <main
-          className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4 sm:p-6"
+          className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div
+            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
+            }}
+          >
             {participants.length === 0 ? (
-              <div className="col-span-full flex items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
-                <div>
-                  <Users
-                    className="mx-auto h-10 w-10 text-gray-400"
-                    aria-hidden="true"
-                  />
-
-                  <p className="mt-4 font-semibold text-white">
-                    Aún no hay participantes conectados
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-400">
-                    Cuando alguien entre a la sala aparecerá aquí.
-                  </p>
-                </div>
+              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
+                <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
+                <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
+                <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
               </div>
             ) : (
-              participants.map((participant, index) => {
-                const participantName = getParticipantName(participant);
-                const isCurrentUser = participant.uid === user?.uid;
+              <AnimatePresence mode="popLayout">
+                {visibleParticipants.map((p, i) => {
+                  const gridColumn = isSm && participants.length === 5
+                    ? i < 3 ? "span 2" : "span 3"
+                    : undefined;
+                  return renderParticipantTile(p, i, gridColumn);
+                })}
 
-                return (
-                  <div
-                    key={participant.uid}
-                    className={`relative overflow-hidden rounded-2xl bg-gray-800 shadow-xl transition-all ${
-                      participant.isSpeaking
-                        ? "ring-4 ring-green-500 shadow-green-500/50"
-                        : "ring-2 ring-gray-700"
-                    }`}
-                    aria-label={`${participantName}${
-                      participant.isSpeaking ? " - hablando" : ""
-                    }`}
+                {participants.length === 1 && (
+                  <motion.div
+                    key="waiting-placeholder"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
                   >
-                    <div className="flex h-full min-h-[280px] items-center justify-center">
-                      <div className="text-center">
-                        {participant.photoURL ? (
-                          <img
-                            src={participant.photoURL}
-                            alt=""
-                            className="mx-auto mb-4 h-32 w-32 rounded-full object-cover shadow-2xl"
-                          />
-                        ) : (
-                          <div
-                            className={`mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${getParticipantGradient(
-                              index
-                            )} shadow-2xl`}
-                            aria-hidden="true"
-                          >
-                            <span className="text-4xl font-bold text-white">
-                              {getInitials(participantName)}
-                            </span>
-                          </div>
-                        )}
-
-                        <p className="text-lg font-semibold text-white">
-                          {isCurrentUser ? "Tú" : participantName}
-                        </p>
-
-                        {participant.isHost && (
-                          <p className="mt-1 text-sm font-medium text-primary-200">
-                            Anfitrión
-                          </p>
-                        )}
-
-                        {participant.isSpeaking && (
-                          <div className="mt-2 flex items-center justify-center gap-2">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                            <span className="text-sm font-medium text-green-400">
-                              Hablando
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                      <Users className="h-8 w-8 text-primary-400 animate-pulse" />
                     </div>
+                    <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                    <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                      Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCopyId}
+                      className="mt-4 flex items-center gap-1.5 rounded-lg bg-gray-700/80 px-4 py-2.5 text-xs font-semibold text-white hover:bg-gray-600 transition cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-green-400" />
+                          <span>¡ID copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Copiar ID</span>
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
 
-                    {isCurrentUser && (
-                      <div className="absolute right-4 top-4 flex gap-2">
-                        <span
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
-                            isCameraOn
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-700 text-gray-300"
-                          }`}
-                        >
-                          CAM {isCameraOn ? "ON" : "OFF"}
-                        </span>
-
-                        <span
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold shadow-lg ${
-                            isMicOn
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-700 text-gray-300"
-                          }`}
-                        >
-                          MIC {isMicOn ? "ON" : "OFF"}
-                        </span>
+                {showOverflow && (
+                  <motion.div
+                    key="overflow"
+                    layout
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
+                  >
+                    <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+                      <div className="flex items-center justify-center">
+                        <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
+                          {renderOverflowAvatar(
+                            sortedParticipants[overflowVisibleCount],
+                            overflowVisibleCount
+                          )}
+                        </div>
+                        {sortedParticipants.length > overflowVisibleCount + 1 && (
+                          <div>
+                            {renderOverflowAvatar(
+                              sortedParticipants[overflowVisibleCount + 1],
+                              overflowVisibleCount + 1
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })
+                      <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                        +{sortedParticipants.length - overflowVisibleCount} más
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             )}
           </div>
 
-          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 p-4 shadow-2xl backdrop-blur-sm sm:p-6">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4">
+            <div className="flex items-center justify-center gap-2 sm:gap-3">
+              {/* Camera */}
               <button
                 type="button"
-                onClick={() => setIsCameraOn((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
-                  isCameraOn
-                    ? "bg-primary-600 text-white hover:bg-primary-700"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                onClick={handleCameraClick}
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                  isCameraBlocked
+                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    : isCameraOn
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isCameraOn}
-                aria-label={isCameraOn ? "Apagar cámara" : "Encender cámara"}
-                title={isCameraOn ? "Apagar cámara" : "Encender cámara"}
+                aria-label={
+                  isCameraBlocked
+                    ? "Cámara bloqueada por permisos"
+                    : isCameraOn
+                      ? "Apagar cámara"
+                      : "Encender cámara"
+                }
               >
-                {isCameraOn ? (
-                  <Video className="h-6 w-6" aria-hidden="true" />
+                {isCameraBlocked ? (
+                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
+                ) : isCameraOn ? (
+                  <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <VideoOff className="h-6 w-6" aria-hidden="true" />
+                  <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Mic */}
               <button
                 type="button"
-                onClick={() => setIsMicOn((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
-                  isMicOn
-                    ? "bg-primary-600 text-white hover:bg-primary-700"
-                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                onClick={handleMicClick}
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                  isMicBlocked
+                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    : isMicOn
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isMicOn}
                 aria-label={
-                  isMicOn ? "Silenciar micrófono" : "Activar micrófono"
+                  isMicBlocked
+                    ? "Micrófono bloqueado por permisos"
+                    : isMicOn
+                      ? "Silenciar micrófono"
+                      : "Activar micrófono"
                 }
-                title={isMicOn ? "Silenciar micrófono" : "Activar micrófono"}
               >
-                {isMicOn ? (
-                  <Mic className="h-6 w-6" aria-hidden="true" />
+                {isMicBlocked ? (
+                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
+                ) : isMicOn ? (
+                  <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <MicOff className="h-6 w-6" aria-hidden="true" />
+                  <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Share screen */}
               <button
                 type="button"
                 onClick={() => setIsScreenSharing((value) => !value)}
-                className={`cursor-pointer rounded-xl p-3 font-semibold shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4 ${
+                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isScreenSharing
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isScreenSharing}
-                aria-label={
-                  isScreenSharing
-                    ? "Dejar de compartir pantalla"
-                    : "Compartir pantalla"
-                }
-                title={
-                  isScreenSharing
-                    ? "Dejar de compartir pantalla"
-                    : "Compartir pantalla"
-                }
+                aria-label={isScreenSharing ? "Dejar de compartir pantalla" : "Compartir pantalla"}
               >
                 {isScreenSharing ? (
-                  <Monitor className="h-6 w-6" aria-hidden="true" />
+                  <ScreenShare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <MonitorOff className="h-6 w-6" aria-hidden="true" />
+                  <ScreenShareOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </button>
 
+              {/* Settings */}
               <button
                 type="button"
-                className="cursor-pointer rounded-xl bg-gray-700 p-3 text-gray-300 shadow-lg transition hover:bg-gray-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:p-4"
-                aria-label="Configuración"
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14"
+                aria-label="Configuración de la sala"
                 title="Configuración"
               >
-                <SettingsIcon className="h-6 w-6" aria-hidden="true" />
+                <Settings className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+              </button>
+
+              {/* Chat — mobile only */}
+              <div className="relative lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => { setIsChatOpen((value) => !value); chat.setUnreadCount(0); }}
+                  className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                    isChatOpen
+                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                  aria-pressed={isChatOpen}
+                  aria-label={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+                >
+                  <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                </button>
+                {chat.unreadCount > 0 && !isChatOpen && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white sm:h-6 sm:w-6 sm:text-sm">
+                    {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+                  </span>
+                )}
+              </div>
+
+              {/* Leave call */}
+              <button
+                type="button"
+                onClick={handleLeaveRoom}
+                className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-red-600 text-white shadow-lg transition hover:bg-red-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14"
+                aria-label="Salir de la sala"
+              >
+                <Phone className="h-6 w-6 rotate-[135deg] sm:h-7 sm:w-7" aria-hidden="true" />
               </button>
             </div>
           </div>
         </main>
 
+        {/* Mobile chat overlay (< lg) */}
         <div
-          className={`relative min-h-0 flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none ${
+          className={`fixed inset-0 z-50 flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:hidden ${
+            isChatOpen ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+          aria-hidden={!isChatOpen}
+        >
+          <div
+            className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={() => { setIsChatOpen(false); chat.setUnreadCount(0); }}
+            aria-hidden="true"
+          />
+          <div
+            className={`relative z-10 mt-auto flex max-h-[75vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl transition-all duration-300 ease-out motion-reduce:transition-none ${
+              isChatOpen ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+              <div className="flex-shrink-0 bg-gradient-to-r from-primary-600 to-purple-600 p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2
+                      id="chat-title-mobile"
+                      className="mb-1 text-xl font-bold text-white"
+                    >
+                      Chat de la sala
+                    </h2>
+                    <p className="text-sm text-primary-100">
+                      {participants.length === 1
+                        ? "1 participante conectado"
+                        : `${participants.length} participantes conectados`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsChatOpen(false); chat.setUnreadCount(0); }}
+                    className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+                    aria-label="Cerrar chat"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              {renderChatContent(mobileChatMessagesContainerRef)}
+            </div>
+          </div>
+
+        {/* Desktop chat sidebar (lg+) */}
+        <div
+          className={`relative hidden min-h-0 flex-shrink-0 transition-all duration-300 ease-out motion-reduce:transition-none lg:block ${
             isChatOpen
-              ? "h-[42vh] w-full lg:h-full lg:w-96"
-              : "h-0 w-full lg:h-full lg:w-0"
+              ? "lg:h-full lg:w-96"
+              : "lg:h-full lg:w-0"
           }`}
         >
           <button
             type="button"
-            onClick={() => setIsChatOpen((value) => !value)}
-            className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-2xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
+            onClick={() => {
+              setIsChatOpen((value) => !value);
+              chat.setUnreadCount(0);
+            }}
+            className="absolute right-4 bottom-0 z-30 flex h-10 w-16 translate-y-full cursor-pointer items-center justify-center rounded-b-1xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-xl transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 lg:left-0 lg:right-auto lg:top-1/2 lg:bottom-auto lg:h-16 lg:w-11 lg:-translate-x-full lg:-translate-y-1/2 lg:rounded-l-2xl lg:rounded-tr-none lg:bg-gradient-to-b"
             aria-label={
               isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"
             }
@@ -1455,6 +2057,12 @@ export function ActiveRoom() {
               <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
               <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
+            )}
+
+            {chat.unreadCount > 0 && !isChatOpen && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-bounce">
+                {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+              </span>
             )}
           </button>
 
@@ -1498,199 +2106,247 @@ export function ActiveRoom() {
                     </div>
                   </div>
                 </div>
-
-                <div
-                  ref={chatMessagesContainerRef}
-                  className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 p-4 sm:p-6"
-                  role="log"
-                  aria-live="polite"
-                  aria-relevant="additions text"
-                  aria-label="Mensajes del chat de la sala"
-                >
-                  {chatStatus === "loading" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div
-                        className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        <Loader2
-                          className="mx-auto h-8 w-8 animate-spin text-primary"
-                          aria-hidden="true"
-                        />
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          Cargando historial del chat...
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          Estamos recuperando los mensajes anteriores de la sala.
-                        </p>
-                      </div>
-                    </div>
-                  ) : chatStatus === "error" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div
-                        className="rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
-                        role="alert"
-                      >
-                        <AlertCircle
-                          className="mx-auto h-8 w-8 text-red-600"
-                          aria-hidden="true"
-                        />
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          No pudimos cargar el historial
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          {chatHistoryError}
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={handleRetryChatHistory}
-                          className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                        >
-                          Reintentar
-                        </button>
-                      </div>
-                    </div>
-                  ) : chatStatus === "empty" ? (
-                    <div className="flex h-full min-h-[220px] items-center justify-center">
-                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center shadow-sm">
-                        <div
-                          className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"
-                          aria-hidden="true"
-                        >
-                          <MessageSquare className="h-6 w-6" />
-                        </div>
-
-                        <p className="mt-4 font-semibold text-gray-800">
-                          Aún no hay mensajes
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-500">
-                          Escribe el primer mensaje para iniciar la conversación.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <ul className="space-y-4">
-                      {chatMessages.map((msg) => {
-                        const isOwnMessage =
-                          msg.senderUid === user?.uid ||
-                          msg.senderName === currentUsername;
-                        const messageUsername = getMessageUsername(msg);
-                        const messageAvatar = getMessageAvatar(msg);
-                        const avatar = messageAvatar ? (
-                          <img
-                            src={messageAvatar}
-                            alt=""
-                            className="mt-1 h-9 w-9 flex-shrink-0 rounded-full object-cover shadow-md"
-                          />
-                        ) : (
-                          <div
-                            className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-purple-500 shadow-md"
-                            aria-hidden="true"
-                          >
-                            <span className="text-xs font-bold text-white">
-                              {getInitials(messageUsername)}
-                            </span>
-                          </div>
-                        );
-
-                        return (
-                          <li
-                            key={msg.id}
-                            className={`flex gap-3 ${
-                              isOwnMessage ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            {!isOwnMessage && avatar}
-
-                            <div
-                              className={`flex max-w-[82%] flex-col ${
-                                isOwnMessage
-                                  ? "items-end text-right"
-                                  : "items-start text-left"
-                              }`}
-                            >
-                              <div className="mb-1 flex max-w-full items-center gap-2">
-                                <span className="truncate text-xs font-semibold text-gray-700">
-                                  {messageUsername}
-                                </span>
-
-                                <span className="text-[11px] text-gray-500">
-                                  {formatMessageTime(msg.createdAt)}
-                                </span>
-                              </div>
-
-                              <p
-                                className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
-                                  isOwnMessage
-                                    ? "rounded-br-sm bg-primary text-white"
-                                    : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
-                                }`}
-                              >
-                                {msg.message}
-                              </p>
-                            </div>
-
-                            {isOwnMessage && avatar}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                <form
-                  onSubmit={handleSendMessage}
-                  className="flex-shrink-0 border-t border-gray-200 bg-white p-4"
-                  aria-label="Formulario para enviar mensajes"
-                >
-                  <label htmlFor="chat-message" className="sr-only">
-                    Escribe un mensaje para enviarlo al chat de la sala
-                  </label>
-
-                  <p id="chat-message-help" className="sr-only">
-                    Escribe tu mensaje y presiona Enter o el botón enviar.
-                  </p>
-
-                  <div className="flex items-end gap-2">
-                    <input
-                      type="text"
-                      id="chat-message"
-                      value={message}
-                      onChange={(event) => setMessage(event.target.value)}
-                      placeholder="Escribe un mensaje..."
-                      aria-describedby="chat-message-help"
-                      disabled={!isConnected}
-                      className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={!message.trim() || !isConnected}
-                      className="flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-md transition hover:brightness-110 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                      aria-label={
-                        isConnected
-                          ? message.trim()
-                            ? "Enviar mensaje"
-                            : "Escribe un mensaje antes de enviar"
-                          : "Conecta a la sala antes de enviar mensajes"
-                      }
-                    >
-                      <Send className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </form>
+                {renderChatContent(chatMessagesContainerRef)}
               </>
             )}
           </aside>
         </div>
       </div>
+
+      {/* Modal de Configuración */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="settings-dialog-title"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative z-10 w-full max-w-lg rounded-2xl bg-gray-900 border border-gray-800 text-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
+                <h2 id="settings-dialog-title" className="text-lg font-bold flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-primary-400" />
+                  Configuración de la Sala
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition cursor-pointer"
+                  aria-label="Cerrar configuración"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Navigation Tabs */}
+              {room?.ownerUid === user?.uid && (
+                <div className="flex border-b border-gray-800 px-6 bg-gray-950" role="tablist" aria-label="Secciones de configuración">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "devices"}
+                    aria-controls="settings-panel-devices"
+                    onClick={() => setSettingsTab("devices")}
+                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition cursor-pointer ${
+                      settingsTab === "devices"
+                        ? "border-primary-500 text-primary-400"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Dispositivos
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "room"}
+                    aria-controls="settings-panel-room"
+                    onClick={() => setSettingsTab("room")}
+                    className={`px-4 py-3 text-sm font-semibold border-b-2 transition cursor-pointer ${
+                      settingsTab === "room"
+                        ? "border-primary-500 text-primary-400"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Gestión de Sala (Anfitrión)
+                  </button>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {settingsTab === "devices" ? (
+                  <div id="settings-panel-devices" role="tabpanel" className="space-y-6">
+                    {/* Selector de Cámara */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-camera-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Cámara de video
+                      </label>
+                      <select
+                        id="settings-camera-select"
+                        value={selectedVideoId}
+                        onChange={(e) => handleDeviceChange("video", e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {videoDevices.length === 0 ? (
+                          <option value="">Cámara por defecto / No detectada</option>
+                        ) : (
+                          videoDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Cámara (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Selector de Micrófono */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-mic-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Micrófono (Entrada)
+                      </label>
+                      <select
+                        id="settings-mic-select"
+                        value={selectedAudioId}
+                        onChange={(e) => handleDeviceChange("audio", e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {audioInputDevices.length === 0 ? (
+                          <option value="">Micrófono por defecto / No detectado</option>
+                        ) : (
+                          audioInputDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Micrófono (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Medidor de Micrófono */}
+                    <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+                      <span className="text-xs font-semibold text-gray-400 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Prueba de voz en vivo
+                      </span>
+                      <div 
+                        className="h-3 w-full rounded-full bg-gray-800 overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={micLevel}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Nivel de entrada del micrófono"
+                      >
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 via-emerald-400 to-cyan-500 transition-all duration-75 ease-out"
+                          style={{ width: `${micLevel}%` }}
+                        />
+                      </div>
+                      <span className="sr-only">Nivel actual del micrófono: {micLevel} por ciento.</span>
+                    </div>
+
+                    {/* Selector de Parlantes */}
+                    <div className="space-y-2">
+                      <label htmlFor="settings-speaker-select" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Salida de audio (Altavoces / Auriculares)
+                      </label>
+                      <select
+                        id="settings-speaker-select"
+                        value={selectedSpeakerId}
+                        onChange={(e) => handleSpeakerChange(e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer animate-none"
+                      >
+                        {audioOutputDevices.length === 0 ? (
+                          <option value="">Sistema por defecto</option>
+                        ) : (
+                          audioOutputDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Altavoces (${d.deviceId.slice(0, 5)}...)`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Botón Probar Sonido */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={playTestSound}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-800 border border-gray-700 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-750 transition cursor-pointer"
+                        aria-label="Probar sonido de salida. Reproducirá un tono de prueba en el altavoz seleccionado."
+                      >
+                        <Volume2 className="h-4.5 w-4.5 text-primary-400" />
+                        Probar sonido de salida
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Room management (Host only) */
+                  <div id="settings-panel-room" role="tabpanel" className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="settings-room-name-input" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Nombre de la sala
+                      </label>
+                      <input
+                        id="settings-room-name-input"
+                        type="text"
+                        value={editingRoomName}
+                        onChange={(e) => setEditingRoomName(e.target.value)}
+                        className="w-full rounded-xl bg-gray-850 border border-gray-800 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="Ej. Clase de Matemáticas"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSavingRoom || !editingRoomName.trim() || editingRoomName === room?.name}
+                      onClick={handleSaveRoomName}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:bg-gray-800 disabled:text-gray-500 transition cursor-pointer"
+                    >
+                      {isSavingRoom ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Guardando cambios...
+                        </>
+                      ) : (
+                        "Guardar cambios de la sala"
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-gray-950 border-t border-gray-800 px-6 py-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
