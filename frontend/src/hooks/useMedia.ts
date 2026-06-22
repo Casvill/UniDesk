@@ -11,6 +11,8 @@ export function useMedia(
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
   }>({ audio: "prompt", video: "prompt" });
 
+  const [selectedAudioId, setSelectedAudioId] = useState<string>("");
+  const [selectedVideoId, setSelectedVideoId] = useState<string>("");
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
 
   useEffect(() => {
@@ -29,13 +31,30 @@ export function useMedia(
       }
       try {
         const constraints = kind === "audio"
-          ? { audio: true }
-          : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
+          ? { audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true }
+          : { video: { 
+              deviceId: selectedVideoId ? { exact: selectedVideoId } : undefined,
+              width: { ideal: 1280 }, 
+              height: { ideal: 720 }, 
+              frameRate: { ideal: 30 }, 
+              facingMode: "user" 
+            } };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+
+        // Detect actual device ID in use
+        const tracks = stream.getTracks();
+        if (tracks.length > 0) {
+          const actualId = tracks[0].getSettings().deviceId;
+          if (actualId) {
+            if (kind === "audio") setSelectedAudioId(actualId);
+            else setSelectedVideoId(actualId);
+          }
+        }
+
         if (localStreamRef.current) {
           stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
         } else {
@@ -83,15 +102,21 @@ export function useMedia(
     };
   }, []);
 
-  const retryMedia = useCallback(async (kind: "audio" | "video") => {
+  const retryMedia = useCallback(async (kind: "audio" | "video", specificDeviceId?: string) => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setMediaPerms((prev) => ({ ...prev, [kind]: "unavailable" }));
       return;
     }
 
+    const devId = specificDeviceId || (kind === "audio" ? selectedAudioId : selectedVideoId);
     const constraints = kind === "audio"
-      ? { audio: true }
-      : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" } };
+      ? { audio: devId ? { deviceId: { exact: devId } } : true }
+      : { video: { 
+          deviceId: devId ? { exact: devId } : undefined,
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 }, 
+          frameRate: { ideal: 30 } 
+        } };
 
     const oldTracks = localStreamRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
     oldTracks.forEach((t) => {
@@ -101,6 +126,16 @@ export function useMedia(
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      const tracks = stream.getTracks();
+      if (tracks.length > 0) {
+        const actualId = tracks[0].getSettings().deviceId;
+        if (actualId) {
+          if (kind === "audio") setSelectedAudioId(actualId);
+          else setSelectedVideoId(actualId);
+        }
+      }
+
       if (localStreamRef.current) {
         stream.getTracks().forEach((t) => localStreamRef.current!.addTrack(t));
       } else {
@@ -125,7 +160,7 @@ export function useMedia(
         setMediaPerms((prev) => ({ ...prev, [kind]: "error" }));
       }
     }
-  }, [isMicOn, isCameraOn]);
+  }, [isMicOn, isCameraOn, selectedAudioId, selectedVideoId]);
 
   useEffect(() => {
     const stream = localStreamRef.current;
@@ -133,14 +168,31 @@ export function useMedia(
 
     const peerConnections = getPeerConnections();
     peerConnections.forEach((pc) => {
-      const kinds = pc.getSenders().map((s) => s.track?.kind);
       stream.getTracks().forEach((track) => {
-        if (!kinds.includes(track.kind)) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+        if (sender) {
+          if (sender.track !== track) {
+            console.log(`[WebRTC] Reemplazando track de ${track.kind} en PeerConnection existente`);
+            sender.replaceTrack(track).catch((err) =>
+              console.warn(`[WebRTC] Error al reemplazar track de ${track.kind} en WebRTC:`, err)
+            );
+          }
+        } else {
+          console.log(`[WebRTC] Agregando nuevo track de ${track.kind} a PeerConnection existente`);
           pc.addTrack(track, stream);
         }
       });
     });
   }, [mediaPerms, getPeerConnections]);
 
-  return { localStreamRef, mediaPerms, mediaInitStatus, retryMedia };
+  return { 
+    localStreamRef, 
+    mediaPerms, 
+    mediaInitStatus, 
+    retryMedia,
+    selectedAudioId,
+    setSelectedAudioId,
+    selectedVideoId,
+    setSelectedVideoId
+  };
 }

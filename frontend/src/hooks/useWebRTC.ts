@@ -58,11 +58,25 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
       });
     }
 
-    pc.ontrack = ({ streams }) => {
-      console.log("[WebRTC] track remoto de", socketId, "streams:", streams.length, streams[0]?.getTracks().map(t => t.kind));
+    pc.ontrack = (event) => {
+      const { streams, track } = event;
+      console.log("[WebRTC] track remoto de", socketId, "streams:", streams.length, track.kind);
       setRemoteStreams((prev) => {
         const next = new Map(prev);
-        next.set(socketId, streams[0]);
+        const oldStream = next.get(socketId);
+        
+        const newStream = new MediaStream();
+        if (oldStream) {
+          oldStream.getTracks().forEach((t) => newStream.addTrack(t));
+        } else if (streams && streams.length > 0) {
+          streams[0].getTracks().forEach((t) => newStream.addTrack(t));
+        }
+        
+        if (!newStream.getTracks().includes(track)) {
+          newStream.addTrack(track);
+        }
+        
+        next.set(socketId, newStream);
         return next;
       });
     };
