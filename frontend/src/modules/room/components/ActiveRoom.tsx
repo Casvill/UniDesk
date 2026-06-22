@@ -130,6 +130,7 @@ export function ActiveRoom() {
     setSelectedAudioId,
     selectedVideoId,
     setSelectedVideoId,
+    localAudioTrackId,
   } = useMedia(
     localStreamRef,
     () =>
@@ -1048,7 +1049,7 @@ export function ActiveRoom() {
         audioContext.close();
       }
     };
-  }, [isMicOn, mediaInitStatus, user?.uid, isConnected]);
+  }, [isMicOn, mediaInitStatus, user?.uid, isConnected, localAudioTrackId]);
 
   // Efecto para monitorear el nivel de audio remoto vía getStats de WebRTC
   useEffect(() => {
