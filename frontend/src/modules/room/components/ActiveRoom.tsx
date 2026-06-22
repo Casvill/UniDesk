@@ -981,7 +981,7 @@ export function ActiveRoom() {
     let audioContext: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
-    let scriptProcessor: ScriptProcessorNode | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
     let isSpeaking = false;
     let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -991,26 +991,27 @@ export function ActiveRoom() {
 
       audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       analyser = audioContext.createAnalyser();
-      analyser.fftSize = 512;
+      analyser.fftSize = 256;
       
       const audioStream = new MediaStream([audioTracks[0]]);
       source = audioContext.createMediaStreamSource(audioStream);
-      scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
-      
       source.connect(analyser);
-      analyser.connect(scriptProcessor);
-      scriptProcessor.connect(audioContext.destination);
 
-      scriptProcessor.onaudioprocess = (event) => {
-        const inputBuffer = event.inputBuffer.getChannelData(0);
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      intervalId = setInterval(() => {
+        if (!analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        
         let sum = 0;
-        for (let i = 0; i < inputBuffer.length; i++) {
-          sum += inputBuffer[i] * inputBuffer[i];
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
         }
-        const rms = Math.sqrt(sum / inputBuffer.length);
-        const volume = rms * 100;
+        const average = sum / bufferLength;
+        const volume = (average / 255) * 100; // Normalizado de 0 a 100
 
-        const threshold = 2; // Umbral de detección
+        const threshold = 1.5; // Umbral de detección de volumen para frecuencia
 
         if (volume > threshold) {
           if (silenceTimeout) {
@@ -1036,14 +1037,15 @@ export function ActiveRoom() {
             }, 400);
           }
         }
-      };
+      }, 100);
+
     } catch (err) {
       console.warn("No se pudo iniciar el detector local de habla:", err);
     }
 
     return () => {
       if (silenceTimeout) clearTimeout(silenceTimeout);
-      if (scriptProcessor) scriptProcessor.disconnect();
+      if (intervalId) clearInterval(intervalId);
       if (source) source.disconnect();
       if (audioContext && audioContext.state !== "closed") {
         audioContext.close();
