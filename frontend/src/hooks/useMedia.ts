@@ -193,6 +193,24 @@ export function useMedia(
     });
   }, [localAudioTrackId, localVideoTrackId, getPeerConnections]);
 
+  const stopScreenCapture = useCallback(async () => {
+    if (screenStream) {
+      console.log("[useMedia] Deteniendo captura de pantalla:", screenStream.id);
+      screenStream.getTracks().forEach((track) => track.stop());
+
+      // Remover pistas de pantalla de localStreamRef
+      const screenTracks = localStreamRef.current?.getVideoTracks() ?? [];
+      screenTracks.forEach((t) => {
+        localStreamRef.current?.removeTrack(t);
+      });
+
+      setScreenStream(null);
+
+      // Restaurar el flujo original de la cámara
+      await retryMedia("video");
+    }
+  }, [screenStream, retryMedia]);
+
   const startScreenCapture = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       showToast.error("Compartir pantalla no es compatible con este navegador.");
@@ -205,7 +223,34 @@ export function useMedia(
         audio: false,
       });
       console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
+
+      const screenTrack = stream.getVideoTracks()[0];
+      if (!screenTrack) {
+        throw new Error("No video track found in screen stream");
+      }
+
+      // Detener y remover pistas de video locales anteriores
+      const oldTracks = localStreamRef.current?.getVideoTracks() ?? [];
+      oldTracks.forEach((t) => {
+        t.stop();
+        localStreamRef.current?.removeTrack(t);
+      });
+
+      // Agregar pista de pantalla al localStreamRef
+      if (localStreamRef.current) {
+        localStreamRef.current.addTrack(screenTrack);
+      } else {
+        localStreamRef.current = stream;
+      }
+
       setScreenStream(stream);
+      setLocalVideoTrackId(screenTrack.id);
+
+      // Escuchar cuando el usuario deje de compartir desde la barra flotante nativa del navegador
+      screenTrack.onended = () => {
+        stopScreenCapture();
+      };
+
       return stream;
     } catch (err) {
       console.error("[useMedia] Error al capturar pantalla:", err);
@@ -216,15 +261,7 @@ export function useMedia(
       }
       throw err;
     }
-  }, []);
-
-  const stopScreenCapture = useCallback(() => {
-    if (screenStream) {
-      console.log("[useMedia] Deteniendo captura de pantalla:", screenStream.id);
-      screenStream.getTracks().forEach((track) => track.stop());
-      setScreenStream(null);
-    }
-  }, [screenStream]);
+  }, [retryMedia, stopScreenCapture]);
 
   return { 
     localStreamRef, 

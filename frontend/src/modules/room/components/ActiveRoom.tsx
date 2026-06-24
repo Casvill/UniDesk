@@ -198,7 +198,7 @@ export function ActiveRoom() {
   const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
     const name = getParticipantName(p);
     const isCurrent = p.uid === user?.uid;
-    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? false;
+    const camOn = isCurrent ? (isCameraOn || isScreenSharing) : (p.cameraEnabled || p.screenSharing) ?? false;
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
     const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
     const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
@@ -839,10 +839,11 @@ export function ActiveRoom() {
       )
     );
 
-    if (isCameraOn) {
+    const shouldEnableVideo = isCameraOn || isScreenSharing;
+    if (shouldEnableVideo) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
-        if (mediaPerms.video !== "prompt") {
+        if (isCameraOn && mediaPerms.video !== "prompt") {
           setIsCameraOn(false);
           if (mediaPerms.video === "denied") {
             showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
@@ -1920,7 +1921,7 @@ export function ActiveRoom() {
                 type="button"
                 onClick={async () => {
                   if (isScreenSharing) {
-                    stopScreenCapture();
+                    await stopScreenCapture();
                     setIsScreenSharing(false);
                   } else {
                     try {
