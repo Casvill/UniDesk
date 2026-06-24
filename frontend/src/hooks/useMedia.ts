@@ -5,8 +5,10 @@ export function useMedia(
   localStreamRef: React.MutableRefObject<MediaStream | null>,
   getPeerConnections: () => Map<string, RTCPeerConnection>,
   isMicOn: boolean,
-  isCameraOn: boolean
+  isCameraOn: boolean,
+  setIsCameraOn?: (on: boolean) => void
 ) {
+  const wasCameraOnRef = useRef(false);
   const [mediaPerms, setMediaPerms] = useState<{
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
@@ -209,10 +211,20 @@ export function useMedia(
       screenStreamRef.current = null;
       setScreenStream(null);
 
-      // Restaurar el flujo original de la cámara
-      await retryMedia("video");
+      // Restaurar el flujo original de la cámara si estaba encendida originalmente
+      if (wasCameraOnRef.current) {
+        try {
+          await retryMedia("video");
+          if (setIsCameraOn) {
+            setIsCameraOn(true);
+          }
+        } catch (err) {
+          console.warn("No se pudo restaurar la cámara:", err);
+        }
+        wasCameraOnRef.current = false;
+      }
     }
-  }, [retryMedia]);
+  }, [retryMedia, setIsCameraOn]);
 
   const startScreenCapture = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
@@ -221,6 +233,13 @@ export function useMedia(
     }
     try {
       console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
+
+      // Guardar el estado actual de la cámara antes de apagarla para compartir pantalla
+      wasCameraOnRef.current = isCameraOn;
+      if (isCameraOn && setIsCameraOn) {
+        setIsCameraOn(false);
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
@@ -258,6 +277,8 @@ export function useMedia(
       return stream;
     } catch (err) {
       console.error("[useMedia] Error al capturar pantalla:", err);
+      // Restaurar estado de cámara si la captura falló o fue cancelada
+      wasCameraOnRef.current = false;
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         showToast.error("Permiso para compartir pantalla denegado.");
       } else {
@@ -265,7 +286,7 @@ export function useMedia(
       }
       throw err;
     }
-  }, [retryMedia, stopScreenCapture]);
+  }, [retryMedia, stopScreenCapture, isCameraOn, setIsCameraOn]);
 
   return { 
     localStreamRef, 
