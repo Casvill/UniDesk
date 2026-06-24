@@ -7,6 +7,7 @@ import { swaggerSpec } from "./config/swagger";
 import userRoutes from "./routes/user.routes";
 import roomRoutes from "./routes/room.routes";
 import messageRoutes from "./routes/message.routes";
+import turnRoutes from "./routes/turn.routes";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/users", userRoutes);
 app.use("/rooms", roomRoutes);
 app.use("/messages", messageRoutes);
+app.use("/turn", turnRoutes);
 
 db.collection("_health").doc("ping").set({ ok: true })
   .then(() => console.log("Firestore bien :)"))
