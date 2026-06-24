@@ -713,6 +713,22 @@ export function ActiveRoom() {
           );
         });
 
+        socket.on("screen-share-started", (payload: { userId: string; estado: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.userId ? { ...p, screenSharing: true } : p
+            )
+          );
+        });
+
+        socket.on("screen-share-stopped", (payload: { userId: string; estado: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.userId ? { ...p, screenSharing: false } : p
+            )
+          );
+        });
+
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -885,6 +901,14 @@ export function ActiveRoom() {
 
     socket.emit(isMicOn ? "user-unmuted" : "user-muted");
     socket.emit(isCameraOn ? "camera-on" : "camera-off");
+
+    if (user) {
+      if (isScreenSharing) {
+        socket.emit("screen-share-started", { userId: user.uid, estado: true });
+      } else {
+        socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
+      }
+    }
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
