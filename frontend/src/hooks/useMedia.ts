@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { showToast } from "@/shared/components/ui/toast";
 
 export function useMedia(
   localStreamRef: React.MutableRefObject<MediaStream | null>,
@@ -16,6 +17,7 @@ export function useMedia(
   const [localAudioTrackId, setLocalAudioTrackId] = useState<string>("");
   const [localVideoTrackId, setLocalVideoTrackId] = useState<string>("");
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +193,39 @@ export function useMedia(
     });
   }, [localAudioTrackId, localVideoTrackId, getPeerConnections]);
 
+  const startScreenCapture = useCallback(async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      showToast.error("Compartir pantalla no es compatible con este navegador.");
+      throw new Error("Screen capture not supported");
+    }
+    try {
+      console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
+      setScreenStream(stream);
+      return stream;
+    } catch (err) {
+      console.error("[useMedia] Error al capturar pantalla:", err);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        showToast.error("Permiso para compartir pantalla denegado.");
+      } else {
+        showToast.error("No se pudo iniciar la captura de pantalla.");
+      }
+      throw err;
+    }
+  }, []);
+
+  const stopScreenCapture = useCallback(() => {
+    if (screenStream) {
+      console.log("[useMedia] Deteniendo captura de pantalla:", screenStream.id);
+      screenStream.getTracks().forEach((track) => track.stop());
+      setScreenStream(null);
+    }
+  }, [screenStream]);
+
   return { 
     localStreamRef, 
     mediaPerms, 
@@ -201,6 +236,9 @@ export function useMedia(
     selectedVideoId,
     setSelectedVideoId,
     localAudioTrackId,
-    localVideoTrackId
+    localVideoTrackId,
+    screenStream,
+    startScreenCapture,
+    stopScreenCapture
   };
 }

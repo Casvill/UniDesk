@@ -131,6 +131,9 @@ export function ActiveRoom() {
     selectedVideoId,
     setSelectedVideoId,
     localAudioTrackId,
+    screenStream,
+    startScreenCapture,
+    stopScreenCapture,
   } = useMedia(
     localStreamRef,
     () =>
@@ -1915,7 +1918,19 @@ export function ActiveRoom() {
               {/* Share screen */}
               <button
                 type="button"
-                onClick={() => setIsScreenSharing((value) => !value)}
+                onClick={async () => {
+                  if (isScreenSharing) {
+                    stopScreenCapture();
+                    setIsScreenSharing(false);
+                  } else {
+                    try {
+                      await startScreenCapture();
+                      setIsScreenSharing(true);
+                    } catch (err) {
+                      console.warn("Screen capture cancelled or failed", err);
+                    }
+                  }
+                }}
                 className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isScreenSharing
                     ? "bg-primary-600 text-white hover:bg-primary-700"

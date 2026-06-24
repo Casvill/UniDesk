@@ -64,3 +64,4 @@ temp/
 # Docs
 # docs/
 .env*.local
+*.pdf
