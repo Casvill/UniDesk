@@ -162,6 +162,16 @@ async function main() {
   const m4 = await emitAndCapture(s1, "camera-on", {}, s2, "camera-on");
   assert(m4.socketId === s1.id, `receive camera-on event has correct socketId`);
 
+  // ── Test 7b: screen-share synchronization events ──────────────────────
+  console.log("\n── Test 7b: screen-share state synchronization events ──");
+  const m5 = await emitAndCapture(s1, "screen-share-started", { userId: "some-uid", estado: true }, s2, "screen-share-started");
+  assert(m5.userId === j.user.uid, `receive screen-share-started event has correct userId`);
+  assert(m5.estado === true, `receive screen-share-started event has estado === true`);
+
+  const m6 = await emitAndCapture(s1, "screen-share-stopped", { userId: "some-uid", estado: false }, s2, "screen-share-stopped");
+  assert(m6.userId === j.user.uid, `receive screen-share-stopped event has correct userId`);
+  assert(m6.estado === false, `receive screen-share-stopped event has estado === false`);
+
   // ── Test 8: peer-closed signaling relay ────────────────────────────────
   console.log("\n── Test 8: peer-closed signaling → peer-disconnected ──");
   const pc = await emitAndCapture(s1, "peer-closed", { to: s2.id }, s2, "peer-disconnected");

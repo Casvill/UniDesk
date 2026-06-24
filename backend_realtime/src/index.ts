@@ -73,6 +73,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
       avatar: (socket.user as any).picture,
       microphoneEnabled: microphoneEnabled ?? false,
       cameraEnabled: cameraEnabled ?? false,
+      screenSharing: false,
     });
     
     socket.join(roomId);
@@ -341,6 +342,26 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     if (user) {
       user.cameraEnabled = false;
       socket.to(roomId).emit("camera-off", { socketId: socket.id, uid: user.uid });
+    }
+  });
+
+  socket.on("screen-share-started", (data: { userId: string; estado: boolean }) => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.screenSharing = true;
+      socket.to(roomId).emit("screen-share-started", { userId: user.uid, estado: true });
+    }
+  });
+
+  socket.on("screen-share-stopped", (data: { userId: string; estado: boolean }) => {
+    const roomId = findRoomOf(rooms, socket.id);
+    if (!roomId) return;
+    const user = rooms.get(roomId)?.get(socket.id);
+    if (user) {
+      user.screenSharing = false;
+      socket.to(roomId).emit("screen-share-stopped", { userId: user.uid, estado: false });
     }
   });
 
