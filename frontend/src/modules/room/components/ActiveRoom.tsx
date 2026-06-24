@@ -82,7 +82,6 @@ export function ActiveRoom() {
   const [connectionStatus, setConnectionStatus] = useState("Conectando...");
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
@@ -131,6 +130,10 @@ export function ActiveRoom() {
     selectedVideoId,
     setSelectedVideoId,
     localAudioTrackId,
+    screenStream,
+    isScreenSharing,
+    startScreenCapture,
+    stopScreenCapture,
   } = useMedia(
     localStreamRef,
     () =>
@@ -195,7 +198,7 @@ export function ActiveRoom() {
   const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
     const name = getParticipantName(p);
     const isCurrent = p.uid === user?.uid;
-    const camOn = isCurrent ? isCameraOn : p.cameraEnabled ?? false;
+    const camOn = isCurrent ? (isCameraOn || isScreenSharing) : (p.cameraEnabled || p.screenSharing) ?? false;
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
     const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
     const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
@@ -710,6 +713,22 @@ export function ActiveRoom() {
           );
         });
 
+        socket.on("screen-share-started", (payload: { userId: string; estado: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.userId ? { ...p, screenSharing: true } : p
+            )
+          );
+        });
+
+        socket.on("screen-share-stopped", (payload: { userId: string; estado: boolean }) => {
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.uid === payload.userId ? { ...p, screenSharing: false } : p
+            )
+          );
+        });
+
       } catch (error) {
         console.error("Error al conectar Socket.IO:", error);
         setIsConnected(false);
@@ -836,10 +855,11 @@ export function ActiveRoom() {
       )
     );
 
-    if (isCameraOn) {
+    const shouldEnableVideo = isCameraOn || isScreenSharing;
+    if (shouldEnableVideo) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
-        if (mediaPerms.video !== "prompt") {
+        if (isCameraOn && mediaPerms.video !== "prompt") {
           setIsCameraOn(false);
           if (mediaPerms.video === "denied") {
             showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
@@ -881,6 +901,14 @@ export function ActiveRoom() {
 
     socket.emit(isMicOn ? "user-unmuted" : "user-muted");
     socket.emit(isCameraOn ? "camera-on" : "camera-off");
+
+    if (user) {
+      if (isScreenSharing) {
+        socket.emit("screen-share-started", { userId: user.uid, estado: true });
+      } else {
+        socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
+      }
+    }
   }, [isCameraOn, isMicOn, isScreenSharing, user]);
 
   useEffect(() => {
@@ -1915,7 +1943,17 @@ export function ActiveRoom() {
               {/* Share screen */}
               <button
                 type="button"
-                onClick={() => setIsScreenSharing((value) => !value)}
+                onClick={async () => {
+                  if (isScreenSharing) {
+                    await stopScreenCapture();
+                  } else {
+                    try {
+                      await startScreenCapture();
+                    } catch (err) {
+                      console.warn("Screen capture cancelled or failed", err);
+                    }
+                  }
+                }}
                 className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isScreenSharing
                     ? "bg-primary-600 text-white hover:bg-primary-700"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { showToast } from "@/shared/components/ui/toast";
 
 export function useMedia(
   localStreamRef: React.MutableRefObject<MediaStream | null>,
@@ -16,6 +17,8 @@ export function useMedia(
   const [localAudioTrackId, setLocalAudioTrackId] = useState<string>("");
   const [localVideoTrackId, setLocalVideoTrackId] = useState<string>("");
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +194,79 @@ export function useMedia(
     });
   }, [localAudioTrackId, localVideoTrackId, getPeerConnections]);
 
+  const stopScreenCapture = useCallback(async () => {
+    const stream = screenStreamRef.current;
+    if (stream) {
+      console.log("[useMedia] Deteniendo captura de pantalla:", stream.id);
+      stream.getTracks().forEach((track) => track.stop());
+
+      // Remover pistas de pantalla de localStreamRef
+      const screenTracks = localStreamRef.current?.getVideoTracks() ?? [];
+      screenTracks.forEach((t) => {
+        localStreamRef.current?.removeTrack(t);
+      });
+
+      screenStreamRef.current = null;
+      setScreenStream(null);
+
+      // Restaurar el flujo original de la cámara
+      await retryMedia("video");
+    }
+  }, [retryMedia]);
+
+  const startScreenCapture = useCallback(async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      showToast.error("Compartir pantalla no es compatible con este navegador.");
+      throw new Error("Screen capture not supported");
+    }
+    try {
+      console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
+
+      const screenTrack = stream.getVideoTracks()[0];
+      if (!screenTrack) {
+        throw new Error("No video track found in screen stream");
+      }
+
+      // Detener y remover pistas de video locales anteriores
+      const oldTracks = localStreamRef.current?.getVideoTracks() ?? [];
+      oldTracks.forEach((t) => {
+        t.stop();
+        localStreamRef.current?.removeTrack(t);
+      });
+
+      // Agregar pista de pantalla al localStreamRef
+      if (localStreamRef.current) {
+        localStreamRef.current.addTrack(screenTrack);
+      } else {
+        localStreamRef.current = stream;
+      }
+
+      screenStreamRef.current = stream;
+      setScreenStream(stream);
+      setLocalVideoTrackId(screenTrack.id);
+
+      // Escuchar cuando el usuario deje de compartir desde la barra flotante nativa del navegador
+      screenTrack.onended = () => {
+        stopScreenCapture();
+      };
+
+      return stream;
+    } catch (err) {
+      console.error("[useMedia] Error al capturar pantalla:", err);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        showToast.error("Permiso para compartir pantalla denegado.");
+      } else {
+        showToast.error("No se pudo iniciar la captura de pantalla.");
+      }
+      throw err;
+    }
+  }, [retryMedia, stopScreenCapture]);
+
   return { 
     localStreamRef, 
     mediaPerms, 
@@ -201,6 +277,10 @@ export function useMedia(
     selectedVideoId,
     setSelectedVideoId,
     localAudioTrackId,
-    localVideoTrackId
+    localVideoTrackId,
+    screenStream,
+    isScreenSharing: !!screenStream,
+    startScreenCapture,
+    stopScreenCapture
   };
 }
