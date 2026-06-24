@@ -18,6 +18,7 @@ export function useMedia(
   const [localVideoTrackId, setLocalVideoTrackId] = useState<string>("");
   const [mediaInitStatus, setMediaInitStatus] = useState<"idle" | "initializing" | "ready" | "error">("idle");
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,9 +195,10 @@ export function useMedia(
   }, [localAudioTrackId, localVideoTrackId, getPeerConnections]);
 
   const stopScreenCapture = useCallback(async () => {
-    if (screenStream) {
-      console.log("[useMedia] Deteniendo captura de pantalla:", screenStream.id);
-      screenStream.getTracks().forEach((track) => track.stop());
+    const stream = screenStreamRef.current;
+    if (stream) {
+      console.log("[useMedia] Deteniendo captura de pantalla:", stream.id);
+      stream.getTracks().forEach((track) => track.stop());
 
       // Remover pistas de pantalla de localStreamRef
       const screenTracks = localStreamRef.current?.getVideoTracks() ?? [];
@@ -204,12 +206,13 @@ export function useMedia(
         localStreamRef.current?.removeTrack(t);
       });
 
+      screenStreamRef.current = null;
       setScreenStream(null);
 
       // Restaurar el flujo original de la cámara
       await retryMedia("video");
     }
-  }, [screenStream, retryMedia]);
+  }, [retryMedia]);
 
   const startScreenCapture = useCallback(async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
@@ -243,6 +246,7 @@ export function useMedia(
         localStreamRef.current = stream;
       }
 
+      screenStreamRef.current = stream;
       setScreenStream(stream);
       setLocalVideoTrackId(screenTrack.id);
 
@@ -275,6 +279,7 @@ export function useMedia(
     localAudioTrackId,
     localVideoTrackId,
     screenStream,
+    isScreenSharing: !!screenStream,
     startScreenCapture,
     stopScreenCapture
   };

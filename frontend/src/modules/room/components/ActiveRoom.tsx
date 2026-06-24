@@ -82,7 +82,6 @@ export function ActiveRoom() {
   const [connectionStatus, setConnectionStatus] = useState("Conectando...");
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
@@ -132,6 +131,7 @@ export function ActiveRoom() {
     setSelectedVideoId,
     localAudioTrackId,
     screenStream,
+    isScreenSharing,
     startScreenCapture,
     stopScreenCapture,
   } = useMedia(
@@ -1922,11 +1922,9 @@ export function ActiveRoom() {
                 onClick={async () => {
                   if (isScreenSharing) {
                     await stopScreenCapture();
-                    setIsScreenSharing(false);
                   } else {
                     try {
                       await startScreenCapture();
-                      setIsScreenSharing(true);
                     } catch (err) {
                       console.warn("Screen capture cancelled or failed", err);
                     }
