@@ -143,7 +143,8 @@ export function ActiveRoom() {
         )
       ),
     isMicOn,
-    isCameraOn
+    isCameraOn,
+    setIsCameraOn
   );
   const chat = useChat(userProfilesCacheRef);
 
