@@ -93,80 +93,77 @@ export function RoomCarousel({
       </div>
 
       <div className="relative">
-        {totalPages > 1 && (
+        <div className="overflow-x-hidden">
           <div
-            className="absolute inset-0 pointer-events-none z-10"
-            style={{
-              background:
-                "linear-gradient(to right, #f6f7f9 0%, transparent 1%, transparent 99%, #f6f7f9 100%)",
-            }}
-            aria-hidden="true"
-          />
-        )}
-
-        <div
-          ref={containerRef}
-          className="relative"
-          style={
-            totalPages > 1
-              ? { clipPath: "inset(-40px -20px -40px -20px)" }
-              : {}
-          }
-          onMouseEnter={() => setContainerHovered(true)}
-          onMouseLeave={() => {
-            setContainerHovered(false);
-            setHoveredCard(null);
-          }}
-          onWheel={handleWheel}
-        >
-          <div
+            ref={containerRef}
             className="relative"
-            style={{
-              height: containerHeight,
-              paddingTop: 32,
-              paddingBottom: 32,
+            style={
+              totalPages > 1
+                ? {
+                    clipPath: "inset(-40px -20px -40px -20px)",
+                    maskImage:
+                      "linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)",
+                    WebkitMaskImage:
+                      "linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)",
+                  }
+                : {}
+            }
+            onMouseEnter={() => setContainerHovered(true)}
+            onMouseLeave={() => {
+              setContainerHovered(false);
+              setHoveredCard(null);
             }}
+            onWheel={handleWheel}
           >
             <div
-              className="flex gap-6 h-full items-center transition-transform duration-500 ease-in-out"
+              className="relative"
               style={{
-                transform: `translateX(-${translateX}px)`,
-                justifyContent:
-                  rooms.length < cardsPerPage ? "center" : "flex-start",
+                height: containerHeight,
+                paddingTop: 32,
+                paddingBottom: 32,
               }}
-              role="list"
-              aria-label="Salas de estudio disponibles"
             >
-              {cardWidth > 0 &&
-                rooms.map((room, index) => {
-                  const aIdx = index % 5;
-                  const isHovered = hoveredCard === room.id;
-                  const isDimmed =
-                    containerHovered && hoveredCard !== null && !isHovered;
+              <div
+                className="flex gap-6 h-full items-center transition-transform duration-500 ease-in-out"
+                style={{
+                  transform: `translateX(-${translateX}px)`,
+                  justifyContent:
+                    rooms.length < cardsPerPage ? "center" : "flex-start",
+                }}
+                role="list"
+                aria-label="Salas de estudio disponibles"
+              >
+                {cardWidth > 0 &&
+                  rooms.map((room, index) => {
+                    const aIdx = index % 5;
+                    const isHovered = hoveredCard === room.id;
+                    const isDimmed =
+                      containerHovered && hoveredCard !== null && !isHovered;
 
-                  return (
-                    <div
-                      role="listitem"
-                      key={room.id}
-                      onFocus={() => goToCardPage(index)}
-                    >
-                      <RoomCard
-                        room={room}
-                        cardWidth={cardWidth}
-                        index={index}
-                        animName={animNames[aIdx]}
-                        animDur={animDurs[aIdx]}
-                        isHovered={isHovered}
-                        isDimmed={isDimmed}
-                        onHover={setHoveredCard}
-                        canManage={true}
-                        user={user}
-                        onRoomUpdated={onRoomUpdated}
-                        onRoomDeleted={onRoomDeleted}
-                      />
-                    </div>
-                  );
-                })}
+                    return (
+                      <div
+                        role="listitem"
+                        key={room.id}
+                        onFocus={() => goToCardPage(index)}
+                      >
+                        <RoomCard
+                          room={room}
+                          cardWidth={cardWidth}
+                          index={index}
+                          animName={animNames[aIdx]}
+                          animDur={animDurs[aIdx]}
+                          isHovered={isHovered}
+                          isDimmed={isDimmed}
+                          onHover={setHoveredCard}
+                          canManage={true}
+                          user={user}
+                          onRoomUpdated={onRoomUpdated}
+                          onRoomDeleted={onRoomDeleted}
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           </div>
         </div>
@@ -214,29 +211,29 @@ export function RoomCarousel({
             </button>
           </>
         )}
-
-        {totalPages > 1 && (
-          <nav
-            className="flex justify-center gap-2 mt-4"
-            aria-label="Paginación de salas de estudio"
-          >
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setPage(i)}
-                className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                  i === page
-                    ? "bg-primary-600 w-6"
-                    : "bg-gray-300 hover:bg-gray-400"
-                }`}
-                aria-label={`Ir a la página ${i + 1} de salas`}
-                aria-current={i === page ? "page" : undefined}
-              />
-            ))}
-          </nav>
-        )}
       </div>
+
+      {totalPages > 1 && (
+        <nav
+          className="flex justify-center gap-2 mt-4"
+          aria-label="Paginación de salas de estudio"
+        >
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setPage(i)}
+              className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                i === page
+                  ? "bg-primary-600 w-6"
+                  : "bg-gray-300 hover:bg-gray-400"
+              }`}
+              aria-label={`Ir a la página ${i + 1} de salas`}
+              aria-current={i === page ? "page" : undefined}
+            />
+          ))}
+        </nav>
+      )}
     </section>
   );
 }
