@@ -106,6 +106,7 @@ export function ActiveRoom() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [waitingCopied, setWaitingCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
 
@@ -1402,9 +1403,27 @@ export function ActiveRoom() {
   const handleCopyId = async () => {
     if (!roomId) return;
 
-    await navigator.clipboard.writeText(roomId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleWaitingCopyId = async () => {
+    if (!roomId) return;
+
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setWaitingCopied(true);
+      setTimeout(() => setWaitingCopied(false), 2000);
+    } catch {
+      setWaitingCopied(true);
+      setTimeout(() => setWaitingCopied(false), 2000);
+    }
   };
 
   const handleLeaveRoom = () => {
@@ -1698,7 +1717,7 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="flex cursor-pointer items-center gap-1 rounded text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                className="flex cursor-pointer items-center gap-1 rounded p-1.5 text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                 aria-label={
                   copied
                     ? "ID copiado al portapapeles"
@@ -1708,7 +1727,7 @@ export function ActiveRoom() {
                 {copied ? (
                   <>
                     <Check className="h-4 w-4" aria-hidden="true" />
-                    <span className="hidden sm:inline">ID copiado</span>
+                    <span className="hidden sm:inline"> Copiado </span>
                   </>
                 ) : (
                   <>
@@ -1842,13 +1861,13 @@ export function ActiveRoom() {
                     </p>
                     <button
                       type="button"
-                      onClick={handleCopyId}
-                      className="mt-4 flex items-center gap-1.5 rounded-lg bg-gray-700/80 px-4 py-2.5 text-xs font-semibold text-white hover:bg-gray-600 transition cursor-pointer"
+                      onClick={handleWaitingCopyId}
+                      className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
                     >
-                      {copied ? (
+                      {waitingCopied ? (
                         <>
                           <Check className="h-3.5 w-3.5 text-green-400" />
-                          <span>¡ID copiado!</span>
+                          <span> Copiado </span>
                         </>
                       ) : (
                         <>
