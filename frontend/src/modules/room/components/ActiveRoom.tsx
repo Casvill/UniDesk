@@ -53,6 +53,7 @@ import {
   upsertParticipant,
 } from "@/utils/room";
 import { showToast } from "@/shared/components/ui/toast";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { useMedia } from "@/hooks/useMedia";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useChat } from "@/hooks/useChat";
@@ -121,6 +122,7 @@ export function ActiveRoom() {
   // Estados para sincronización de WebRTC y accesibilidad de audio
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [isAudioAutoplayBlocked, setIsAudioAutoplayBlocked] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const webRTC = useWebRTC(localStreamRef);
 
@@ -1406,12 +1408,10 @@ export function ActiveRoom() {
   };
 
   const handleLeaveRoom = () => {
-    const shouldLeave = window.confirm(
-      "¿Estás seguro de que quieres salir de esta sala de estudio?"
-    );
+    setShowLeaveConfirm(true);
+  };
 
-    if (!shouldLeave) return;
-
+  const confirmLeaveRoom = () => {
     if (socketRef.current) {
       socketRef.current.emit("leave-room");
       socketRef.current.disconnect();
@@ -2408,6 +2408,16 @@ export function ActiveRoom() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={showLeaveConfirm}
+        onOpenChange={setShowLeaveConfirm}
+        title="Salir de la sala"
+        description="¿Estás seguro de que quieres salir de esta sala de estudio?"
+        confirmLabel="Salir"
+        variant="destructive"
+        onConfirm={confirmLeaveRoom}
+      />
     </div>
   );
 }
