@@ -184,12 +184,12 @@ export function RoomCard({
         <div className="px-5 pt-3 pb-5 flex flex-col justify-between gap-4 flex-1">
           <div>
             <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
                   ID de sala
                 </p>
 
-                <p className="font-mono text-sm font-medium text-gray-600">
+                <p className="font-mono text-sm font-medium text-gray-600 truncate">
                   {room.id}
                 </p>
               </div>
@@ -197,7 +197,7 @@ export function RoomCard({
               <button
                 type="button"
                 onClick={handleCopy}
-                className={`flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer ${
+                className={`flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer flex-shrink-0 whitespace-nowrap ${
                   copied
                     ? "bg-green-100 text-green-700 border border-green-200"
                     : "text-gray-500 bg-white border border-gray-200 hover:text-gray-800 hover:border-gray-300"
