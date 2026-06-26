@@ -93,6 +93,8 @@ export function ActiveRoom() {
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
+  const hasJoinedRoomRef = useRef(false);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
 
@@ -124,6 +126,9 @@ export function ActiveRoom() {
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [isAudioAutoplayBlocked, setIsAudioAutoplayBlocked] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showDuplicateTabDialog, setShowDuplicateTabDialog] = useState(false);
+  const [duplicateTabResolved, setDuplicateTabResolved] = useState(false);
+  const duplicateTabPendingRef = useRef(false);
 
   const webRTC = useWebRTC(localStreamRef);
 
@@ -539,8 +544,18 @@ export function ActiveRoom() {
           if (mappedParticipants.length === 0) return;
 
           if (action === "snapshot") {
+            const seen = new Map<string, RoomParticipant>();
+            mappedParticipants.forEach((p) => {
+              if (p.uid) seen.set(p.uid, p);
+            });
+            const deduped = Array.from(seen.values());
+
+            if (deduped.length !== mappedParticipants.length) {
+              console.warn("[Presence] snapshot had duplicates, deduped:", mappedParticipants.length, "→", deduped.length);
+            }
+
             setParticipants((previousParticipants) =>
-              mappedParticipants.map((participant) => {
+              deduped.map((participant) => {
                 const previousParticipant = previousParticipants.find(
                   (item) => item.uid === participant.uid
                 );
@@ -604,16 +619,24 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
-            console.log("[Sync] room-participants-update received:", currentParticipants.map(p => ({ uid: p.uid, cam: p.cameraEnabled, mic: p.microphoneEnabled })));
-
+            const seen = new Map<string, RoomParticipant>();
             currentParticipants.forEach((p) => {
+              if (p.uid) seen.set(p.uid, p);
+            });
+            const deduped = Array.from(seen.values());
+
+            if (deduped.length !== currentParticipants.length) {
+              console.warn("[Sync] room-participants-update had duplicates, deduped:", currentParticipants.length, "→", deduped.length);
+            }
+
+            deduped.forEach((p) => {
               if (p.socketId && p.uid) {
                 webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
               }
             });
 
             setParticipants((previousParticipants) =>
-              currentParticipants.map((participant) => {
+              deduped.map((participant) => {
                 const previousParticipant = previousParticipants.find(
                   (item) => item.uid === participant.uid
                 );
@@ -777,6 +800,7 @@ export function ActiveRoom() {
 
       socketRef.current = null;
       setIsConnected(false);
+      hasJoinedRoomRef.current = false;
       setHasJoinedRoom(false);
     };
   }, [
@@ -953,15 +977,77 @@ export function ActiveRoom() {
     return () => clearTimeout(scrollTimer);
   }, [chat.chatMessages.length, isChatOpen]);
 
+  // BroadcastChannel: detectar pestañas duplicadas del mismo usuario
+  useEffect(() => {
+    if (!user || !roomId) return;
+
+    const bc = new BroadcastChannel(`unidesk-room-${roomId}`);
+    broadcastChannelRef.current = bc;
+
+    bc.onmessage = (event) => {
+      if (event.data?.type === "duplicate-ping" && event.data.uid === user.uid) {
+        bc.postMessage({ type: "duplicate-pong", uid: user.uid });
+      }
+      if (event.data?.type === "leave-request" && event.data.uid === user.uid) {
+        if (socketRef.current) {
+          socketRef.current.emit("leave-room");
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+        showToast.info("Tu sesión fue transferida a otra pestaña.");
+        navigate("/dashboard");
+      }
+    };
+
+    return () => {
+      bc.close();
+      broadcastChannelRef.current = null;
+    };
+  }, [user, roomId, navigate]);
+
   // Sincronizar unión a la sala cuando el socket esté conectado y los medios inicializados
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom) return;
+    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom || hasJoinedRoomRef.current) return;
 
     // Esperar a que la inicialización de medios haya concluido (ready o error)
     if (mediaInitStatus === "initializing" || mediaInitStatus === "idle") {
       return;
     }
+
+    // Detectar pestañas duplicadas antes de unirse
+    if (!duplicateTabResolved && !duplicateTabPendingRef.current) {
+      duplicateTabPendingRef.current = true;
+      let otherTabFound = false;
+
+      const bc = broadcastChannelRef.current;
+      if (bc) {
+        const handler = (event: MessageEvent) => {
+          if (event.data?.type === "duplicate-pong" && event.data.uid === user.uid) {
+            otherTabFound = true;
+            setShowDuplicateTabDialog(true);
+            setDuplicateTabResolved(true);
+          }
+        };
+        bc.addEventListener("message", handler);
+        bc.postMessage({ type: "duplicate-ping", uid: user.uid });
+
+        setTimeout(() => {
+          bc.removeEventListener("message", handler);
+          if (!otherTabFound) {
+            setDuplicateTabResolved(true);
+          }
+          duplicateTabPendingRef.current = false;
+        }, 500);
+      } else {
+        setDuplicateTabResolved(true);
+        duplicateTabPendingRef.current = false;
+      }
+
+      return;
+    }
+
+    if (!duplicateTabResolved) return;
 
     const localParticipant: RoomParticipant = {
       uid: user.uid,
@@ -987,6 +1073,7 @@ export function ActiveRoom() {
     setParticipants((currentParticipants) =>
       upsertParticipant(currentParticipants, localParticipant)
     );
+    hasJoinedRoomRef.current = true;
     setHasJoinedRoom(true);
   }, [
     isConnected,
@@ -1001,6 +1088,7 @@ export function ActiveRoom() {
     isMicOn,
     isScreenSharing,
     hasJoinedRoom,
+    duplicateTabResolved,
   ]);
 
   const handleUnblockAudio = () => {
@@ -2429,9 +2517,21 @@ export function ActiveRoom() {
       </AnimatePresence>
 
       <ConfirmDialog
+        open={showDuplicateTabDialog}
+        onOpenChange={(open) => { setShowDuplicateTabDialog(open); if (!open) navigate("/dashboard"); }}
+        title="Sesión duplicada detectada"
+        description="Ya tienes una sesión activa en esta sala desde otra pestaña. ¿Quieres usar esta y cerrar la otra?"
+        confirmLabel="Usar esta y cerrar la otra"
+        onConfirm={() => {
+          broadcastChannelRef.current?.postMessage({ type: "leave-request", uid: user?.uid });
+          setShowDuplicateTabDialog(false);
+        }}
+      />
+
+      <ConfirmDialog
         open={showLeaveConfirm}
         onOpenChange={setShowLeaveConfirm}
-        title="Salir de la sala"
+        title="¿Salir de la sala?"
         description="¿Estás seguro de que quieres salir de esta sala de estudio?"
         confirmLabel="Salir"
         variant="destructive"
