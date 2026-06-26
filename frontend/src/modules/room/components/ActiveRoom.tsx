@@ -309,7 +309,7 @@ export function ActiveRoom() {
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
           {hasMediaError ? (
             <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
-              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2 animate-pulse" aria-hidden="true" />
+              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2" aria-hidden="true" />
               <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Acceso Denegado</p>
               <p className="text-[11px] text-gray-300 leading-normal">
                 {mediaPerms.video === "denied" || mediaPerms.audio === "denied"
@@ -1170,7 +1170,7 @@ export function ActiveRoom() {
     if (isCameraBlocked) {
       if (mediaPerms.video === "denied") {
         showToast.error(
-          "No es posible acceder a la cámara. Por favor, concede los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
+          "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
         );
       } else if (mediaPerms.video === "unavailable") {
         showToast.error("No se detectó ninguna cámara en este dispositivo.");
@@ -1199,7 +1199,7 @@ export function ActiveRoom() {
     if (isMicBlocked) {
       if (mediaPerms.audio === "denied") {
         showToast.error(
-          "No es posible acceder al micrófono. Por favor, concede los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
+          "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
         );
       } else if (mediaPerms.audio === "unavailable") {
         showToast.error("No se detectó ningún micrófono en este dispositivo.");
@@ -1903,9 +1903,9 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={handleCameraClick}
-                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isCameraBlocked
-                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 hover:bg-amber-500/30"
                     : isCameraOn
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -1919,22 +1919,25 @@ export function ActiveRoom() {
                       : "Encender cámara"
                 }
               >
-                {isCameraBlocked ? (
-                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
-                ) : isCameraOn ? (
-                  <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                ) : (
-                  <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                )}
+                  {isCameraOn ? (
+                    <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  ) : (
+                    <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  )}
+                  {isCameraBlocked && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#403421] shadow-md">
+                      <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    </span>
+                  )}
               </button>
 
               {/* Mic */}
               <button
                 type="button"
                 onClick={handleMicClick}
-                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isMicBlocked
-                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 hover:bg-amber-500/30"
                     : isMicOn
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -1948,13 +1951,16 @@ export function ActiveRoom() {
                       : "Activar micrófono"
                 }
               >
-                {isMicBlocked ? (
-                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
-                ) : isMicOn ? (
-                  <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                ) : (
-                  <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                )}
+                  {isMicOn ? (
+                    <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  ) : (
+                    <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  )}
+                  {isMicBlocked && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#403421] shadow-md">
+                      <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    </span>
+                  )}
               </button>
 
               {/* Share screen */}
