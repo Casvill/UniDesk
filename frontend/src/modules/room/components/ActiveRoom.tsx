@@ -94,6 +94,7 @@ export function ActiveRoom() {
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
   const hasJoinedRoomRef = useRef(false);
+  const localSocketIdRef = useRef<string | null>(null);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
@@ -228,11 +229,10 @@ export function ActiveRoom() {
 
   const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
     const name = getParticipantName(p);
-    const isCurrent = p.uid === user?.uid;
+    const isCurrent = (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid);
     const camOn = isCurrent ? (isCameraOn || isScreenSharing) : (p.cameraEnabled || p.screenSharing) ?? false;
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
-    const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
-    const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
+    const remoteStream = p.socketId ? webRTC.remoteStreams.get(p.socketId) : undefined;
 
     const hasMediaError = isCurrent && (
       mediaPerms.audio === "denied" ||
@@ -245,7 +245,7 @@ export function ActiveRoom() {
 
     return (
       <motion.div
-        key={p.uid}
+        key={p.socketId || p.uid}
         layout
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -503,6 +503,7 @@ export function ActiveRoom() {
         });
 
         socket.on("connect", () => {
+          localSocketIdRef.current = socket!.id ?? null;
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
@@ -544,25 +545,15 @@ export function ActiveRoom() {
           if (mappedParticipants.length === 0) return;
 
           if (action === "snapshot") {
-            const seen = new Map<string, RoomParticipant>();
-            mappedParticipants.forEach((p) => {
-              if (p.uid) seen.set(p.uid, p);
-            });
-            const deduped = Array.from(seen.values());
-
-            if (deduped.length !== mappedParticipants.length) {
-              console.warn("[Presence] snapshot had duplicates, deduped:", mappedParticipants.length, "→", deduped.length);
-            }
-
             setParticipants((previousParticipants) =>
-              deduped.map((participant) => {
+              mappedParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
-                  (item) => item.uid === participant.uid
+                  (item) => (item.socketId || item.uid) === (participant.socketId || participant.uid)
                 );
                 const cachedProfile = userProfilesCacheRef.current.get(
                   participant.uid
                 );
-                const isCurrentUser = participant.uid === user.uid;
+                const isCurrentUser = (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid);
 
                 return mergeProfileIntoParticipant(
                   {
@@ -592,13 +583,13 @@ export function ActiveRoom() {
           }
 
           if (action === "leave") {
-            const leavingIds = mappedParticipants.map(
-              (participant) => participant.uid
+            const leavingKeys = mappedParticipants.map(
+              (p) => p.socketId || p.uid
             );
 
             setParticipants((currentParticipants) =>
               currentParticipants.filter(
-                (participant) => !leavingIds.includes(participant.uid)
+                (p) => !leavingKeys.includes(p.socketId || p.uid)
               )
             );
 
@@ -619,28 +610,12 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
-            const seen = new Map<string, RoomParticipant>();
-            currentParticipants.forEach((p) => {
-              if (p.uid) seen.set(p.uid, p);
-            });
-            const deduped = Array.from(seen.values());
-
-            if (deduped.length !== currentParticipants.length) {
-              console.warn("[Sync] room-participants-update had duplicates, deduped:", currentParticipants.length, "→", deduped.length);
-            }
-
-            deduped.forEach((p) => {
-              if (p.socketId && p.uid) {
-                webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
-              }
-            });
-
             setParticipants((previousParticipants) =>
-              deduped.map((participant) => {
+              currentParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
-                  (item) => item.uid === participant.uid
+                  (item) => (item.socketId || item.uid) === (participant.socketId || participant.uid)
                 );
-                const isCurrentUser = participant.uid === user.uid;
+                const isCurrentUser = (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid);
 
                 const cachedProfile = userProfilesCacheRef.current.get(
                   participant.uid
@@ -694,12 +669,12 @@ export function ActiveRoom() {
           setSocketError(err)
         );
 
-        webRTC.registerWebRTCEventHandlers(socket, user.uid);
+        webRTC.registerWebRTCEventHandlers(socket, localSocketIdRef.current ?? "");
 
         socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, isSpeaking: payload.speaking } : p
+              p.socketId === payload.socketId ? { ...p, isSpeaking: payload.speaking } : p
             )
           );
         });
@@ -718,7 +693,7 @@ export function ActiveRoom() {
             let name = cached?.username || "";
             
             if (!name) {
-              const currentParticipant = participants.find(p => p.uid === payload.uid);
+              const currentParticipant = participants.find(p => p.socketId === payload.socketId);
               name = currentParticipant?.username || "";
             }
             
@@ -733,7 +708,7 @@ export function ActiveRoom() {
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, microphoneEnabled: false } : p
+              p.socketId === payload.socketId ? { ...p, microphoneEnabled: false } : p
             )
           );
         });
@@ -741,7 +716,7 @@ export function ActiveRoom() {
         socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, microphoneEnabled: true } : p
+              p.socketId === payload.socketId ? { ...p, microphoneEnabled: true } : p
             )
           );
         });
@@ -749,7 +724,7 @@ export function ActiveRoom() {
         socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, cameraEnabled: true } : p
+              p.socketId === payload.socketId ? { ...p, cameraEnabled: true } : p
             )
           );
         });
@@ -757,7 +732,7 @@ export function ActiveRoom() {
         socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, cameraEnabled: false } : p
+              p.socketId === payload.socketId ? { ...p, cameraEnabled: false } : p
             )
           );
         });
@@ -791,7 +766,6 @@ export function ActiveRoom() {
     return () => {
       webRTC.peerConnectionsRef.current.forEach((pc) => pc.close());
       webRTC.peerConnectionsRef.current.clear();
-      webRTC.socketIdByUidRef.current.clear();
 
       if (socket) {
         socket.emit("leave-room");
@@ -894,7 +868,7 @@ export function ActiveRoom() {
 
     setParticipants((currentParticipants) =>
       currentParticipants.map((participant) =>
-        participant.uid === user.uid
+        (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid)
           ? {
               ...participant,
               cameraEnabled: isCameraOn,
@@ -1109,7 +1083,7 @@ export function ActiveRoom() {
     const socket = socketRef.current;
     if (!isMicOn || !localStreamRef.current || !socket || mediaInitStatus !== "ready") {
       setParticipants((prev) =>
-        prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+        prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: false } : p)
       );
       return;
     }
@@ -1158,7 +1132,7 @@ export function ActiveRoom() {
             isSpeaking = true;
             socket.emit("user-speaking", { speaking: true });
             setParticipants((prev) =>
-              prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: true } : p))
+              prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: true } : p)
             );
           }
         } else {
@@ -1167,7 +1141,7 @@ export function ActiveRoom() {
               isSpeaking = false;
               socket.emit("user-speaking", { speaking: false });
               setParticipants((prev) =>
-                prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+                prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: false } : p)
               );
               silenceTimeout = null;
             }, 400);
@@ -1197,7 +1171,7 @@ export function ActiveRoom() {
       const pcs = webRTC.peerConnectionsRef.current;
       if (pcs.size === 0) return;
 
-      const speakingUids = new Set<string>();
+      const speakingSocketIds = new Set<string>();
 
       for (const [socketId, pc] of pcs.entries()) {
         if (pc.connectionState !== "connected") continue;
@@ -1216,11 +1190,7 @@ export function ActiveRoom() {
           });
 
           if (isSpeakingRemote) {
-            const uid = Array.from(webRTC.socketIdByUidRef.current.entries())
-              .find(([_, sid]) => sid === socketId)?.[0];
-            if (uid) {
-              speakingUids.add(uid);
-            }
+            speakingSocketIds.add(socketId);
           }
         } catch (err) {
           // Ignorar errores silenciosamente para evitar spam en consola
@@ -1230,10 +1200,10 @@ export function ActiveRoom() {
       setParticipants((prev) => {
         let changed = false;
         const next = prev.map((p) => {
-          const isCurrentUser = p.uid === user?.uid;
-          if (isCurrentUser) return p; // El usuario local tiene su propio analizador de micrófono directo
+          const isCurrentUser = (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid);
+          if (isCurrentUser) return p; // La instancia local tiene su propio analizador de micrófono directo
 
-          const shouldBeSpeaking = speakingUids.has(p.uid);
+          const shouldBeSpeaking = p.socketId ? speakingSocketIds.has(p.socketId) : false;
           if (p.isSpeaking !== shouldBeSpeaking) {
             changed = true;
             return { ...p, isSpeaking: shouldBeSpeaking };
@@ -1245,7 +1215,7 @@ export function ActiveRoom() {
     }, 200);
 
     return () => clearInterval(intervalId);
-  }, [isConnected, user?.uid, webRTC.peerConnectionsRef, webRTC.socketIdByUidRef]);
+  }, [isConnected, user?.uid, webRTC.peerConnectionsRef]);
 
   const isCameraBlocked =
     mediaPerms.video === "denied" ||

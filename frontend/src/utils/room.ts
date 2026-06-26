@@ -319,11 +319,13 @@ export function upsertParticipant(
   participants: RoomParticipant[],
   participant: RoomParticipant
 ) {
-  const exists = participants.some((item) => item.uid === participant.uid);
+  const key = participant.socketId || participant.uid;
+
+  const exists = participants.some((item) => (item.socketId || item.uid) === key);
 
   if (exists) {
     return participants.map((item) =>
-      item.uid === participant.uid ? { ...item, ...participant } : item
+      (item.socketId || item.uid) === key ? { ...item, ...participant } : item
     );
   }
 

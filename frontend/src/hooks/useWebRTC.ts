@@ -7,7 +7,6 @@ const RTC_CONFIG: RTCConfiguration = {
 
 export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const socketIdByUidRef = useRef<Map<string, string>>(new Map());
   const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
@@ -120,11 +119,10 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     return pc;
   }
 
-  function registerWebRTCEventHandlers(socket: Socket, currentUserUid: string) {
+  function registerWebRTCEventHandlers(socket: Socket, localSocketId: string) {
     socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
       console.log("[WebRTC] usuario conectado:", payload.socketId, payload.user.uid);
-      socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
-      if (payload.user.uid === currentUserUid) return;
+      if (payload.socketId === localSocketId) return;
       if (peerConnectionsRef.current.has(payload.socketId)) return;
       createPeerConnection(payload.socketId, socket);
     });
@@ -195,7 +193,6 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
   return {
     peerConnectionsRef,
-    socketIdByUidRef,
     remoteStreams,
     createPeerConnection,
     closePeerConnection,
