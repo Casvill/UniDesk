@@ -78,13 +78,13 @@ export function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowJoinDialog(true)}
-                className="h-12 w-full bg-primary text-white px-5 rounded-lg text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer lg:hidden"
+                className="h-12 w-full sm:w-auto bg-primary text-white px-5 rounded-lg text-sm font-semibold hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer md:hidden"
                 aria-label="Unirse a una sala usando su código"
               >
                 Unirse a una sala
               </button>
 
-              <div className="hidden lg:block">
+              <div className="hidden md:block">
                 <JoinRoomForm user={user} />
               </div>
             </>
