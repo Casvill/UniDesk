@@ -1295,7 +1295,15 @@ export function ActiveRoom() {
     mediaPerms.audio === "unavailable" ||
     mediaPerms.audio === "error";
 
+  const showCameraAlert = isCameraBlocked || isScreenSharing;
+
   const handleCameraClick = async () => {
+    if (isScreenSharing) {
+      showToast.error(
+        "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara."
+      );
+      return;
+    }
     if (isCameraBlocked) {
       if (mediaPerms.video === "denied") {
         showToast.error(
@@ -2049,7 +2057,7 @@ export function ActiveRoom() {
                 type="button"
                 onClick={handleCameraClick}
                 className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
-                  isCameraBlocked
+                  showCameraAlert
                     ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 hover:bg-amber-500/30"
                     : isCameraOn
                       ? "bg-primary-600 text-white hover:bg-primary-700"
@@ -2057,8 +2065,10 @@ export function ActiveRoom() {
                 }`}
                 aria-pressed={isCameraOn}
                 aria-label={
-                  isCameraBlocked
-                    ? "Cámara bloqueada por permisos"
+                  showCameraAlert
+                    ? isScreenSharing
+                      ? "Cámara desactivada mientras compartes pantalla"
+                      : "Cámara bloqueada por permisos"
                     : isCameraOn
                       ? "Apagar cámara"
                       : "Encender cámara"
@@ -2069,7 +2079,7 @@ export function ActiveRoom() {
                   ) : (
                     <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                   )}
-                  {isCameraBlocked && (
+                  {showCameraAlert && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#403421] shadow-md">
                       <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
                     </span>
