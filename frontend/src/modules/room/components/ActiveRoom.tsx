@@ -57,6 +57,28 @@ import { useMedia } from "@/hooks/useMedia";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useChat } from "@/hooks/useChat";
 
+function renderMessageWithLinks(text: string) {
+  const urlRegex = /(https?:\/\/[^\s)"'\]}>]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, i) => {
+    if (part.startsWith("http://") || part.startsWith("https://")) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline font-medium hover:opacity-80"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
 export function ActiveRoom() {
@@ -917,13 +939,7 @@ export function ActiveRoom() {
 
     const scrollContainer = (container: HTMLDivElement | null) => {
       if (!container) return;
-      const prefersReducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-      });
+      container.scrollTop = container.scrollHeight;
     };
 
     const scrollTimer = setTimeout(() => {
@@ -1532,11 +1548,11 @@ export function ActiveRoom() {
                   {!isOwnMessage && avatar}
 
                   <div
-                    className={`flex max-w-[82%] flex-col ${
+                    className={`min-w-0 max-w-[82%] flex-col overflow-hidden ${
                       isOwnMessage
                         ? "items-end text-right"
                         : "items-start text-left"
-                    }`}
+                    } flex`}
                   >
                     <div className="mb-1 flex max-w-full items-center gap-2">
                       <span className="truncate text-xs font-semibold text-gray-700">
@@ -1549,13 +1565,13 @@ export function ActiveRoom() {
                     </div>
 
                     <p
-                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
+                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm break-all ${
                         isOwnMessage
                           ? "rounded-br-sm bg-primary text-white"
                           : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
                       }`}
                     >
-                      {msg.message}
+                      {renderMessageWithLinks(msg.message)}
                     </p>
                   </div>
 
@@ -1997,7 +2013,7 @@ export function ActiveRoom() {
                   <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
                 {chat.unreadCount > 0 && !isChatOpen && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white sm:h-6 sm:w-6 sm:text-sm">
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce sm:h-6 sm:w-6 sm:text-sm">
                     {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
                   </span>
                 )}
@@ -2099,7 +2115,7 @@ export function ActiveRoom() {
             )}
 
             {chat.unreadCount > 0 && !isChatOpen && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-bounce">
+              <span className="absolute -top-1.5 -left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce">
                 {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
               </span>
             )}

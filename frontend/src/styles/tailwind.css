@@ -2,3 +2,18 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+@theme inline {
+  --animate-badge-bounce: badge-bounce 2s infinite;
+}
+
+@keyframes badge-bounce {
+  0%, 100% {
+    transform: translateY(-10%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
