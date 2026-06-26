@@ -351,7 +351,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.screenSharing = true;
-      socket.to(roomId).emit("screen-share-started", { userId: user.uid, estado: true });
+      socket.to(roomId).emit("screen-share-started", { socketId: socket.id, userId: user.uid, estado: true });
     }
   });
 
@@ -361,7 +361,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     const user = rooms.get(roomId)?.get(socket.id);
     if (user) {
       user.screenSharing = false;
-      socket.to(roomId).emit("screen-share-stopped", { userId: user.uid, estado: false });
+      socket.to(roomId).emit("screen-share-stopped", { socketId: socket.id, userId: user.uid, estado: false });
     }
   });
 

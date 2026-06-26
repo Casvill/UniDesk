@@ -130,6 +130,9 @@ export function ActiveRoom() {
   const [showDuplicateTabDialog, setShowDuplicateTabDialog] = useState(false);
   const [duplicateTabResolved, setDuplicateTabResolved] = useState(false);
   const duplicateTabPendingRef = useRef(false);
+  // FIX 2: flag para evitar registrar los handlers de WebRTC más de una vez
+  // (p.ej. en reconexiones) y evitar listeners duplicados.
+  const webRTCHandlersRegisteredRef = useRef(false);
 
   const webRTC = useWebRTC(localStreamRef);
 
@@ -509,6 +512,16 @@ export function ActiveRoom() {
           setSocketError("");
           chat.setChatStatus("loading");
           chat.setChatHistoryError("");
+
+          // FIX 2: registrar los handlers de WebRTC aquí, cuando socket.id ya
+          // existe, y pasar localSocketIdRef (ref mutable) para que el guard
+          // interno siempre lea el valor actual y no el string vacío capturado
+          // en el momento de registro. El flag evita duplicar listeners en
+          // reconexiones automáticas del mismo socket.
+          if (!webRTCHandlersRegisteredRef.current) {
+            webRTC.registerWebRTCEventHandlers(socket!, localSocketIdRef);
+            webRTCHandlersRegisteredRef.current = true;
+          }
         });
 
         socket.on("connect_error", (error) => {
@@ -545,8 +558,8 @@ export function ActiveRoom() {
           if (mappedParticipants.length === 0) return;
 
           if (action === "snapshot") {
-            setParticipants((previousParticipants) =>
-              mappedParticipants.map((participant) => {
+            setParticipants((previousParticipants) => {
+              const result = mappedParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
                   (item) => (item.socketId || item.uid) === (participant.socketId || participant.uid)
                 );
@@ -559,6 +572,12 @@ export function ActiveRoom() {
                   {
                     ...previousParticipant,
                     ...participant,
+                    // Preservar estado de medios del participante existente
+                    // (presence-data no tiene el estado real — siempre envía false)
+                    screenSharing: previousParticipant?.screenSharing ?? participant.screenSharing ?? false,
+                    cameraEnabled: previousParticipant?.cameraEnabled ?? participant.cameraEnabled ?? false,
+                    microphoneEnabled: previousParticipant?.microphoneEnabled ?? participant.microphoneEnabled ?? false,
+                    isSpeaking: previousParticipant?.isSpeaking ?? participant.isSpeaking ?? false,
                     username:
                       participant.username ||
                       previousParticipant?.username ||
@@ -577,8 +596,21 @@ export function ActiveRoom() {
                   },
                   cachedProfile
                 );
-              })
-            );
+              });
+
+              // Preservar participantes previos que no fueron cubiertos por el snapshot
+              // (ej: misma cuenta con múltiples sesiones — cada una tiene distinto socketId)
+              previousParticipants.forEach((prev) => {
+                const exists = result.some(
+                  (r) => (r.socketId || r.uid) === (prev.socketId || prev.uid)
+                );
+                if (!exists) {
+                  result.push(prev);
+                }
+              });
+
+              return result;
+            });
             return;
           }
 
@@ -596,13 +628,30 @@ export function ActiveRoom() {
             return;
           }
 
-          setParticipants((currentParticipants) =>
-            mappedParticipants.reduce(
-              (updatedParticipants, participant) =>
-                upsertParticipant(updatedParticipants, participant),
-              currentParticipants
-            )
-          );
+          setParticipants((currentParticipants) => {
+            const updated = [...currentParticipants];
+            mappedParticipants.forEach((participant) => {
+              const existing = updated.find(
+                (p) => (p.socketId || p.uid) === (participant.socketId || participant.uid)
+              );
+              if (existing) {
+                const idx = updated.indexOf(existing);
+                updated[idx] = {
+                  ...existing,
+                  ...participant,
+                  socketId: existing.socketId,
+                  // Preservar estado de medios del participante existente
+                  screenSharing: existing.screenSharing ?? participant.screenSharing ?? false,
+                  cameraEnabled: existing.cameraEnabled ?? participant.cameraEnabled ?? false,
+                  microphoneEnabled: existing.microphoneEnabled ?? participant.microphoneEnabled ?? false,
+                  isSpeaking: existing.isSpeaking ?? participant.isSpeaking ?? false,
+                };
+              } else {
+                updated.push(participant);
+              }
+            });
+            return updated;
+          });
         });
 
         socket.on(
@@ -669,12 +718,10 @@ export function ActiveRoom() {
           setSocketError(err)
         );
 
-        webRTC.registerWebRTCEventHandlers(socket, localSocketIdRef.current ?? "");
-
         socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.socketId === payload.socketId ? { ...p, isSpeaking: payload.speaking } : p
+              matchParticipant(p, payload.socketId, payload.uid) ? { ...p, isSpeaking: payload.speaking } : p
             )
           );
         });
@@ -693,7 +740,7 @@ export function ActiveRoom() {
             let name = cached?.username || "";
             
             if (!name) {
-              const currentParticipant = participants.find(p => p.socketId === payload.socketId);
+              const currentParticipant = participants.find(p => matchParticipant(p, payload.socketId, payload.uid));
               name = currentParticipant?.username || "";
             }
             
@@ -705,10 +752,26 @@ export function ActiveRoom() {
           }
         });
 
+        // matchParticipant: usado solo para eventos que NO son de estado de media
+        // (user-joined toast, user-left toast). Tiene fallback a uid para compatibilidad.
+        function matchParticipant(p: RoomParticipant, socketId: string | undefined, uid: string): boolean {
+          if (p.socketId && socketId) return p.socketId === socketId;
+          return p.uid === uid;
+        }
+
+        // FIX 3: matchBySocketIdOnly — usado para TODOS los eventos de estado de media
+        // (mute, cámara, screen share, speaking). Dos usuarios de la misma cuenta tienen
+        // el mismo uid pero distinto socketId. Usar uid como fallback aquí causaba que un
+        // evento de A (p.ej. camera-off al iniciar screen share) también afectara el
+        // estado visible de B, produciendo pantalla negra y estados incorrectos en C.
+        function matchBySocketIdOnly(p: RoomParticipant, socketId: string): boolean {
+          return !!p.socketId && p.socketId === socketId;
+        }
+
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.socketId === payload.socketId ? { ...p, microphoneEnabled: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: false } : p
             )
           );
         });
@@ -716,7 +779,7 @@ export function ActiveRoom() {
         socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.socketId === payload.socketId ? { ...p, microphoneEnabled: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: true } : p
             )
           );
         });
@@ -724,7 +787,7 @@ export function ActiveRoom() {
         socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.socketId === payload.socketId ? { ...p, cameraEnabled: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: true } : p
             )
           );
         });
@@ -732,23 +795,23 @@ export function ActiveRoom() {
         socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.socketId === payload.socketId ? { ...p, cameraEnabled: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: false } : p
             )
           );
         });
 
-        socket.on("screen-share-started", (payload: { userId: string; estado: boolean }) => {
+        socket.on("screen-share-started", (payload: { socketId: string; userId: string; estado: boolean }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.userId ? { ...p, screenSharing: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: true } : p
             )
           );
         });
 
-        socket.on("screen-share-stopped", (payload: { userId: string; estado: boolean }) => {
+        socket.on("screen-share-stopped", (payload: { socketId: string; userId: string; estado: boolean }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.userId ? { ...p, screenSharing: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: false } : p
             )
           );
         });
@@ -776,6 +839,9 @@ export function ActiveRoom() {
       setIsConnected(false);
       hasJoinedRoomRef.current = false;
       setHasJoinedRoom(false);
+      // FIX 2: resetear el flag para que si el efecto se vuelve a ejecutar
+      // (p.ej. cambio de sala) los handlers se registren de nuevo correctamente.
+      webRTCHandlersRegisteredRef.current = false;
     };
   }, [
     roomId,
@@ -883,7 +949,9 @@ export function ActiveRoom() {
     if (shouldEnableVideo) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
-        if (isCameraOn && mediaPerms.video !== "prompt") {
+        if (isCameraOn && mediaPerms.video === "granted") {
+          retryMedia("video").catch(() => setIsCameraOn(false));
+        } else if (isCameraOn && mediaPerms.video !== "prompt") {
           setIsCameraOn(false);
           if (mediaPerms.video === "denied") {
             showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
@@ -933,7 +1001,7 @@ export function ActiveRoom() {
         socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
       }
     }
-  }, [isCameraOn, isMicOn, isScreenSharing, user]);
+  }, [isCameraOn, isMicOn, isScreenSharing, user, retryMedia]);
 
   useEffect(() => {
     if (!isChatOpen) return;

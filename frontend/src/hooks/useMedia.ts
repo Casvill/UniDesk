@@ -234,12 +234,6 @@ export function useMedia(
     try {
       console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
 
-      // Guardar el estado actual de la cámara antes de apagarla para compartir pantalla
-      wasCameraOnRef.current = isCameraOn;
-      if (isCameraOn && setIsCameraOn) {
-        setIsCameraOn(false);
-      }
-
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
@@ -250,6 +244,9 @@ export function useMedia(
       if (!screenTrack) {
         throw new Error("No video track found in screen stream");
       }
+
+      // Guardar el estado actual de la cámara antes de apagarla para compartir pantalla
+      wasCameraOnRef.current = isCameraOn;
 
       // Detener y remover pistas de video locales anteriores
       const oldTracks = localStreamRef.current?.getVideoTracks() ?? [];
@@ -268,6 +265,11 @@ export function useMedia(
       screenStreamRef.current = stream;
       setScreenStream(stream);
       setLocalVideoTrackId(screenTrack.id);
+
+      // Apagar la cámara DESPUÉS de que el screen share está listo
+      if (isCameraOn && setIsCameraOn) {
+        setIsCameraOn(false);
+      }
 
       // Escuchar cuando el usuario deje de compartir desde la barra flotante nativa del navegador
       screenTrack.onended = () => {
