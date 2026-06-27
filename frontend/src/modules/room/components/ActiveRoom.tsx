@@ -896,7 +896,21 @@ export function ActiveRoom() {
           );
         });
 
-        socket.on("screen-share-stopped", (payload: { socketId: string; userId: string; estado: boolean }) => {
+        socket.on("screen-share-stopped", async (payload: { socketId: string; userId: string; estado: boolean }) => {
+          const cached = userProfilesCacheRef.current.get(payload.userId);
+          let name = cached?.username || "";
+
+          if (!name) {
+            const currentParticipant = participants.find(p => matchBySocketIdOnly(p, payload.socketId));
+            name = currentParticipant?.username || "";
+          }
+
+          if (!name) {
+            name = await getRealUsername(payload.userId, "compañero");
+          }
+
+          showToast.info(`${name} dejó de compartir pantalla.`);
+
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: false } : p
