@@ -499,6 +499,8 @@ export function ActiveRoom() {
     );
   };
 
+  const [chatAnnouncement, setChatAnnouncement] = useState("");
+
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
 
@@ -1130,6 +1132,18 @@ export function ActiveRoom() {
     }
     wasScreenSharingRef.current = isScreenSharing;
   }, [isCameraOn, isMicOn, isScreenSharing, user, retryMedia]);
+
+  const prevUnreadRef = useRef(0);
+  useEffect(() => {
+    if (chat.unreadCount > prevUnreadRef.current && chat.chatMessages.length > 0) {
+      const lastMsg = chat.chatMessages[chat.chatMessages.length - 1];
+      const senderName = chat.getMessageUsername(lastMsg, participants, user, currentUsername);
+      setChatAnnouncement(`Nuevo mensaje de ${senderName}.`);
+    } else if (chat.unreadCount === 0) {
+      setChatAnnouncement("");
+    }
+    prevUnreadRef.current = chat.unreadCount;
+  }, [chat.unreadCount, chat.chatMessages, participants, user, currentUsername, chat]);
 
   useEffect(() => {
     if (!isChatOpen) return;
@@ -2028,6 +2042,10 @@ export function ActiveRoom() {
         </div>
       </header>
 
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {chatAnnouncement}
+      </div>
+
       {!isConnected && (
         <div 
           className="flex-shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-amber-200 text-sm shadow-md flex items-center justify-between gap-3"
@@ -2374,7 +2392,10 @@ export function ActiveRoom() {
                   <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
                 {chat.unreadCount > 0 && !isChatOpen && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce sm:h-6 sm:w-6 sm:text-sm">
+                  <span
+                    className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce sm:h-6 sm:w-6 sm:text-sm"
+                    aria-label={`${chat.unreadCount > 9 ? "9 o más" : chat.unreadCount} mensajes sin leer`}
+                  >
                     {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
                   </span>
                 )}
@@ -2476,7 +2497,10 @@ export function ActiveRoom() {
             )}
 
             {chat.unreadCount > 0 && !isChatOpen && (
-              <span className="absolute -top-1.5 -left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce">
+              <span
+                className="absolute -top-1.5 -left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce"
+                aria-label={`${chat.unreadCount > 9 ? "9 o más" : chat.unreadCount} mensajes sin leer`}
+              >
                 {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
               </span>
             )}
