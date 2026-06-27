@@ -212,37 +212,48 @@ export function ActiveRoom() {
   const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
   const overflowVisibleCount = gridCols * 2 - 1;
 
-  const sortedParticipants = [...participants].sort((a, b) => {
-    // 1. Current user siempre primero
+  // Orden base: orden original (estable), con usuario actual primero
+  let sortedParticipants = [...participants].sort((a, b) => {
     if (a.uid === user?.uid) return -1;
     if (b.uid === user?.uid) return 1;
-
-    // 2. Quien comparte pantalla
-    if (a.screenSharing && !b.screenSharing) return -1;
-    if (!a.screenSharing && b.screenSharing) return 1;
-
-    // 3. Oradores activos (isSpeaking)
-    if (a.isSpeaking && !b.isSpeaking) return -1;
-    if (!a.isSpeaking && b.isSpeaking) return 1;
-
-    // 4. Cámara encendida
-    const aCamOn = a.cameraEnabled || a.screenSharing;
-    const bCamOn = b.cameraEnabled || b.screenSharing;
-    if (aCamOn && !bCamOn) return -1;
-    if (!aCamOn && bCamOn) return 1;
-
-    // 5. Micrófono encendido
-    if (a.microphoneEnabled && !b.microphoneEnabled) return -1;
-    if (!a.microphoneEnabled && b.microphoneEnabled) return 1;
-
-    // 6. Alfabético por username como desempate
-    const nameA = (a.username || a.displayName || "").toLowerCase();
-    const nameB = (b.username || b.displayName || "").toLowerCase();
-    if (nameA < nameB) return -1;
-    if (nameA > nameB) return 1;
-
     return 0;
   });
+
+  // Solo reordenar por prioridad cuando hay más participantes de los que caben en pantalla
+  if (showOverflow) {
+    const prioritySort = (a: RoomParticipant, b: RoomParticipant) => {
+      // Quien comparte pantalla
+      if (a.screenSharing && !b.screenSharing) return -1;
+      if (!a.screenSharing && b.screenSharing) return 1;
+      // Oradores activos
+      if (a.isSpeaking && !b.isSpeaking) return -1;
+      if (!a.isSpeaking && b.isSpeaking) return 1;
+      // Cámara encendida
+      const aCam = a.cameraEnabled || a.screenSharing;
+      const bCam = b.cameraEnabled || b.screenSharing;
+      if (aCam && !bCam) return -1;
+      if (!aCam && bCam) return 1;
+      // Micrófono encendido
+      if (a.microphoneEnabled && !b.microphoneEnabled) return -1;
+      if (!a.microphoneEnabled && b.microphoneEnabled) return 1;
+      // Alfabético
+      const na = (a.username || a.displayName || "").toLowerCase();
+      const nb = (b.username || b.displayName || "").toLowerCase();
+      if (na < nb) return -1;
+      if (na > nb) return 1;
+      return 0;
+    };
+
+    const priorityOrdered = [...sortedParticipants].sort(prioritySort);
+    const visibleCount = overflowVisibleCount;
+    const highPriorityIds = new Set(
+      priorityOrdered.slice(0, visibleCount).map(p => p.socketId || p.uid)
+    );
+
+    const visible = sortedParticipants.filter(p => highPriorityIds.has(p.socketId || p.uid));
+    const overflow = sortedParticipants.filter(p => !highPriorityIds.has(p.socketId || p.uid));
+    sortedParticipants = [...visible, ...overflow];
+  }
   const visibleParticipants = sortedParticipants.slice(
     0,
     showOverflow ? overflowVisibleCount : sortedParticipants.length
