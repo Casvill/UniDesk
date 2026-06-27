@@ -279,10 +279,15 @@ export function useMedia(
       return stream;
     } catch (err) {
       console.error("[useMedia] Error al capturar pantalla:", err);
-      // Restaurar estado de cámara si la captura falló o fue cancelada
       wasCameraOnRef.current = false;
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        showToast.error("Permiso para compartir pantalla denegado.");
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          showToast.error("Permiso para compartir pantalla denegado.");
+        } else if (err.name === "AbortError") {
+          // Usuario canceló el selector — no mostrar error
+        } else {
+          showToast.error("No se pudo iniciar la captura de pantalla.");
+        }
       } else {
         showToast.error("No se pudo iniciar la captura de pantalla.");
       }
