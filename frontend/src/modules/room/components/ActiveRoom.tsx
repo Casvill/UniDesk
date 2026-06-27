@@ -2338,7 +2338,7 @@ export function ActiveRoom() {
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isScreenSharing}
-                aria-label={isScreenSharing ? "Dejar de compartir pantalla" : "Compartir pantalla"}
+                aria-label={isScreenSharing ? "Detener compartir pantalla" : "Compartir pantalla"}
               >
                 {isScreenSharing ? (
                   <ScreenShare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />

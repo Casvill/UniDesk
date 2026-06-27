@@ -243,6 +243,7 @@ export function useMedia(
         audio: false,
       });
       showToast.close(loadingKey);
+      showToast.info("Comenzaste a compartir pantalla.");
       console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
 
       const screenTrack = stream.getVideoTracks()[0];
