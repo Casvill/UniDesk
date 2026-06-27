@@ -9,6 +9,7 @@ export function useMedia(
   setIsCameraOn?: (on: boolean) => void
 ) {
   const wasCameraOnRef = useRef(false);
+  const stoppingProgrammaticallyRef = useRef(false);
   const [mediaPerms, setMediaPerms] = useState<{
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
@@ -200,7 +201,9 @@ export function useMedia(
     const stream = screenStreamRef.current;
     if (stream) {
       console.log("[useMedia] Deteniendo captura de pantalla:", stream.id);
+      stoppingProgrammaticallyRef.current = true;
       stream.getTracks().forEach((track) => track.stop());
+      stoppingProgrammaticallyRef.current = false;
 
       // Remover pistas de pantalla de localStreamRef
       const screenTracks = localStreamRef.current?.getVideoTracks() ?? [];
@@ -273,6 +276,8 @@ export function useMedia(
 
       // Escuchar cuando el usuario deje de compartir desde la barra flotante nativa del navegador
       screenTrack.onended = () => {
+        if (stoppingProgrammaticallyRef.current) return;
+        showToast.info("Dejaste de compartir pantalla.");
         stopScreenCapture();
       };
 
