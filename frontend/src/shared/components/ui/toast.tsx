@@ -45,7 +45,7 @@ function getToastStyles(type: ToastType): string {
     case "success":
       return "bg-green-600 text-white";
     case "error":
-      return "bg-red-600 text-white";
+      return "bg-amber-600 text-white";
     case "warning":
       return "bg-yellow-500 text-white";
     case "info":

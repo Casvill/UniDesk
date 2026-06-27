@@ -9,6 +9,7 @@ export function useMedia(
   setIsCameraOn?: (on: boolean) => void
 ) {
   const wasCameraOnRef = useRef(false);
+  const stoppingProgrammaticallyRef = useRef(false);
   const [mediaPerms, setMediaPerms] = useState<{
     audio: "prompt" | "granted" | "denied" | "unavailable" | "error";
     video: "prompt" | "granted" | "denied" | "unavailable" | "error";
@@ -200,7 +201,9 @@ export function useMedia(
     const stream = screenStreamRef.current;
     if (stream) {
       console.log("[useMedia] Deteniendo captura de pantalla:", stream.id);
+      stoppingProgrammaticallyRef.current = true;
       stream.getTracks().forEach((track) => track.stop());
+      stoppingProgrammaticallyRef.current = false;
 
       // Remover pistas de pantalla de localStreamRef
       const screenTracks = localStreamRef.current?.getVideoTracks() ?? [];
@@ -231,25 +234,25 @@ export function useMedia(
       showToast.error("Compartir pantalla no es compatible con este navegador.");
       throw new Error("Screen capture not supported");
     }
+    const loadingKey = showToast.loading("Esperando que selecciones una pantalla para compartir...");
     try {
       console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
-
-      // Guardar el estado actual de la cámara antes de apagarla para compartir pantalla
-      wasCameraOnRef.current = isCameraOn;
-      if (isCameraOn && setIsCameraOn) {
-        setIsCameraOn(false);
-      }
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
       });
+      showToast.close(loadingKey);
+      showToast.info("Comenzaste a compartir pantalla.");
       console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
 
       const screenTrack = stream.getVideoTracks()[0];
       if (!screenTrack) {
         throw new Error("No video track found in screen stream");
       }
+
+      // Guardar el estado actual de la cámara antes de apagarla para compartir pantalla
+      wasCameraOnRef.current = isCameraOn;
 
       // Detener y remover pistas de video locales anteriores
       const oldTracks = localStreamRef.current?.getVideoTracks() ?? [];
@@ -269,20 +272,37 @@ export function useMedia(
       setScreenStream(stream);
       setLocalVideoTrackId(screenTrack.id);
 
+      // Apagar la cámara DESPUÉS de que el screen share está listo
+      if (isCameraOn && setIsCameraOn) {
+        setIsCameraOn(false);
+      }
+
       // Escuchar cuando el usuario deje de compartir desde la barra flotante nativa del navegador
       screenTrack.onended = () => {
+        if (stoppingProgrammaticallyRef.current) return;
+        showToast.info("Dejaste de compartir pantalla.");
         stopScreenCapture();
       };
 
       return stream;
     } catch (err) {
       console.error("[useMedia] Error al capturar pantalla:", err);
-      // Restaurar estado de cámara si la captura falló o fue cancelada
+      showToast.close(loadingKey);
       wasCameraOnRef.current = false;
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        showToast.error("Permiso para compartir pantalla denegado.");
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          showToast.error("Permiso para compartir pantalla denegado.");
+        } else if (err.name === "AbortError") {
+          // Usuario canceló el selector — no mostrar error
+        } else if (err.name === "NotReadableError") {
+          showToast.error("No se pudo acceder a la pantalla. Verifica que no esté siendo usada por otra aplicación.");
+        } else if (err.name === "NotSupportedError" || err.name === "OverconstrainedError") {
+          showToast.error("La pantalla seleccionada no es compatible con los requisitos de la sala.");
+        } else {
+          showToast.error("Ocurrió un error inesperado al compartir pantalla. Intenta de nuevo.");
+        }
       } else {
-        showToast.error("No se pudo iniciar la captura de pantalla.");
+        showToast.error("Ocurrió un error inesperado al compartir pantalla. Intenta de nuevo.");
       }
       throw err;
     }

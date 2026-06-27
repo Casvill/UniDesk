@@ -13,6 +13,9 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  MonitorPlay,
+  Pin,
+  PinOff,
   ScreenShare,
   ScreenShareOff,
   Phone,
@@ -53,9 +56,32 @@ import {
   upsertParticipant,
 } from "@/utils/room";
 import { showToast } from "@/shared/components/ui/toast";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { useMedia } from "@/hooks/useMedia";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useChat } from "@/hooks/useChat";
+
+function renderMessageWithLinks(text: string) {
+  const urlRegex = /(https?:\/\/[^\s)"'\]}>]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, i) => {
+    if (part.startsWith("http://") || part.startsWith("https://")) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline font-medium hover:opacity-80"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
@@ -70,8 +96,12 @@ export function ActiveRoom() {
   const userProfilesCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
   const userProfilesInFlightRef = useRef<Set<string>>(new Set());
   const isChatOpenRef = useRef(true);
+  const hasJoinedRoomRef = useRef(false);
+  const localSocketIdRef = useRef<string | null>(null);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
+  const wasScreenSharingRef = useRef(false);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -83,6 +113,7 @@ export function ActiveRoom() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [waitingCopied, setWaitingCopied] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   isChatOpenRef.current = isChatOpen;
 
@@ -99,6 +130,17 @@ export function ActiveRoom() {
   // Estados para sincronización de WebRTC y accesibilidad de audio
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [isAudioAutoplayBlocked, setIsAudioAutoplayBlocked] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showDuplicateTabDialog, setShowDuplicateTabDialog] = useState(false);
+  const [duplicateTabResolved, setDuplicateTabResolved] = useState(false);
+  const duplicateTabPendingRef = useRef(false);
+  // FIX 2: flag para evitar registrar los handlers de WebRTC más de una vez
+  // (p.ej. en reconexiones) y evitar listeners duplicados.
+  const webRTCHandlersRegisteredRef = useRef(false);
+
+  const [isPinned, setIsPinned] = useState(false);
+  const [pinnedSharersocketId, setPinnedSharersocketId] = useState<string | null>(null);
+  const pinManuallyDisabledRef = useRef(false);
 
   const webRTC = useWebRTC(localStreamRef);
 
@@ -170,11 +212,48 @@ export function ActiveRoom() {
   const showOverflow = isSm ? participants.length > 6 : participants.length > 4;
   const overflowVisibleCount = gridCols * 2 - 1;
 
-  const sortedParticipants = [...participants].sort((a, b) => {
+  // Orden base: orden original (estable), con usuario actual primero
+  let sortedParticipants = [...participants].sort((a, b) => {
     if (a.uid === user?.uid) return -1;
     if (b.uid === user?.uid) return 1;
     return 0;
   });
+
+  // Solo reordenar por prioridad cuando hay más participantes de los que caben en pantalla
+  if (showOverflow) {
+    const prioritySort = (a: RoomParticipant, b: RoomParticipant) => {
+      // Quien comparte pantalla
+      if (a.screenSharing && !b.screenSharing) return -1;
+      if (!a.screenSharing && b.screenSharing) return 1;
+      // Oradores activos
+      if (a.isSpeaking && !b.isSpeaking) return -1;
+      if (!a.isSpeaking && b.isSpeaking) return 1;
+      // Cámara encendida
+      const aCam = a.cameraEnabled || a.screenSharing;
+      const bCam = b.cameraEnabled || b.screenSharing;
+      if (aCam && !bCam) return -1;
+      if (!aCam && bCam) return 1;
+      // Micrófono encendido
+      if (a.microphoneEnabled && !b.microphoneEnabled) return -1;
+      if (!a.microphoneEnabled && b.microphoneEnabled) return 1;
+      // Alfabético
+      const na = (a.username || a.displayName || "").toLowerCase();
+      const nb = (b.username || b.displayName || "").toLowerCase();
+      if (na < nb) return -1;
+      if (na > nb) return 1;
+      return 0;
+    };
+
+    const priorityOrdered = [...sortedParticipants].sort(prioritySort);
+    const visibleCount = overflowVisibleCount;
+    const highPriorityIds = new Set(
+      priorityOrdered.slice(0, visibleCount).map(p => p.socketId || p.uid)
+    );
+
+    const visible = sortedParticipants.filter(p => highPriorityIds.has(p.socketId || p.uid));
+    const overflow = sortedParticipants.filter(p => !highPriorityIds.has(p.socketId || p.uid));
+    sortedParticipants = [...visible, ...overflow];
+  }
   const visibleParticipants = sortedParticipants.slice(
     0,
     showOverflow ? overflowVisibleCount : sortedParticipants.length
@@ -198,11 +277,10 @@ export function ActiveRoom() {
 
   const renderParticipantTile = (p: RoomParticipant, index: number, gridColumn?: string) => {
     const name = getParticipantName(p);
-    const isCurrent = p.uid === user?.uid;
+    const isCurrent = (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid);
     const camOn = isCurrent ? (isCameraOn || isScreenSharing) : (p.cameraEnabled || p.screenSharing) ?? false;
     const micOn = isCurrent ? isMicOn : p.microphoneEnabled ?? false;
-    const socketId = isCurrent ? undefined : webRTC.socketIdByUidRef.current.get(p.uid);
-    const remoteStream = socketId ? webRTC.remoteStreams.get(socketId) : undefined;
+    const remoteStream = p.socketId ? webRTC.remoteStreams.get(p.socketId) : undefined;
 
     const hasMediaError = isCurrent && (
       mediaPerms.audio === "denied" ||
@@ -215,12 +293,12 @@ export function ActiveRoom() {
 
     return (
       <motion.div
-        key={p.uid}
+        key={p.socketId || p.uid}
         layout
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        className={`relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
+        className={`group relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
           p.isSpeaking 
             ? "ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
             : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
@@ -284,10 +362,15 @@ export function ActiveRoom() {
             />
           </>
         ) : null}
-        <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+        {camOn && (
+          <div className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white shadow-lg backdrop-blur-sm sm:px-2.5 sm:py-1.5 sm:text-sm">
+            {isCurrent ? "Tú" : name}
+          </div>
+        )}
+        <div className="flex h-full min-h-[140px] items-center justify-center sm:min-h-[180px] lg:min-h-[200px]">
           {hasMediaError ? (
             <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
-              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2 animate-pulse" aria-hidden="true" />
+              <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2" aria-hidden="true" />
               <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Acceso Denegado</p>
               <p className="text-[11px] text-gray-300 leading-normal">
                 {mediaPerms.video === "denied" || mediaPerms.audio === "denied"
@@ -331,23 +414,23 @@ export function ActiveRoom() {
                 <img
                   src={p.photoURL}
                   alt=""
-                  className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+                  className="mx-auto mb-2 h-12 w-12 rounded-full object-cover shadow-2xl sm:h-16 sm:w-16 lg:h-20 lg:w-20"
                 />
               ) : (
                 <div
-                  className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                  className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br sm:h-16 sm:w-16 lg:h-20 lg:w-20 ${getParticipantGradient(index)} shadow-2xl`}
                   aria-hidden="true"
                 >
-                  <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                  <span className="text-lg font-bold text-white sm:text-xl lg:text-2xl">
                     {getInitials(name)}
                   </span>
                 </div>
               )}
-              <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+              <p className="text-xs font-semibold text-white sm:text-sm">
                 {isCurrent ? "Tú" : name}
               </p>
               {p.isHost && (
-                <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+                <p className="mt-0.5 text-[10px] font-medium text-primary-200 sm:text-xs">Anfitrión</p>
               )}
             </div>
           )}
@@ -357,10 +440,17 @@ export function ActiveRoom() {
             className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
               camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
             }`}
-            aria-label={camOn ? "Cámara encendida" : "Cámara apagada"}
+            aria-label={camOn ? (p.screenSharing ? "Compartiendo pantalla" : "Cámara encendida") : "Cámara apagada"}
           >
             {camOn ? (
-              <Video className="h-3.5 w-3.5" aria-hidden="true" />
+              p.screenSharing ? (
+                <>
+                  <MonitorPlay className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">Compartiendo pantalla</span>
+                </>
+              ) : (
+                <Video className="h-3.5 w-3.5" aria-hidden="true" />
+              )
             ) : (
               <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
             )}
@@ -388,9 +478,39 @@ export function ActiveRoom() {
             )}
           </span>
         </div>
+        {p.screenSharing && isLg && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isPinned && pinnedSharersocketId === p.socketId) {
+                setIsPinned(false);
+                pinManuallyDisabledRef.current = true;
+              } else {
+                setIsPinned(true);
+                setPinnedSharersocketId(p.socketId ?? null);
+                pinManuallyDisabledRef.current = false;
+              }
+            }}
+            className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-xl p-3 opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:opacity-100 ${
+              isPinned && pinnedSharersocketId === p.socketId
+                ? "bg-primary-600 text-white"
+                : "bg-black/60 text-gray-300 hover:text-white"
+            }`}
+            aria-label={isPinned && pinnedSharersocketId === p.socketId ? "Desfijar expositor" : "Fijar expositor"}
+          >
+            {isPinned && pinnedSharersocketId === p.socketId ? (
+              <Pin className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <PinOff className="h-6 w-6" aria-hidden="true" />
+            )}
+          </button>
+        )}
       </motion.div>
     );
   };
+
+  const [chatAnnouncement, setChatAnnouncement] = useState("");
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -473,11 +593,22 @@ export function ActiveRoom() {
         });
 
         socket.on("connect", () => {
+          localSocketIdRef.current = socket!.id ?? null;
           setIsConnected(true);
           setConnectionStatus("En tiempo real");
           setSocketError("");
           chat.setChatStatus("loading");
           chat.setChatHistoryError("");
+
+          // FIX 2: registrar los handlers de WebRTC aquí, cuando socket.id ya
+          // existe, y pasar localSocketIdRef (ref mutable) para que el guard
+          // interno siempre lea el valor actual y no el string vacío capturado
+          // en el momento de registro. El flag evita duplicar listeners en
+          // reconexiones automáticas del mismo socket.
+          if (!webRTCHandlersRegisteredRef.current) {
+            webRTC.registerWebRTCEventHandlers(socket!, localSocketIdRef);
+            webRTCHandlersRegisteredRef.current = true;
+          }
         });
 
         socket.on("connect_error", (error) => {
@@ -514,20 +645,26 @@ export function ActiveRoom() {
           if (mappedParticipants.length === 0) return;
 
           if (action === "snapshot") {
-            setParticipants((previousParticipants) =>
-              mappedParticipants.map((participant) => {
+            setParticipants((previousParticipants) => {
+              const result = mappedParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
-                  (item) => item.uid === participant.uid
+                  (item) => (item.socketId || item.uid) === (participant.socketId || participant.uid)
                 );
                 const cachedProfile = userProfilesCacheRef.current.get(
                   participant.uid
                 );
-                const isCurrentUser = participant.uid === user.uid;
+                const isCurrentUser = (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid);
 
                 return mergeProfileIntoParticipant(
                   {
                     ...previousParticipant,
                     ...participant,
+                    // Preservar estado de medios del participante existente
+                    // (presence-data no tiene el estado real — siempre envía false)
+                    screenSharing: previousParticipant?.screenSharing ?? participant.screenSharing ?? false,
+                    cameraEnabled: previousParticipant?.cameraEnabled ?? participant.cameraEnabled ?? false,
+                    microphoneEnabled: previousParticipant?.microphoneEnabled ?? participant.microphoneEnabled ?? false,
+                    isSpeaking: previousParticipant?.isSpeaking ?? participant.isSpeaking ?? false,
                     username:
                       participant.username ||
                       previousParticipant?.username ||
@@ -546,32 +683,62 @@ export function ActiveRoom() {
                   },
                   cachedProfile
                 );
-              })
-            );
+              });
+
+              // Preservar participantes previos que no fueron cubiertos por el snapshot
+              // (ej: misma cuenta con múltiples sesiones — cada una tiene distinto socketId)
+              previousParticipants.forEach((prev) => {
+                const exists = result.some(
+                  (r) => (r.socketId || r.uid) === (prev.socketId || prev.uid)
+                );
+                if (!exists) {
+                  result.push(prev);
+                }
+              });
+
+              return result;
+            });
             return;
           }
 
           if (action === "leave") {
-            const leavingIds = mappedParticipants.map(
-              (participant) => participant.uid
+            const leavingKeys = mappedParticipants.map(
+              (p) => p.socketId || p.uid
             );
 
             setParticipants((currentParticipants) =>
               currentParticipants.filter(
-                (participant) => !leavingIds.includes(participant.uid)
+                (p) => !leavingKeys.includes(p.socketId || p.uid)
               )
             );
 
             return;
           }
 
-          setParticipants((currentParticipants) =>
-            mappedParticipants.reduce(
-              (updatedParticipants, participant) =>
-                upsertParticipant(updatedParticipants, participant),
-              currentParticipants
-            )
-          );
+          setParticipants((currentParticipants) => {
+            const updated = [...currentParticipants];
+            mappedParticipants.forEach((participant) => {
+              const existing = updated.find(
+                (p) => (p.socketId || p.uid) === (participant.socketId || participant.uid)
+              );
+              if (existing) {
+                const idx = updated.indexOf(existing);
+                updated[idx] = {
+                  ...existing,
+                  ...participant,
+                  socketId: existing.socketId,
+                  // Preservar estado de medios del participante existente
+                  screenSharing: existing.screenSharing ?? participant.screenSharing ?? false,
+                  cameraEnabled: existing.cameraEnabled ?? participant.cameraEnabled ?? false,
+                  microphoneEnabled: existing.microphoneEnabled ?? participant.microphoneEnabled ?? false,
+                  isSpeaking: existing.isSpeaking ?? participant.isSpeaking ?? false,
+                };
+              } else {
+                updated.push(participant);
+              }
+            });
+            return updated;
+          });
         });
 
         socket.on(
@@ -579,20 +746,12 @@ export function ActiveRoom() {
           (currentParticipants: RoomParticipant[]) => {
             if (!Array.isArray(currentParticipants)) return;
 
-            console.log("[Sync] room-participants-update received:", currentParticipants.map(p => ({ uid: p.uid, cam: p.cameraEnabled, mic: p.microphoneEnabled })));
-
-            currentParticipants.forEach((p) => {
-              if (p.socketId && p.uid) {
-                webRTC.socketIdByUidRef.current.set(p.uid, p.socketId);
-              }
-            });
-
             setParticipants((previousParticipants) =>
               currentParticipants.map((participant) => {
                 const previousParticipant = previousParticipants.find(
-                  (item) => item.uid === participant.uid
+                  (item) => (item.socketId || item.uid) === (participant.socketId || participant.uid)
                 );
-                const isCurrentUser = participant.uid === user.uid;
+                const isCurrentUser = (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid);
 
                 const cachedProfile = userProfilesCacheRef.current.get(
                   participant.uid
@@ -646,12 +805,10 @@ export function ActiveRoom() {
           setSocketError(err)
         );
 
-        webRTC.registerWebRTCEventHandlers(socket, user.uid);
-
         socket.on("user-speaking", (payload: { socketId: string; uid: string; speaking: boolean }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, isSpeaking: payload.speaking } : p
+              matchParticipant(p, payload.socketId, payload.uid) ? { ...p, isSpeaking: payload.speaking } : p
             )
           );
         });
@@ -670,7 +827,7 @@ export function ActiveRoom() {
             let name = cached?.username || "";
             
             if (!name) {
-              const currentParticipant = participants.find(p => p.uid === payload.uid);
+              const currentParticipant = participants.find(p => matchParticipant(p, payload.socketId, payload.uid));
               name = currentParticipant?.username || "";
             }
             
@@ -682,10 +839,26 @@ export function ActiveRoom() {
           }
         });
 
+        // matchParticipant: usado solo para eventos que NO son de estado de media
+        // (user-joined toast, user-left toast). Tiene fallback a uid para compatibilidad.
+        function matchParticipant(p: RoomParticipant, socketId: string | undefined, uid: string): boolean {
+          if (p.socketId && socketId) return p.socketId === socketId;
+          return p.uid === uid;
+        }
+
+        // FIX 3: matchBySocketIdOnly — usado para TODOS los eventos de estado de media
+        // (mute, cámara, screen share, speaking). Dos usuarios de la misma cuenta tienen
+        // el mismo uid pero distinto socketId. Usar uid como fallback aquí causaba que un
+        // evento de A (p.ej. camera-off al iniciar screen share) también afectara el
+        // estado visible de B, produciendo pantalla negra y estados incorrectos en C.
+        function matchBySocketIdOnly(p: RoomParticipant, socketId: string): boolean {
+          return !!p.socketId && p.socketId === socketId;
+        }
+
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, microphoneEnabled: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: false } : p
             )
           );
         });
@@ -693,7 +866,7 @@ export function ActiveRoom() {
         socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, microphoneEnabled: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: true } : p
             )
           );
         });
@@ -701,7 +874,7 @@ export function ActiveRoom() {
         socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, cameraEnabled: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: true } : p
             )
           );
         });
@@ -709,23 +882,51 @@ export function ActiveRoom() {
         socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.uid ? { ...p, cameraEnabled: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: false } : p
             )
           );
         });
 
-        socket.on("screen-share-started", (payload: { userId: string; estado: boolean }) => {
+        socket.on("screen-share-started", async (payload: { socketId: string; userId: string; estado: boolean }) => {
+          const cached = userProfilesCacheRef.current.get(payload.userId);
+          let name = cached?.username || "";
+
+          if (!name) {
+            const currentParticipant = participants.find(p => matchBySocketIdOnly(p, payload.socketId));
+            name = currentParticipant?.username || "";
+          }
+
+          if (!name) {
+            name = await getRealUsername(payload.userId, "compañero");
+          }
+
+          showToast.info(`${name} comenzó a compartir pantalla.`);
+
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.userId ? { ...p, screenSharing: true } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: true } : p
             )
           );
         });
 
-        socket.on("screen-share-stopped", (payload: { userId: string; estado: boolean }) => {
+        socket.on("screen-share-stopped", async (payload: { socketId: string; userId: string; estado: boolean }) => {
+          const cached = userProfilesCacheRef.current.get(payload.userId);
+          let name = cached?.username || "";
+
+          if (!name) {
+            const currentParticipant = participants.find(p => matchBySocketIdOnly(p, payload.socketId));
+            name = currentParticipant?.username || "";
+          }
+
+          if (!name) {
+            name = await getRealUsername(payload.userId, "compañero");
+          }
+
+          showToast.info(`${name} dejó de compartir pantalla.`);
+
           setParticipants((prev) =>
             prev.map((p) =>
-              p.uid === payload.userId ? { ...p, screenSharing: false } : p
+              matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: false } : p
             )
           );
         });
@@ -743,7 +944,6 @@ export function ActiveRoom() {
     return () => {
       webRTC.peerConnectionsRef.current.forEach((pc) => pc.close());
       webRTC.peerConnectionsRef.current.clear();
-      webRTC.socketIdByUidRef.current.clear();
 
       if (socket) {
         socket.emit("leave-room");
@@ -752,7 +952,11 @@ export function ActiveRoom() {
 
       socketRef.current = null;
       setIsConnected(false);
+      hasJoinedRoomRef.current = false;
       setHasJoinedRoom(false);
+      // FIX 2: resetear el flag para que si el efecto se vuelve a ejecutar
+      // (p.ej. cambio de sala) los handlers se registren de nuevo correctamente.
+      webRTCHandlersRegisteredRef.current = false;
     };
   }, [
     roomId,
@@ -840,12 +1044,37 @@ export function ActiveRoom() {
     void loadMissingProfiles();
   }, [participants, chat.chatMessages, user]);
 
+  // Auto-pin cuando alguien comparte pantalla
+  useEffect(() => {
+    const currentSharer = participants.find(p => p.screenSharing);
+
+    if (currentSharer) {
+      const isNewSharer = pinnedSharersocketId !== currentSharer.socketId;
+      if (!isPinned) {
+        if (!pinManuallyDisabledRef.current || isNewSharer) {
+          setIsPinned(true);
+          setPinnedSharersocketId(currentSharer.socketId ?? null);
+          pinManuallyDisabledRef.current = false;
+        }
+      } else if (isNewSharer) {
+        setPinnedSharersocketId(currentSharer.socketId ?? null);
+        pinManuallyDisabledRef.current = false;
+      }
+    } else {
+      if (isPinned) {
+        setIsPinned(false);
+        setPinnedSharersocketId(null);
+      }
+      pinManuallyDisabledRef.current = false;
+    }
+  }, [participants, isPinned, pinnedSharersocketId]);
+
   useEffect(() => {
     if (!user) return;
 
     setParticipants((currentParticipants) =>
       currentParticipants.map((participant) =>
-        participant.uid === user.uid
+        (participant.socketId || participant.uid) === (localSocketIdRef.current || user?.uid)
           ? {
               ...participant,
               cameraEnabled: isCameraOn,
@@ -860,7 +1089,9 @@ export function ActiveRoom() {
     if (shouldEnableVideo) {
       const videoTracks = localStreamRef.current?.getVideoTracks();
       if (!videoTracks || videoTracks.length === 0) {
-        if (isCameraOn && mediaPerms.video !== "prompt") {
+        if (isCameraOn && mediaPerms.video === "granted") {
+          retryMedia("video").catch(() => setIsCameraOn(false));
+        } else if (isCameraOn && mediaPerms.video !== "prompt") {
           setIsCameraOn(false);
           if (mediaPerms.video === "denied") {
             showToast.error("Permiso de cámara denegado. Concede el permiso desde la configuración del navegador para usar la cámara.");
@@ -904,26 +1135,33 @@ export function ActiveRoom() {
     socket.emit(isCameraOn ? "camera-on" : "camera-off");
 
     if (user) {
-      if (isScreenSharing) {
+      if (isScreenSharing && !wasScreenSharingRef.current) {
         socket.emit("screen-share-started", { userId: user.uid, estado: true });
-      } else {
+      } else if (!isScreenSharing && wasScreenSharingRef.current) {
         socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
       }
     }
-  }, [isCameraOn, isMicOn, isScreenSharing, user]);
+    wasScreenSharingRef.current = isScreenSharing;
+  }, [isCameraOn, isMicOn, isScreenSharing, user, retryMedia]);
+
+  const prevUnreadRef = useRef(0);
+  useEffect(() => {
+    if (chat.unreadCount > prevUnreadRef.current && chat.chatMessages.length > 0) {
+      const lastMsg = chat.chatMessages[chat.chatMessages.length - 1];
+      const senderName = chat.getMessageUsername(lastMsg, participants, user, currentUsername);
+      setChatAnnouncement(`Nuevo mensaje de ${senderName}.`);
+    } else if (chat.unreadCount === 0) {
+      setChatAnnouncement("");
+    }
+    prevUnreadRef.current = chat.unreadCount;
+  }, [chat.unreadCount, chat.chatMessages, participants, user, currentUsername, chat]);
 
   useEffect(() => {
     if (!isChatOpen) return;
 
     const scrollContainer = (container: HTMLDivElement | null) => {
       if (!container) return;
-      const prefersReducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-      });
+      container.scrollTop = container.scrollHeight;
     };
 
     const scrollTimer = setTimeout(() => {
@@ -934,15 +1172,77 @@ export function ActiveRoom() {
     return () => clearTimeout(scrollTimer);
   }, [chat.chatMessages.length, isChatOpen]);
 
+  // BroadcastChannel: detectar pestañas duplicadas del mismo usuario
+  useEffect(() => {
+    if (!user || !roomId) return;
+
+    const bc = new BroadcastChannel(`unidesk-room-${roomId}`);
+    broadcastChannelRef.current = bc;
+
+    bc.onmessage = (event) => {
+      if (event.data?.type === "duplicate-ping" && event.data.uid === user.uid) {
+        bc.postMessage({ type: "duplicate-pong", uid: user.uid });
+      }
+      if (event.data?.type === "leave-request" && event.data.uid === user.uid) {
+        if (socketRef.current) {
+          socketRef.current.emit("leave-room");
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+        showToast.info("Tu sesión fue transferida a otra pestaña.");
+        navigate("/dashboard");
+      }
+    };
+
+    return () => {
+      bc.close();
+      broadcastChannelRef.current = null;
+    };
+  }, [user, roomId, navigate]);
+
   // Sincronizar unión a la sala cuando el socket esté conectado y los medios inicializados
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom) return;
+    if (!socket || !isConnected || !user || !room || !roomId || hasJoinedRoom || hasJoinedRoomRef.current) return;
 
     // Esperar a que la inicialización de medios haya concluido (ready o error)
     if (mediaInitStatus === "initializing" || mediaInitStatus === "idle") {
       return;
     }
+
+    // Detectar pestañas duplicadas antes de unirse
+    if (!duplicateTabResolved && !duplicateTabPendingRef.current) {
+      duplicateTabPendingRef.current = true;
+      let otherTabFound = false;
+
+      const bc = broadcastChannelRef.current;
+      if (bc) {
+        const handler = (event: MessageEvent) => {
+          if (event.data?.type === "duplicate-pong" && event.data.uid === user.uid) {
+            otherTabFound = true;
+            setShowDuplicateTabDialog(true);
+            setDuplicateTabResolved(true);
+          }
+        };
+        bc.addEventListener("message", handler);
+        bc.postMessage({ type: "duplicate-ping", uid: user.uid });
+
+        setTimeout(() => {
+          bc.removeEventListener("message", handler);
+          if (!otherTabFound) {
+            setDuplicateTabResolved(true);
+          }
+          duplicateTabPendingRef.current = false;
+        }, 500);
+      } else {
+        setDuplicateTabResolved(true);
+        duplicateTabPendingRef.current = false;
+      }
+
+      return;
+    }
+
+    if (!duplicateTabResolved) return;
 
     const localParticipant: RoomParticipant = {
       uid: user.uid,
@@ -968,6 +1268,7 @@ export function ActiveRoom() {
     setParticipants((currentParticipants) =>
       upsertParticipant(currentParticipants, localParticipant)
     );
+    hasJoinedRoomRef.current = true;
     setHasJoinedRoom(true);
   }, [
     isConnected,
@@ -982,6 +1283,7 @@ export function ActiveRoom() {
     isMicOn,
     isScreenSharing,
     hasJoinedRoom,
+    duplicateTabResolved,
   ]);
 
   const handleUnblockAudio = () => {
@@ -1002,7 +1304,7 @@ export function ActiveRoom() {
     const socket = socketRef.current;
     if (!isMicOn || !localStreamRef.current || !socket || mediaInitStatus !== "ready") {
       setParticipants((prev) =>
-        prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+        prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: false } : p)
       );
       return;
     }
@@ -1051,7 +1353,7 @@ export function ActiveRoom() {
             isSpeaking = true;
             socket.emit("user-speaking", { speaking: true });
             setParticipants((prev) =>
-              prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: true } : p))
+              prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: true } : p)
             );
           }
         } else {
@@ -1060,7 +1362,7 @@ export function ActiveRoom() {
               isSpeaking = false;
               socket.emit("user-speaking", { speaking: false });
               setParticipants((prev) =>
-                prev.map((p) => (p.uid === user?.uid ? { ...p, isSpeaking: false } : p))
+                prev.map((p) => (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid) ? { ...p, isSpeaking: false } : p)
               );
               silenceTimeout = null;
             }, 400);
@@ -1090,7 +1392,7 @@ export function ActiveRoom() {
       const pcs = webRTC.peerConnectionsRef.current;
       if (pcs.size === 0) return;
 
-      const speakingUids = new Set<string>();
+      const speakingSocketIds = new Set<string>();
 
       for (const [socketId, pc] of pcs.entries()) {
         if (pc.connectionState !== "connected") continue;
@@ -1109,11 +1411,7 @@ export function ActiveRoom() {
           });
 
           if (isSpeakingRemote) {
-            const uid = Array.from(webRTC.socketIdByUidRef.current.entries())
-              .find(([_, sid]) => sid === socketId)?.[0];
-            if (uid) {
-              speakingUids.add(uid);
-            }
+            speakingSocketIds.add(socketId);
           }
         } catch (err) {
           // Ignorar errores silenciosamente para evitar spam en consola
@@ -1123,10 +1421,10 @@ export function ActiveRoom() {
       setParticipants((prev) => {
         let changed = false;
         const next = prev.map((p) => {
-          const isCurrentUser = p.uid === user?.uid;
-          if (isCurrentUser) return p; // El usuario local tiene su propio analizador de micrófono directo
+          const isCurrentUser = (p.socketId || p.uid) === (localSocketIdRef.current || user?.uid);
+          if (isCurrentUser) return p; // La instancia local tiene su propio analizador de micrófono directo
 
-          const shouldBeSpeaking = speakingUids.has(p.uid);
+          const shouldBeSpeaking = p.socketId ? speakingSocketIds.has(p.socketId) : false;
           if (p.isSpeaking !== shouldBeSpeaking) {
             changed = true;
             return { ...p, isSpeaking: shouldBeSpeaking };
@@ -1138,7 +1436,7 @@ export function ActiveRoom() {
     }, 200);
 
     return () => clearInterval(intervalId);
-  }, [isConnected, user?.uid, webRTC.peerConnectionsRef, webRTC.socketIdByUidRef]);
+  }, [isConnected, user?.uid, webRTC.peerConnectionsRef]);
 
   const isCameraBlocked =
     mediaPerms.video === "denied" ||
@@ -1150,11 +1448,19 @@ export function ActiveRoom() {
     mediaPerms.audio === "unavailable" ||
     mediaPerms.audio === "error";
 
+  const showCameraAlert = isCameraBlocked || isScreenSharing;
+
   const handleCameraClick = async () => {
+    if (isScreenSharing) {
+      showToast.error(
+        "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara."
+      );
+      return;
+    }
     if (isCameraBlocked) {
       if (mediaPerms.video === "denied") {
         showToast.error(
-          "No es posible acceder a la cámara. Por favor, concede los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
+          "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
         );
       } else if (mediaPerms.video === "unavailable") {
         showToast.error("No se detectó ninguna cámara en este dispositivo.");
@@ -1183,7 +1489,7 @@ export function ActiveRoom() {
     if (isMicBlocked) {
       if (mediaPerms.audio === "denied") {
         showToast.error(
-          "No es posible acceder al micrófono. Por favor, concede los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
+          "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
         );
       } else if (mediaPerms.audio === "unavailable") {
         showToast.error("No se detectó ningún micrófono en este dispositivo.");
@@ -1384,18 +1690,34 @@ export function ActiveRoom() {
   const handleCopyId = async () => {
     if (!roomId) return;
 
-    await navigator.clipboard.writeText(roomId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleWaitingCopyId = async () => {
+    if (!roomId) return;
+
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setWaitingCopied(true);
+      setTimeout(() => setWaitingCopied(false), 2000);
+    } catch {
+      setWaitingCopied(true);
+      setTimeout(() => setWaitingCopied(false), 2000);
+    }
   };
 
   const handleLeaveRoom = () => {
-    const shouldLeave = window.confirm(
-      "¿Estás seguro de que quieres salir de esta sala de estudio?"
-    );
+    setShowLeaveConfirm(true);
+  };
 
-    if (!shouldLeave) return;
-
+  const confirmLeaveRoom = () => {
     if (socketRef.current) {
       socketRef.current.emit("leave-room");
       socketRef.current.disconnect();
@@ -1532,11 +1854,11 @@ export function ActiveRoom() {
                   {!isOwnMessage && avatar}
 
                   <div
-                    className={`flex max-w-[82%] flex-col ${
+                    className={`min-w-0 max-w-[82%] flex-col overflow-hidden ${
                       isOwnMessage
                         ? "items-end text-right"
                         : "items-start text-left"
-                    }`}
+                    } flex`}
                   >
                     <div className="mb-1 flex max-w-full items-center gap-2">
                       <span className="truncate text-xs font-semibold text-gray-700">
@@ -1549,13 +1871,13 @@ export function ActiveRoom() {
                     </div>
 
                     <p
-                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm ${
+                      className={`rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm break-all ${
                         isOwnMessage
                           ? "rounded-br-sm bg-primary text-white"
                           : "rounded-bl-sm border border-gray-200 bg-white text-gray-700"
                       }`}
                     >
-                      {msg.message}
+                      {renderMessageWithLinks(msg.message)}
                     </p>
                   </div>
 
@@ -1682,7 +2004,7 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="flex cursor-pointer items-center gap-1 rounded text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                className="flex cursor-pointer items-center gap-1 rounded p-1.5 text-sm text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                 aria-label={
                   copied
                     ? "ID copiado al portapapeles"
@@ -1692,7 +2014,7 @@ export function ActiveRoom() {
                 {copied ? (
                   <>
                     <Check className="h-4 w-4" aria-hidden="true" />
-                    <span className="hidden sm:inline">ID copiado</span>
+                    <span className="hidden sm:inline"> Copiado </span>
                   </>
                 ) : (
                   <>
@@ -1730,6 +2052,10 @@ export function ActiveRoom() {
           </div>
         </div>
       </header>
+
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {chatAnnouncement}
+      </div>
 
       {!isConnected && (
         <div 
@@ -1787,99 +2113,171 @@ export function ActiveRoom() {
           className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div
-            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
-            style={{
-              gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
-            }}
-          >
-            {participants.length === 0 ? (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
-                <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
-                <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
-                <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
+          {isPinned && isLg && pinnedSharersocketId ? (
+            <div className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4 lg:grid-cols-[2fr_1fr]">
+              {/* Left column: pinned sharer — grid interno de 1 celda para estirar el tile */}
+              <div className="grid min-h-0 grid-cols-1 grid-rows-1">
+                {(() => {
+                  const pinned = sortedParticipants.find(p => p.socketId === pinnedSharersocketId);
+                  if (!pinned) return null;
+                  return renderParticipantTile(pinned, sortedParticipants.indexOf(pinned));
+                })()}
               </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {visibleParticipants.map((p, i) => {
-                  const gridColumn = isSm && participants.length === 5
-                    ? i < 3 ? "span 2" : "span 3"
-                    : undefined;
-                  return renderParticipantTile(p, i, gridColumn);
-                })}
+              {/* Right column: other participants */}
+              <div className="grid min-h-0 auto-rows-fr gap-2 sm:gap-4">
+                {(() => {
+                  const others = sortedParticipants.filter(p => p.socketId !== pinnedSharersocketId);
+                  const hasOverflow = others.length > 1;
+                  const visible = hasOverflow ? others.slice(0, 1) : others;
 
-                {participants.length === 1 && (
-                  <motion.div
-                    key="waiting-placeholder"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
-                  >
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
-                      <Users className="h-8 w-8 text-primary-400 animate-pulse" />
-                    </div>
-                    <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
-                    <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
-                      Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleCopyId}
-                      className="mt-4 flex items-center gap-1.5 rounded-lg bg-gray-700/80 px-4 py-2.5 text-xs font-semibold text-white hover:bg-gray-600 transition cursor-pointer"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-green-400" />
-                          <span>¡ID copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copiar ID</span>
-                        </>
-                      )}
-                    </button>
-                  </motion.div>
-                )}
-
-                {showOverflow && (
-                  <motion.div
-                    key="overflow"
-                    layout
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
-                  >
-                    <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
-                      <div className="flex items-center justify-center">
-                        <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
-                          {renderOverflowAvatar(
-                            sortedParticipants[overflowVisibleCount],
-                            overflowVisibleCount
-                          )}
-                        </div>
-                        {sortedParticipants.length > overflowVisibleCount + 1 && (
-                          <div>
-                            {renderOverflowAvatar(
-                              sortedParticipants[overflowVisibleCount + 1],
-                              overflowVisibleCount + 1
+                  return (
+                    <>
+                      {visible.map(p => renderParticipantTile(p, sortedParticipants.indexOf(p)))}
+                      {hasOverflow && (
+                        <div className="flex flex-col items-center justify-center rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl min-h-0">
+                          <div className="flex items-center justify-center">
+                            <div className="relative z-10 mr-[-14px] sm:mr-[-16px]">
+                              {renderOverflowAvatar(others[1], sortedParticipants.indexOf(others[1]))}
+                            </div>
+                            {others.length > 2 && (
+                              <div>
+                                {renderOverflowAvatar(others[2], sortedParticipants.indexOf(others[2]))}
+                              </div>
                             )}
                           </div>
-                        )}
+                          <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                            +{others.length - 1} más
+                          </p>
+                        </div>
+                      )}
+                      {sortedParticipants.length === 1 && (
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-0">
+                          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                            <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                          </div>
+                          <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                          <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                            Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleWaitingCopyId}
+                            className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
+                          >
+                            {waitingCopied ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-green-400" />
+                                <span> Copiado </span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>Copiar ID</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
+              }}
+            >
+              {participants.length === 0 ? (
+                <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
+                  <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
+                  <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
+                  <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
+                </div>
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  {visibleParticipants.map((p, i) => {
+                    const gridColumn = isSm && participants.length === 5
+                      ? i < 3 ? "span 2" : "span 3"
+                      : undefined;
+                    return renderParticipantTile(p, i, gridColumn);
+                  })}
+
+                  {participants.length === 1 && (
+                    <motion.div
+                      key="waiting-placeholder"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
+                    >
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                        <Users className="h-8 w-8 text-primary-400 animate-pulse" />
                       </div>
-                      <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
-                        +{sortedParticipants.length - overflowVisibleCount} más
+                      <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                      <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                        Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
                       </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
+                      <button
+                        type="button"
+                        onClick={handleWaitingCopyId}
+                        className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
+                      >
+                        {waitingCopied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-green-400" />
+                            <span> Copiado </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copiar ID</span>
+                          </>
+                        )}
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {showOverflow && (
+                    <motion.div
+                      key="overflow"
+                      layout
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
+                    >
+                      <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+                        <div className="flex items-center justify-center">
+                          <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
+                            {renderOverflowAvatar(
+                              sortedParticipants[overflowVisibleCount],
+                              overflowVisibleCount
+                            )}
+                          </div>
+                          {sortedParticipants.length > overflowVisibleCount + 1 && (
+                            <div>
+                              {renderOverflowAvatar(
+                                sortedParticipants[overflowVisibleCount + 1],
+                                overflowVisibleCount + 1
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                          +{sortedParticipants.length - overflowVisibleCount} más
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+            </div>
+          )}
 
           <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
@@ -1887,38 +2285,43 @@ export function ActiveRoom() {
               <button
                 type="button"
                 onClick={handleCameraClick}
-                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
-                  isCameraBlocked
-                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                  showCameraAlert
+                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 hover:bg-amber-500/30"
                     : isCameraOn
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isCameraOn}
                 aria-label={
-                  isCameraBlocked
-                    ? "Cámara bloqueada por permisos"
+                  showCameraAlert
+                    ? isScreenSharing
+                      ? "Cámara desactivada mientras compartes pantalla"
+                      : "Cámara bloqueada por permisos"
                     : isCameraOn
                       ? "Apagar cámara"
                       : "Encender cámara"
                 }
               >
-                {isCameraBlocked ? (
-                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
-                ) : isCameraOn ? (
-                  <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                ) : (
-                  <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                )}
+                  {isCameraOn ? (
+                    <Video className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  ) : (
+                    <VideoOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  )}
+                  {showCameraAlert && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#403421] shadow-md">
+                      <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    </span>
+                  )}
               </button>
 
               {/* Mic */}
               <button
                 type="button"
                 onClick={handleMicClick}
-                className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
+                className={`relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14 ${
                   isMicBlocked
-                    ? "bg-red-500/20 text-red-500 border border-red-500/40 hover:bg-red-500/30"
+                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/40 hover:bg-amber-500/30"
                     : isMicOn
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -1932,13 +2335,16 @@ export function ActiveRoom() {
                       : "Activar micrófono"
                 }
               >
-                {isMicBlocked ? (
-                  <AlertCircle className="h-6 w-6 text-red-500 animate-pulse" aria-hidden="true" />
-                ) : isMicOn ? (
-                  <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                ) : (
-                  <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
-                )}
+                  {isMicOn ? (
+                    <Mic className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  ) : (
+                    <MicOff className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
+                  )}
+                  {isMicBlocked && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#403421] shadow-md">
+                      <AlertCircle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    </span>
+                  )}
               </button>
 
               {/* Share screen */}
@@ -1961,7 +2367,7 @@ export function ActiveRoom() {
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 aria-pressed={isScreenSharing}
-                aria-label={isScreenSharing ? "Dejar de compartir pantalla" : "Compartir pantalla"}
+                aria-label={isScreenSharing ? "Detener compartir pantalla" : "Compartir pantalla"}
               >
                 {isScreenSharing ? (
                   <ScreenShare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
@@ -1997,7 +2403,10 @@ export function ActiveRoom() {
                   <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
                 {chat.unreadCount > 0 && !isChatOpen && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white sm:h-6 sm:w-6 sm:text-sm">
+                  <span
+                    className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce sm:h-6 sm:w-6 sm:text-sm"
+                    aria-label={`${chat.unreadCount > 9 ? "9 o más" : chat.unreadCount} mensajes sin leer`}
+                  >
                     {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
                   </span>
                 )}
@@ -2099,7 +2508,10 @@ export function ActiveRoom() {
             )}
 
             {chat.unreadCount > 0 && !isChatOpen && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-bounce">
+              <span
+                className="absolute -top-1.5 -left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md animate-badge-bounce"
+                aria-label={`${chat.unreadCount > 9 ? "9 o más" : chat.unreadCount} mensajes sin leer`}
+              >
                 {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
               </span>
             )}
@@ -2386,6 +2798,28 @@ export function ActiveRoom() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={showDuplicateTabDialog}
+        onOpenChange={(open) => { setShowDuplicateTabDialog(open); if (!open) navigate("/dashboard"); }}
+        title="Sesión duplicada detectada"
+        description="Ya tienes una sesión activa en esta sala desde otra pestaña. ¿Quieres usar esta y cerrar la otra?"
+        confirmLabel="Usar esta y cerrar la otra"
+        onConfirm={() => {
+          broadcastChannelRef.current?.postMessage({ type: "leave-request", uid: user?.uid });
+          setShowDuplicateTabDialog(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={showLeaveConfirm}
+        onOpenChange={setShowLeaveConfirm}
+        title="¿Salir de la sala?"
+        description="¿Estás seguro de que quieres salir de esta sala de estudio?"
+        confirmLabel="Salir"
+        variant="destructive"
+        onConfirm={confirmLeaveRoom}
+      />
     </div>
   );
 }

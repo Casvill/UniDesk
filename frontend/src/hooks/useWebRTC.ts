@@ -7,7 +7,6 @@ const RTC_CONFIG: RTCConfiguration = {
 
 export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const socketIdByUidRef = useRef<Map<string, string>>(new Map());
   const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
@@ -46,36 +45,49 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     console.log("[WebRTC] crear conexión peer para", socketId);
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
-    const localTracks = localStreamRef.current?.getTracks() ?? [];
-    if (localTracks.length === 0) {
-      console.log("[WebRTC] sin tracks locales, agregando transceivers recvonly para", socketId);
-      pc.addTransceiver("audio", { direction: "recvonly" });
-      pc.addTransceiver("video", { direction: "recvonly" });
+    let needsNegotiation = false;
+
+    const localAudio = localStreamRef.current?.getAudioTracks()?.[0];
+    const localVideo = localStreamRef.current?.getVideoTracks()?.[0];
+
+    if (localAudio) {
+      console.log("[WebRTC] agregando track local de audio a", socketId);
+      pc.addTrack(localAudio, localStreamRef.current!);
     } else {
-      localTracks.forEach((track) => {
-        console.log("[WebRTC] agregando track local", track.kind, "a", socketId);
-        pc.addTrack(track, localStreamRef.current!);
-      });
+      pc.addTransceiver("audio", { direction: "recvonly" });
     }
 
+    if (localVideo) {
+      console.log("[WebRTC] agregando track local de video a", socketId);
+      pc.addTrack(localVideo, localStreamRef.current!);
+    } else {
+      pc.addTransceiver("video", { direction: "recvonly" });
+    }
+
+    // FIX 1: Al recibir un track nuevo, reemplazar el track del mismo kind en el
+    // stream existente en lugar de acumular. Esto evita que tracks ended (de cámara
+    // previa o screen share anterior) queden en el MediaStream y muestren negro.
     pc.ontrack = (event) => {
-      const { streams, track } = event;
-      console.log("[WebRTC] track remoto de", socketId, "streams:", streams.length, track.kind);
+      const { track } = event;
+      console.log("[WebRTC] track remoto de", socketId, "kind:", track.kind);
       setRemoteStreams((prev) => {
         const next = new Map(prev);
         const oldStream = next.get(socketId);
-        
         const newStream = new MediaStream();
+
+        // Copiar al nuevo stream solo los tracks del kind DISTINTO al que llega
+        // (conserva audio si llega video, y viceversa)
         if (oldStream) {
-          oldStream.getTracks().forEach((t) => newStream.addTrack(t));
-        } else if (streams && streams.length > 0) {
-          streams[0].getTracks().forEach((t) => newStream.addTrack(t));
+          oldStream.getTracks().forEach((t) => {
+            if (t.kind !== track.kind) {
+              newStream.addTrack(t);
+            }
+          });
         }
-        
-        if (!newStream.getTracks().includes(track)) {
-          newStream.addTrack(track);
-        }
-        
+
+        // Agregar el track nuevo (reemplaza cualquier track del mismo kind)
+        newStream.addTrack(track);
+
         next.set(socketId, newStream);
         return next;
       });
@@ -91,12 +103,12 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
       }
     };
 
-    pc.onnegotiationneeded = async () => {
-      console.log("[WebRTC] negociación necesaria para", socketId);
+    const negotiate = async () => {
       if (pc.signalingState !== "stable") {
-        console.log("[WebRTC] diferir negociación — signalingState:", pc.signalingState);
+        needsNegotiation = true;
         return;
       }
+      needsNegotiation = false;
       try {
         await pc.setLocalDescription(await pc.createOffer());
         console.log("[WebRTC] enviando offer a", socketId);
@@ -106,6 +118,14 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
         });
       } catch (err) {
         console.error("Error al crear offer:", err);
+      }
+    };
+
+    pc.onnegotiationneeded = negotiate;
+
+    pc.onsignalingstatechange = () => {
+      if (pc.signalingState === "stable" && needsNegotiation) {
+        negotiate();
       }
     };
 
@@ -120,11 +140,14 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
     return pc;
   }
 
-  function registerWebRTCEventHandlers(socket: Socket, currentUserUid: string) {
+  // FIX 2: localSocketId se pasa como ref mutable para que siempre refleje el valor
+  // actual en el momento en que se evalúa el guard dentro de los listeners, en lugar
+  // de capturar el string vacío del momento del registro.
+  function registerWebRTCEventHandlers(socket: Socket, localSocketIdRef: React.MutableRefObject<string | null>) {
     socket.on("user-joined", (payload: { socketId: string; user: { uid: string } }) => {
       console.log("[WebRTC] usuario conectado:", payload.socketId, payload.user.uid);
-      socketIdByUidRef.current.set(payload.user.uid, payload.socketId);
-      if (payload.user.uid === currentUserUid) return;
+      // Usar el ref en lugar del string capturado al momento del registro
+      if (payload.socketId === localSocketIdRef.current) return;
       if (peerConnectionsRef.current.has(payload.socketId)) return;
       createPeerConnection(payload.socketId, socket);
     });
@@ -195,7 +218,6 @@ export function useWebRTC(localStreamRef: React.RefObject<MediaStream | null>) {
 
   return {
     peerConnectionsRef,
-    socketIdByUidRef,
     remoteStreams,
     createPeerConnection,
     closePeerConnection,
