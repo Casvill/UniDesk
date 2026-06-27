@@ -213,8 +213,34 @@ export function ActiveRoom() {
   const overflowVisibleCount = gridCols * 2 - 1;
 
   const sortedParticipants = [...participants].sort((a, b) => {
+    // 1. Current user siempre primero
     if (a.uid === user?.uid) return -1;
     if (b.uid === user?.uid) return 1;
+
+    // 2. Quien comparte pantalla
+    if (a.screenSharing && !b.screenSharing) return -1;
+    if (!a.screenSharing && b.screenSharing) return 1;
+
+    // 3. Oradores activos (isSpeaking)
+    if (a.isSpeaking && !b.isSpeaking) return -1;
+    if (!a.isSpeaking && b.isSpeaking) return 1;
+
+    // 4. Cámara encendida
+    const aCamOn = a.cameraEnabled || a.screenSharing;
+    const bCamOn = b.cameraEnabled || b.screenSharing;
+    if (aCamOn && !bCamOn) return -1;
+    if (!aCamOn && bCamOn) return 1;
+
+    // 5. Micrófono encendido
+    if (a.microphoneEnabled && !b.microphoneEnabled) return -1;
+    if (!a.microphoneEnabled && b.microphoneEnabled) return 1;
+
+    // 6. Alfabético por username como desempate
+    const nameA = (a.username || a.displayName || "").toLowerCase();
+    const nameB = (b.username || b.displayName || "").toLowerCase();
+    if (nameA < nameB) return -1;
+    if (nameA > nameB) return 1;
+
     return 0;
   });
   const visibleParticipants = sortedParticipants.slice(
