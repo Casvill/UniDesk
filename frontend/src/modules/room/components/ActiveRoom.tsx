@@ -14,6 +14,8 @@ import {
   Mic,
   MicOff,
   MonitorPlay,
+  Pin,
+  PinOff,
   ScreenShare,
   ScreenShareOff,
   Phone,
@@ -136,6 +138,10 @@ export function ActiveRoom() {
   // (p.ej. en reconexiones) y evitar listeners duplicados.
   const webRTCHandlersRegisteredRef = useRef(false);
 
+  const [isPinned, setIsPinned] = useState(false);
+  const [pinnedSharersocketId, setPinnedSharersocketId] = useState<string | null>(null);
+  const pinManuallyDisabledRef = useRef(false);
+
   const webRTC = useWebRTC(localStreamRef);
 
   const getRealUsername = async (uid: string, fallback: string): Promise<string> => {
@@ -255,7 +261,7 @@ export function ActiveRoom() {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        className={`relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
+        className={`group relative overflow-hidden rounded-2xl bg-gray-800 transition-all duration-300 ${
           p.isSpeaking 
             ? "ring-4 ring-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" 
             : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
@@ -324,7 +330,7 @@ export function ActiveRoom() {
             {isCurrent ? "Tú" : name}
           </div>
         )}
-        <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+        <div className="flex h-full min-h-[140px] items-center justify-center sm:min-h-[180px] lg:min-h-[200px]">
           {hasMediaError ? (
             <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
               <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-2" aria-hidden="true" />
@@ -371,23 +377,23 @@ export function ActiveRoom() {
                 <img
                   src={p.photoURL}
                   alt=""
-                  className="mx-auto mb-4 h-16 w-16 rounded-full object-cover shadow-2xl sm:h-20 sm:w-20 lg:h-32 lg:w-32"
+                  className="mx-auto mb-2 h-12 w-12 rounded-full object-cover shadow-2xl sm:h-16 sm:w-16 lg:h-20 lg:w-20"
                 />
               ) : (
                 <div
-                  className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br sm:h-20 sm:w-20 lg:h-32 lg:w-32 ${getParticipantGradient(index)} shadow-2xl`}
+                  className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br sm:h-16 sm:w-16 lg:h-20 lg:w-20 ${getParticipantGradient(index)} shadow-2xl`}
                   aria-hidden="true"
                 >
-                  <span className="text-xl font-bold text-white sm:text-2xl lg:text-4xl">
+                  <span className="text-lg font-bold text-white sm:text-xl lg:text-2xl">
                     {getInitials(name)}
                   </span>
                 </div>
               )}
-              <p className="text-sm font-semibold text-white sm:text-base lg:text-lg">
+              <p className="text-xs font-semibold text-white sm:text-sm">
                 {isCurrent ? "Tú" : name}
               </p>
               {p.isHost && (
-                <p className="mt-1 text-sm font-medium text-primary-200">Anfitrión</p>
+                <p className="mt-0.5 text-[10px] font-medium text-primary-200 sm:text-xs">Anfitrión</p>
               )}
             </div>
           )}
@@ -435,6 +441,34 @@ export function ActiveRoom() {
             )}
           </span>
         </div>
+        {p.screenSharing && isLg && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isPinned && pinnedSharersocketId === p.socketId) {
+                setIsPinned(false);
+                pinManuallyDisabledRef.current = true;
+              } else {
+                setIsPinned(true);
+                setPinnedSharersocketId(p.socketId ?? null);
+                pinManuallyDisabledRef.current = false;
+              }
+            }}
+            className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-xl p-3 opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:opacity-100 ${
+              isPinned && pinnedSharersocketId === p.socketId
+                ? "bg-primary-600 text-white"
+                : "bg-black/60 text-gray-300 hover:text-white"
+            }`}
+            aria-label={isPinned && pinnedSharersocketId === p.socketId ? "Desfijar expositor" : "Fijar expositor"}
+          >
+            {isPinned && pinnedSharersocketId === p.socketId ? (
+              <Pin className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <PinOff className="h-6 w-6" aria-hidden="true" />
+            )}
+          </button>
+        )}
       </motion.div>
     );
   };
@@ -956,6 +990,31 @@ export function ActiveRoom() {
 
     void loadMissingProfiles();
   }, [participants, chat.chatMessages, user]);
+
+  // Auto-pin cuando alguien comparte pantalla
+  useEffect(() => {
+    const currentSharer = participants.find(p => p.screenSharing);
+
+    if (currentSharer) {
+      const isNewSharer = pinnedSharersocketId !== currentSharer.socketId;
+      if (!isPinned) {
+        if (!pinManuallyDisabledRef.current || isNewSharer) {
+          setIsPinned(true);
+          setPinnedSharersocketId(currentSharer.socketId ?? null);
+          pinManuallyDisabledRef.current = false;
+        }
+      } else if (isNewSharer) {
+        setPinnedSharersocketId(currentSharer.socketId ?? null);
+        pinManuallyDisabledRef.current = false;
+      }
+    } else {
+      if (isPinned) {
+        setIsPinned(false);
+        setPinnedSharersocketId(null);
+      }
+      pinManuallyDisabledRef.current = false;
+    }
+  }, [participants, isPinned, pinnedSharersocketId]);
 
   useEffect(() => {
     if (!user) return;
@@ -1985,36 +2044,23 @@ export function ActiveRoom() {
           className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6"
           aria-label="Área de video"
         >
-          <div
-            className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
-            style={{
-              gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
-            }}
-          >
-            {participants.length === 0 ? (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
-                <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
-                <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
-                <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
+          {isPinned && isLg && pinnedSharersocketId ? (
+            <div className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4 lg:grid-cols-[2fr_1fr]">
+              {/* Left column: pinned sharer — grid interno de 1 celda para estirar el tile */}
+              <div className="grid min-h-0 grid-cols-1 grid-rows-1">
+                {(() => {
+                  const pinned = sortedParticipants.find(p => p.socketId === pinnedSharersocketId);
+                  if (!pinned) return null;
+                  return renderParticipantTile(pinned, sortedParticipants.indexOf(pinned));
+                })()}
               </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {visibleParticipants.map((p, i) => {
-                  const gridColumn = isSm && participants.length === 5
-                    ? i < 3 ? "span 2" : "span 3"
-                    : undefined;
-                  return renderParticipantTile(p, i, gridColumn);
-                })}
-
-                {participants.length === 1 && (
-                  <motion.div
-                    key="waiting-placeholder"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
-                  >
+              {/* Right column: other participants */}
+              <div className="grid min-h-0 auto-rows-fr gap-2 sm:gap-4">
+                {sortedParticipants.filter(p => p.socketId !== pinnedSharersocketId).map((p, i) =>
+                  renderParticipantTile(p, sortedParticipants.indexOf(p))
+                )}
+                {sortedParticipants.length === 1 && (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]">
                     <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
                       <Users className="h-8 w-8 text-primary-400 animate-pulse" />
                     </div>
@@ -2039,45 +2085,105 @@ export function ActiveRoom() {
                         </>
                       )}
                     </button>
-                  </motion.div>
+                  </div>
                 )}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${effectiveGridCols}, minmax(0, 1fr))`,
+              }}
+            >
+              {participants.length === 0 ? (
+                <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-600 bg-gray-800 p-10 text-center">
+                  <Users className="mx-auto h-12 w-12 text-gray-500 animate-pulse" aria-hidden="true" />
+                  <p className="mt-4 font-semibold text-white">Conectando a la sala...</p>
+                  <p className="mt-1 text-sm text-gray-400">Por favor, espera mientras nos unimos a la sesión.</p>
+                </div>
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  {visibleParticipants.map((p, i) => {
+                    const gridColumn = isSm && participants.length === 5
+                      ? i < 3 ? "span 2" : "span 3"
+                      : undefined;
+                    return renderParticipantTile(p, i, gridColumn);
+                  })}
 
-                {showOverflow && (
-                  <motion.div
-                    key="overflow"
-                    layout
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
-                  >
-                    <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
-                      <div className="flex items-center justify-center">
-                        <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
-                          {renderOverflowAvatar(
-                            sortedParticipants[overflowVisibleCount],
-                            overflowVisibleCount
-                          )}
-                        </div>
-                        {sortedParticipants.length > overflowVisibleCount + 1 && (
-                          <div>
+                  {participants.length === 1 && (
+                    <motion.div
+                      key="waiting-placeholder"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
+                    >
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                        <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                      </div>
+                      <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                      <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                        Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleWaitingCopyId}
+                        className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
+                      >
+                        {waitingCopied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-green-400" />
+                            <span> Copiado </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copiar ID</span>
+                          </>
+                        )}
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {showOverflow && (
+                    <motion.div
+                      key="overflow"
+                      layout
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="relative overflow-hidden rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl"
+                    >
+                      <div className="flex h-full min-h-[180px] flex-col items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
+                        <div className="flex items-center justify-center">
+                          <div className="relative z-10 mr-[-14px] sm:mr-[-16px] lg:mr-[-20px]">
                             {renderOverflowAvatar(
-                              sortedParticipants[overflowVisibleCount + 1],
-                              overflowVisibleCount + 1
+                              sortedParticipants[overflowVisibleCount],
+                              overflowVisibleCount
                             )}
                           </div>
-                        )}
+                          {sortedParticipants.length > overflowVisibleCount + 1 && (
+                            <div>
+                              {renderOverflowAvatar(
+                                sortedParticipants[overflowVisibleCount + 1],
+                                overflowVisibleCount + 1
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                          +{sortedParticipants.length - overflowVisibleCount} más
+                        </p>
                       </div>
-                      <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
-                        +{sortedParticipants.length - overflowVisibleCount} más
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+            </div>
+          )}
 
           <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4">
             <div className="flex items-center justify-center gap-2 sm:gap-3">
