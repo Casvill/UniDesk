@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  MonitorPlay,
   ScreenShare,
   ScreenShareOff,
   Phone,
@@ -98,6 +99,7 @@ export function ActiveRoom() {
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const retryingMediaRef = useRef<Set<"audio" | "video">>(new Set());
+  const wasScreenSharingRef = useRef(false);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
@@ -390,10 +392,17 @@ export function ActiveRoom() {
             className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
               camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
             }`}
-            aria-label={camOn ? "Cámara encendida" : "Cámara apagada"}
+            aria-label={camOn ? (p.screenSharing ? "Compartiendo pantalla" : "Cámara encendida") : "Cámara apagada"}
           >
             {camOn ? (
-              <Video className="h-3.5 w-3.5" aria-hidden="true" />
+              p.screenSharing ? (
+                <>
+                  <MonitorPlay className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">Compartiendo pantalla</span>
+                </>
+              ) : (
+                <Video className="h-3.5 w-3.5" aria-hidden="true" />
+              )
             ) : (
               <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
             )}
@@ -800,7 +809,21 @@ export function ActiveRoom() {
           );
         });
 
-        socket.on("screen-share-started", (payload: { socketId: string; userId: string; estado: boolean }) => {
+        socket.on("screen-share-started", async (payload: { socketId: string; userId: string; estado: boolean }) => {
+          const cached = userProfilesCacheRef.current.get(payload.userId);
+          let name = cached?.username || "";
+
+          if (!name) {
+            const currentParticipant = participants.find(p => matchBySocketIdOnly(p, payload.socketId));
+            name = currentParticipant?.username || "";
+          }
+
+          if (!name) {
+            name = await getRealUsername(payload.userId, "compañero");
+          }
+
+          showToast.info(`${name} comenzó a compartir pantalla.`);
+
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, screenSharing: true } : p
@@ -995,12 +1018,13 @@ export function ActiveRoom() {
     socket.emit(isCameraOn ? "camera-on" : "camera-off");
 
     if (user) {
-      if (isScreenSharing) {
+      if (isScreenSharing && !wasScreenSharingRef.current) {
         socket.emit("screen-share-started", { userId: user.uid, estado: true });
-      } else {
+      } else if (!isScreenSharing && wasScreenSharingRef.current) {
         socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
       }
     }
+    wasScreenSharingRef.current = isScreenSharing;
   }, [isCameraOn, isMicOn, isScreenSharing, user, retryMedia]);
 
   useEffect(() => {
