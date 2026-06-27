@@ -319,6 +319,11 @@ export function ActiveRoom() {
             />
           </>
         ) : null}
+        {camOn && (
+          <div className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white shadow-lg backdrop-blur-sm sm:px-2.5 sm:py-1.5 sm:text-sm">
+            {isCurrent ? "Tú" : name}
+          </div>
+        )}
         <div className="flex h-full min-h-[180px] items-center justify-center sm:min-h-[240px] lg:min-h-[280px]">
           {hasMediaError ? (
             <div className="text-center px-4 max-w-xs" role="alert" aria-live="assertive">
