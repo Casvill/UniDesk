@@ -234,6 +234,7 @@ export function useMedia(
       showToast.error("Compartir pantalla no es compatible con este navegador.");
       throw new Error("Screen capture not supported");
     }
+    const loadingKey = showToast.loading("Esperando que selecciones una pantalla para compartir...");
     try {
       console.log("[useMedia] Solicitando captura de pantalla/ventana/pestaña...");
 
@@ -241,6 +242,7 @@ export function useMedia(
         video: true,
         audio: false,
       });
+      showToast.close(loadingKey);
       console.log("[useMedia] Captura de pantalla obtenida con éxito:", stream.id);
 
       const screenTrack = stream.getVideoTracks()[0];
@@ -284,6 +286,7 @@ export function useMedia(
       return stream;
     } catch (err) {
       console.error("[useMedia] Error al capturar pantalla:", err);
+      showToast.close(loadingKey);
       wasCameraOnRef.current = false;
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {
