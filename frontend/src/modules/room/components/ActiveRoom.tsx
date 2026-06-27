@@ -2056,37 +2056,62 @@ export function ActiveRoom() {
               </div>
               {/* Right column: other participants */}
               <div className="grid min-h-0 auto-rows-fr gap-2 sm:gap-4">
-                {sortedParticipants.filter(p => p.socketId !== pinnedSharersocketId).map((p, i) =>
-                  renderParticipantTile(p, sortedParticipants.indexOf(p))
-                )}
-                {sortedParticipants.length === 1 && (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]">
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
-                      <Users className="h-8 w-8 text-primary-400 animate-pulse" />
-                    </div>
-                    <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
-                    <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
-                      Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleWaitingCopyId}
-                      className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
-                    >
-                      {waitingCopied ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-green-400" />
-                          <span> Copiado </span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copiar ID</span>
-                        </>
+                {(() => {
+                  const others = sortedParticipants.filter(p => p.socketId !== pinnedSharersocketId);
+                  const hasOverflow = others.length > 1;
+                  const visible = hasOverflow ? others.slice(0, 1) : others;
+
+                  return (
+                    <>
+                      {visible.map(p => renderParticipantTile(p, sortedParticipants.indexOf(p)))}
+                      {hasOverflow && (
+                        <div className="flex flex-col items-center justify-center rounded-2xl bg-gray-800 ring-2 ring-gray-700 shadow-xl min-h-0">
+                          <div className="flex items-center justify-center">
+                            <div className="relative z-10 mr-[-14px] sm:mr-[-16px]">
+                              {renderOverflowAvatar(others[1], sortedParticipants.indexOf(others[1]))}
+                            </div>
+                            {others.length > 2 && (
+                              <div>
+                                {renderOverflowAvatar(others[2], sortedParticipants.indexOf(others[2]))}
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-2 text-sm font-semibold text-gray-300 sm:text-base">
+                            +{others.length - 1} más
+                          </p>
+                        </div>
                       )}
-                    </button>
-                  </div>
-                )}
+                      {sortedParticipants.length === 1 && (
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-0">
+                          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
+                            <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                          </div>
+                          <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
+                          <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
+                            Comparte el ID de la sala con tus compañeros para que se unan a la sesión de estudio.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleWaitingCopyId}
+                            className="mt-4 flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-700/80 px-6 py-3 text-sm sm:px-4 sm:py-2.5 sm:text-xs font-semibold text-white hover:bg-gray-600 transition"
+                          >
+                            {waitingCopied ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-green-400" />
+                                <span> Copiado </span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>Copiar ID</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
