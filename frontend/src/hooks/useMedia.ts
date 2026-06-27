@@ -285,11 +285,15 @@ export function useMedia(
           showToast.error("Permiso para compartir pantalla denegado.");
         } else if (err.name === "AbortError") {
           // Usuario canceló el selector — no mostrar error
+        } else if (err.name === "NotReadableError") {
+          showToast.error("No se pudo acceder a la pantalla. Verifica que no esté siendo usada por otra aplicación.");
+        } else if (err.name === "NotSupportedError" || err.name === "OverconstrainedError") {
+          showToast.error("La pantalla seleccionada no es compatible con los requisitos de la sala.");
         } else {
-          showToast.error("No se pudo iniciar la captura de pantalla.");
+          showToast.error("Ocurrió un error inesperado al compartir pantalla. Intenta de nuevo.");
         }
       } else {
-        showToast.error("No se pudo iniciar la captura de pantalla.");
+        showToast.error("Ocurrió un error inesperado al compartir pantalla. Intenta de nuevo.");
       }
       throw err;
     }
