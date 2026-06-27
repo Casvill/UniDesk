@@ -141,7 +141,6 @@ export function ActiveRoom() {
   const [isPinned, setIsPinned] = useState(false);
   const [pinnedSharersocketId, setPinnedSharersocketId] = useState<string | null>(null);
   const pinManuallyDisabledRef = useRef(false);
-  const [screenShareAriaText, setScreenShareAriaText] = useState("");
 
   const webRTC = useWebRTC(localStreamRef);
 
@@ -889,7 +888,6 @@ export function ActiveRoom() {
           }
 
           showToast.info(`${name} comenzó a compartir pantalla.`);
-          setScreenShareAriaText(`${name} comenzó a compartir pantalla.`);
 
           setParticipants((prev) =>
             prev.map((p) =>
@@ -912,7 +910,6 @@ export function ActiveRoom() {
           }
 
           showToast.info(`${name} dejó de compartir pantalla.`);
-          setScreenShareAriaText(`${name} dejó de compartir pantalla.`);
 
           setParticipants((prev) =>
             prev.map((p) =>
@@ -1127,10 +1124,8 @@ export function ActiveRoom() {
     if (user) {
       if (isScreenSharing && !wasScreenSharingRef.current) {
         socket.emit("screen-share-started", { userId: user.uid, estado: true });
-        setScreenShareAriaText("Comenzaste a compartir pantalla.");
       } else if (!isScreenSharing && wasScreenSharingRef.current) {
         socket.emit("screen-share-stopped", { userId: user.uid, estado: false });
-        setScreenShareAriaText("Dejaste de compartir pantalla.");
       }
     }
     wasScreenSharingRef.current = isScreenSharing;
@@ -2032,10 +2027,6 @@ export function ActiveRoom() {
           </div>
         </div>
       </header>
-
-      <div aria-live="polite" className="sr-only" role="status">
-        {screenShareAriaText}
-      </div>
 
       {!isConnected && (
         <div 
