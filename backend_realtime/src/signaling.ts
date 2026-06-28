@@ -23,8 +23,9 @@ export interface UserInfo {
   username: string;
   roomId: string;
   avatar?: string;
-  microphoneEnabled?: boolean; 
-  cameraEnabled?: boolean; 
+  microphoneEnabled?: boolean;
+  cameraEnabled?: boolean;
+  screenSharing?: boolean;
 }
 
 /** In-memory membership index: roomId -> (socketId -> UserInfo). */

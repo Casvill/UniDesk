@@ -13,15 +13,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { storage } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/shared/components/ui/dialog";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { api } from "@/services/api";
 
 type ProfileForm = {
@@ -917,46 +909,17 @@ export function MyProfile() {
         </div>
       </div>
 
-      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent
-          onOpenAutoFocus={(e) => {
-            e.preventDefault();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>¿Eliminar cuenta?</DialogTitle>
-            <DialogDescription>
-              Esta acción es irreversible. Se perderá tu perfil, salas y toda la información asociada a tu cuenta.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <button
-                type="button"
-                disabled={deletingAccount}
-                className="bg-white border border-gray-300 px-4 py-2.5 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                aria-label="Cancelar eliminación de cuenta"
-              >
-                Cancelar
-              </button>
-            </DialogClose>
-
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                handleDeleteAccount();
-              }}
-              disabled={deletingAccount}
-              className="bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              aria-label={deletingAccount ? "Eliminando cuenta, por favor espera" : "Confirmar eliminación de cuenta"}
-            >
-              {deletingAccount ? "Eliminando..." : "Confirmar"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="¿Eliminar cuenta?"
+        description="Esta acción es irreversible. Se perderá tu perfil, salas y toda la información asociada a tu cuenta."
+        confirmLabel="Confirmar"
+        variant="destructive"
+        isLoading={deletingAccount}
+        loadingLabel="Eliminando..."
+        onConfirm={handleDeleteAccount}
+      />
 
       <div
         id="settings-status"
