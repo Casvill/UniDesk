@@ -59,6 +59,7 @@ interface RoomCardProps {
   user?: { getIdToken: () => Promise<string> } | null;
   onRoomUpdated?: (updatedRoom: Room) => void;
   onRoomDeleted?: (deletedRoomId: string) => void;
+  isVisible?: boolean;
 }
 
 export function RoomCard({
@@ -74,6 +75,7 @@ export function RoomCard({
   user = null,
   onRoomUpdated,
   onRoomDeleted,
+  isVisible = true,
 }: RoomCardProps) {
   const navigate = useNavigate();
   const formattedDate = formatDate(room.createdAt);
@@ -112,6 +114,7 @@ export function RoomCard({
         }}
         aria-labelledby={`room-title-${room.id}`}
         aria-describedby={`room-description-${room.id}`}
+        aria-hidden={!isVisible}
         onMouseEnter={() => onHover(room.id)}
         onMouseLeave={() => onHover(null)}
       >
@@ -138,6 +141,7 @@ export function RoomCard({
                       event.stopPropagation();
                       setIsEditDialogOpen(true);
                     }}
+                    tabIndex={isVisible ? undefined : -1}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
                     aria-label={`Editar nombre de la sala ${room.name}`}
                     title="Editar nombre"
@@ -162,6 +166,7 @@ export function RoomCard({
                   event.stopPropagation();
                   setIsDeleteDialogOpen(true);
                 }}
+                tabIndex={isVisible ? undefined : -1}
                 className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 cursor-pointer"
                 aria-label={`Eliminar sala ${room.name}`}
                 title="Eliminar sala"
@@ -197,6 +202,7 @@ export function RoomCard({
               <button
                 type="button"
                 onClick={handleCopy}
+                tabIndex={isVisible ? undefined : -1}
                 className={`flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer flex-shrink-0 whitespace-nowrap ${
                   copied
                     ? "bg-green-100 text-green-700 border border-green-200"
@@ -221,6 +227,7 @@ export function RoomCard({
           <button
             type="button"
             onClick={() => navigate(`/rooms/${room.id}`)}
+            tabIndex={isVisible ? undefined : -1}
             className="w-full mt-auto flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
             aria-label={`Entrar a la sala de estudio ${room.name}`}
           >

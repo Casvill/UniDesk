@@ -312,6 +312,8 @@ export function ActiveRoom() {
             muted
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
+            aria-label={`Transmisión de video de ${name} (Tú)`}
+            title={`Transmisión de video de ${name} (Tú)`}
             ref={(el) => {
               if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
                 el.srcObject = localStreamRef.current;
@@ -325,6 +327,8 @@ export function ActiveRoom() {
               playsInline
               muted
               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${!camOn ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+              aria-label={`Transmisión de video de ${name}`}
+              title={`Transmisión de video de ${name}`}
               ref={(el) => {
                 if (el) {
                   if (remoteStream && el.srcObject !== remoteStream) {
@@ -2428,7 +2432,7 @@ export function ActiveRoom() {
         {/* Mobile chat overlay (< lg) */}
         <div
           className={`fixed inset-0 z-50 flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:hidden ${
-            isChatOpen ? "pointer-events-auto" : "pointer-events-none"
+            isChatOpen ? "pointer-events-auto" : "pointer-events-none invisible"
           }`}
           aria-hidden={!isChatOpen}
         >
