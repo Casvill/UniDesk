@@ -244,6 +244,7 @@ export function GooglePage() {
         <div className="relative">
 
           <div
+            role="img"
             className="w-24 h-24 rounded-full bg-gray-100 border overflow-hidden flex items-center justify-center"
             aria-label="Vista previa del avatar"
           >
@@ -258,23 +259,23 @@ export function GooglePage() {
             )}
           </div>
 
-          <label
-            htmlFor="avatarInput"
-            className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700"
-            aria-label="Cambiar imagen de perfil"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-          </label>
-
           <input
             id="avatarInput"
             type="file"
             accept="image/*"
             onChange={handleAvatarChange}
-            className="hidden"
+            className="peer sr-only"
             aria-label="Seleccionar imagen de avatar"
             disabled={isSubmitting}
           />
+
+          <label
+            htmlFor="avatarInput"
+            className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-primary-500"
+            aria-label="Cambiar imagen de perfil"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
 
         </div>
       </div>
