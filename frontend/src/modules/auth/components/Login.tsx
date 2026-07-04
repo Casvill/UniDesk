@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
@@ -8,6 +8,7 @@ import { useCardTransition } from "@/context/CardTransitionContext";
 import { auth } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 async function getManualLoginErrorMessage(
   error: unknown,
@@ -87,14 +88,7 @@ export function Login() {
   const navigate = useNavigate();
   const { navigateWithTransition } = useCardTransition();
   const { login, loginWithGoogle } = useAuth();
-  const descriptionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      descriptionRef.current?.focus();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, []);
+  const tourStep = useAutoTour();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -202,7 +196,7 @@ export function Login() {
 
   return (
     <>
-      <div className="text-center mb-6">
+      <div ref={tourStep(0)} className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Bienvenido de nuevo
         </h1>
@@ -213,11 +207,11 @@ export function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div
-          ref={descriptionRef}
+          ref={tourStep(1)}
           tabIndex={-1}
           className="sr-only outline-none"
         >
-          Estás en la pantalla de inicio de sesión de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un campo obligatorio para ingresar tu Correo Electrónico. Segundo, un campo obligatorio para ingresar tu Contraseña. Tercero, un botón para alternar la visibilidad de tu contraseña. Cuarto, el botón Ingresar para iniciar sesión. Quinto, el botón para Continuar con Google. Sexto, un enlace para ir a la pantalla de recuperación de contraseña si la olvidaste. Y por último, un enlace para registrar una cuenta nueva.
+          Estás en la pantalla de inicio de sesión de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un campo obligatorio para ingresar tu Correo Electrónico. Segundo, un campo obligatorio para ingresar tu Contraseña. Tercero, un botón para alternar la visibilidad de tu contraseña. Cuarto, una casilla para mantener tu sesión iniciada en este dispositivo. Quinto, el botón Iniciar sesión. Sexto, el botón Continuar con Google. Y por último, el botón Crear cuenta para registrarte si aún no tienes una.
         </div>
 
       {/* EMAIL */}
@@ -251,7 +245,6 @@ export function Login() {
             }`}
             disabled={isSubmitting}
             autoComplete="email"
-            aria-label="Campo de correo electrónico"
             aria-required="true"
             aria-invalid={Boolean(errors.email)}
             aria-describedby={errors.email ? "email-error" : undefined}
@@ -317,7 +310,6 @@ export function Login() {
             }`}
             disabled={isSubmitting}
             autoComplete="current-password"
-            aria-label="Campo de contraseña"
             aria-required="true"
             aria-invalid={Boolean(errors.password)}
             aria-describedby={errors.password ? "password-error" : undefined}
@@ -328,6 +320,7 @@ export function Login() {
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            disabled={isSubmitting}
           >
             {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
           </button>
@@ -359,7 +352,6 @@ export function Login() {
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             className="rounded border-primary-500"
-            aria-label="Recordar sesión en este dispositivo"
             disabled={isSubmitting}
           />
           Mantener mi sesión iniciada
@@ -372,8 +364,6 @@ export function Login() {
           type="submit"
           disabled={isSubmitting}
           aria-busy={loading}
-          aria-disabled={isSubmitting}
-          aria-label={loading ? "Iniciando sesión, por favor espera" : "Iniciar sesión"}
           className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
         >
           {loading ? (
@@ -392,8 +382,6 @@ export function Login() {
           onClick={handleGoogleLogin}
           disabled={isSubmitting}
           aria-busy={googleLoading}
-          aria-disabled={isSubmitting}
-          aria-label={googleLoading ? "Autenticando con Google, por favor espera" : "Iniciar sesión con Google"}
           className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
         >
           {googleLoading ? (
@@ -418,7 +406,6 @@ export function Login() {
           type="button"
           onClick={() => navigateWithTransition("/register")}
           className="text-primary-600 font-semibold hover:underline text-sm cursor-pointer"
-          aria-label="Ir a registro"
           disabled={isSubmitting}
         >
           Crear cuenta

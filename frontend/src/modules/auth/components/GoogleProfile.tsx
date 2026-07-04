@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { User, Pencil, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -71,14 +72,7 @@ function getCompleteProfileErrorMessage(error: unknown): string {
 export function GooglePage() {
   const navigate = useNavigate();
   const { user, status, completeProfile } = useAuth();
-  const descriptionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      descriptionRef.current?.focus();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, []);
+  const tourStep = useAutoTour({ enabled: status === "needs-profile" });
 
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
@@ -238,7 +232,7 @@ export function GooglePage() {
 
   return (
     <>
-      <div className="text-center mb-6">
+      <div ref={tourStep(0)} className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
           Completa tu perfil
         </h1>
@@ -259,7 +253,7 @@ export function GooglePage() {
             {avatarPreview ? (
               <img
                 src={avatarPreview}
-                alt="Avatar de perfil"
+                alt=""
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -296,11 +290,11 @@ export function GooglePage() {
         noValidate
       >
         <div
-          ref={descriptionRef}
+          ref={tourStep(1)}
           tabIndex={-1}
           className="sr-only outline-none"
         >
-          Estás completando tu registro en UniDesk a través de Google. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para cargar o cambiar tu imagen de perfil. Segundo, un campo con tu Nombre Completo que ya está prellenado por Google y no es editable. Tercero, un campo obligatorio para ingresar tu nombre de usuario deseado. Y por último, el botón Completar Registro para guardar tus datos.
+          Estás completando tu registro en UniDesk a través de Google. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para cargar o cambiar tu imagen de perfil. Segundo, un campo con tu Nombre Completo que ya está prellenado por Google y no es editable. Tercero, un campo obligatorio para ingresar tu nombre de usuario deseado. Y por último, el botón Continuar para guardar tus datos y finalizar el registro.
         </div>
 
         {/* FULL NAME */}
@@ -314,8 +308,11 @@ export function GooglePage() {
             value={user.displayName || ""}
             disabled
             className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
-            aria-label="Nombre completo del usuario no editable"
+            aria-describedby="googleFullName-help"
           />
+          <p id="googleFullName-help" className="sr-only">
+            Este campo fue prellenado por Google y no es editable.
+          </p>
         </div>
 
         {/* USERNAME */}
@@ -382,8 +379,11 @@ export function GooglePage() {
             value={user.email || ""}
             disabled
             className="w-full pl-4 py-3 border rounded-lg bg-gray-100"
-            aria-label="Correo del usuario no editable"
+            aria-describedby="googleEmail-help"
           />
+          <p id="googleEmail-help" className="sr-only">
+            Este campo fue prellenado por Google y no es editable.
+          </p>
         </div>
 
         {/* STATUS ANNOUNCER */}
@@ -402,16 +402,6 @@ export function GooglePage() {
           type="submit"
           disabled={isButtonDisabled}
           aria-busy={loading}
-          aria-disabled={isButtonDisabled}
-          aria-label={
-            loading
-              ? "Creando cuenta, por favor espera"
-              : success
-              ? "Registro completado"
-              : !isUsernameValid
-              ? "Completa un nombre de usuario válido para continuar"
-              : "Finalizar registro de usuario"
-          }
           className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition cursor-pointer
             ${
               success
