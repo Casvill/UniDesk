@@ -72,10 +72,9 @@ export function RoomCarousel({
       aria-describedby="active-rooms-description"
     >
       <div
-        tabIndex={0}
         aria-labelledby="active-rooms-heading"
         aria-describedby="active-rooms-description"
-        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
+        className="rounded-lg"
       >
         <h2
           id="active-rooms-heading"
@@ -139,6 +138,7 @@ export function RoomCarousel({
                     const isHovered = hoveredCard === room.id;
                     const isDimmed =
                       containerHovered && hoveredCard !== null && !isHovered;
+                    const isVisible = index >= page * cardsPerPage && index < (page + 1) * cardsPerPage;
 
                     return (
                       <div
@@ -159,6 +159,7 @@ export function RoomCarousel({
                           user={user}
                           onRoomUpdated={onRoomUpdated}
                           onRoomDeleted={onRoomDeleted}
+                          isVisible={isVisible}
                         />
                       </div>
                     );

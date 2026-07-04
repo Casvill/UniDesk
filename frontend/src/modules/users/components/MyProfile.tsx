@@ -768,30 +768,31 @@ export function MyProfile() {
         >
           <div className="flex flex-col items-center">
             <div className="relative">
-              <div
-                className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
-                aria-label="Vista previa del avatar"
-              >
-                {avatarContent}
-              </div>
+                <div
+                  role="img"
+                  className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
+                  aria-label="Vista previa del avatar"
+                >
+                  {avatarContent}
+                </div>
 
-              <label
-                htmlFor="settings-avatar"
-                className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
-                aria-label="Cambiar imagen de perfil"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </label>
+                <input
+                  id="settings-avatar"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="peer sr-only"
+                  aria-label="Seleccionar imagen de perfil"
+                  disabled={loading || deletingAccount}
+                />
 
-              <input
-                id="settings-avatar"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-                aria-label="Seleccionar imagen de perfil"
-                disabled={loading || deletingAccount}
-              />
+                <label
+                  htmlFor="settings-avatar"
+                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-indigo-500 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 shadow-lg"
+                  aria-label="Cambiar imagen de perfil"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </label>
             </div>
 
             <p className="text-sm text-gray-600 mt-3">
@@ -842,29 +843,30 @@ export function MyProfile() {
             <div className="flex flex-col items-center">
               <div className="relative">
                 <div
+                  role="img"
                   className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
                   aria-label="Vista previa del avatar"
                 >
                   {avatarContent}
                 </div>
 
-                <label
-                  htmlFor="settings-avatar-desktop"
-                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
-                  aria-label="Cambiar imagen de perfil"
-                >
-                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                </label>
-
                 <input
                   id="settings-avatar-desktop"
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  className="hidden"
+                  className="peer sr-only"
                   aria-label="Seleccionar imagen de perfil"
                   disabled={loading || deletingAccount}
                 />
+
+                <label
+                   htmlFor="settings-avatar-desktop"
+                   className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-indigo-500 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 shadow-lg"
+                   aria-label="Cambiar imagen de perfil"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </label>
               </div>
 
               <p className="text-sm text-gray-600 mt-3">

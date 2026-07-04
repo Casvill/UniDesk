@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { User, Pencil, Loader2, CheckCircle, XCircle } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
@@ -71,6 +71,14 @@ function getCompleteProfileErrorMessage(error: unknown): string {
 export function GooglePage() {
   const navigate = useNavigate();
   const { user, status, completeProfile } = useAuth();
+  const descriptionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      descriptionRef.current?.focus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
@@ -244,6 +252,7 @@ export function GooglePage() {
         <div className="relative">
 
           <div
+            role="img"
             className="w-24 h-24 rounded-full bg-gray-100 border overflow-hidden flex items-center justify-center"
             aria-label="Vista previa del avatar"
           >
@@ -258,23 +267,23 @@ export function GooglePage() {
             )}
           </div>
 
-          <label
-            htmlFor="avatarInput"
-            className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700"
-            aria-label="Cambiar imagen de perfil"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-          </label>
-
           <input
             id="avatarInput"
             type="file"
             accept="image/*"
             onChange={handleAvatarChange}
-            className="hidden"
+            className="peer sr-only"
             aria-label="Seleccionar imagen de avatar"
             disabled={isSubmitting}
           />
+
+          <label
+            htmlFor="avatarInput"
+            className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-primary-500"
+            aria-label="Cambiar imagen de perfil"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
 
         </div>
       </div>
@@ -286,6 +295,13 @@ export function GooglePage() {
         aria-describedby="google-profile-status"
         noValidate
       >
+        <div
+          ref={descriptionRef}
+          tabIndex={-1}
+          className="sr-only outline-none"
+        >
+          Estás completando tu registro en UniDesk a través de Google. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para cargar o cambiar tu imagen de perfil. Segundo, un campo con tu Nombre Completo que ya está prellenado por Google y no es editable. Tercero, un campo obligatorio para ingresar tu nombre de usuario deseado. Y por último, el botón Completar Registro para guardar tus datos.
+        </div>
 
         {/* FULL NAME */}
         <div>
@@ -321,6 +337,7 @@ export function GooglePage() {
             aria-invalid={isUsernameError ? true : undefined}
             aria-describedby={isUsernameError ? "username-error" : undefined}
             autoComplete="username"
+            aria-required="true"
             disabled={isSubmitting}
           />
 
