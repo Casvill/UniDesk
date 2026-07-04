@@ -415,7 +415,7 @@ export function Register() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
+              <User className="h-10 w-10 text-gray-500" aria-hidden="true" />
             )}
           </div>
 
@@ -451,7 +451,7 @@ export function Register() {
           value={form.fullName}
           onChange={handleChange}
           placeholder="Ej: Juan Pérez"
-          className={`w-full px-4 py-3 border rounded-lg ${errors.fullName ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg placeholder-gray-500 ${errors.fullName ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.fullName)}
           aria-describedby={errors.fullName ? "fullName-error" : undefined}
           autoComplete="name"
@@ -491,7 +491,7 @@ export function Register() {
           }}
           onBlur={() => setUsernameTouched(true)}
           placeholder="Ej: estudiante_123"
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none ${showUsernameAsError ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${showUsernameAsError ? "border-red-400" : ""}`}
           aria-invalid={isUsernameError ? true : undefined}
           aria-describedby={isUsernameError ? "username-error" : undefined}
           autoComplete="username"
@@ -546,7 +546,7 @@ export function Register() {
           value={form.email}
           onChange={handleChange}
           placeholder="ejemplo@universidad.edu.co"
-          className={`w-full px-4 py-3 border rounded-lg ${errors.email ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg placeholder-gray-500 ${errors.email ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
@@ -584,7 +584,7 @@ export function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Mínimo 8 caracteres"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.password ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg placeholder-gray-500 ${errors.password ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.password)}
             aria-describedby={
               [
@@ -605,7 +605,7 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             disabled={isSubmitting}
           >
@@ -643,7 +643,7 @@ export function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             placeholder="Repite tu contraseña"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.confirmPassword ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg placeholder-gray-500 ${errors.confirmPassword ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={
               [
@@ -664,7 +664,7 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showConfirm ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
             disabled={isSubmitting}
           >

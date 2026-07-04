@@ -225,7 +225,7 @@ export function Login() {
 
         <div className="relative">
           <Mail
-            className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+            className="absolute left-3 top-3.5 h-5 w-5 text-gray-500"
             aria-hidden="true"
           />
 
@@ -238,7 +238,7 @@ export function Login() {
               clearFieldError("email");
             }}
             placeholder="ejemplo@universidad.edu.co"
-            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none ${
+            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-500 ${
               errors.email
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"
@@ -290,7 +290,7 @@ export function Login() {
 
         <div className="relative">
           <Lock
-            className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+            className="absolute left-3 top-3.5 h-5 w-5 text-gray-500"
             aria-hidden="true"
           />
 
@@ -303,7 +303,7 @@ export function Login() {
               clearFieldError("password");
             }}
             placeholder="Ingresa tu contraseña"
-            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none ${
+            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-500 ${
               errors.password
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"
@@ -318,7 +318,7 @@ export function Login() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             disabled={isSubmitting}
           >

@@ -1230,7 +1230,12 @@ export function ActiveRoom() {
     if (chat.unreadCount > prevUnreadRef.current && chat.chatMessages.length > 0) {
       const lastMsg = chat.chatMessages[chat.chatMessages.length - 1];
       const senderName = chat.getMessageUsername(lastMsg, participants, user, currentUsername);
-      setChatAnnouncement(`Nuevo mensaje de ${senderName}.`);
+      // Vaciar y reescribir para forzar que el aria-live anuncie el mensaje
+      setChatAnnouncement("");
+      const timer = window.setTimeout(() => {
+        setChatAnnouncement(`Nuevo mensaje de ${senderName}: ${lastMsg.text}`);
+      }, 50);
+      return () => window.clearTimeout(timer);
     } else if (chat.unreadCount === 0) {
       setChatAnnouncement("");
     }
@@ -1952,7 +1957,7 @@ export function ActiveRoom() {
                         {messageUsername}
                       </span>
 
-                      <span className="text-[11px] text-gray-500">
+                      <span className="text-[11px] text-gray-600">
                         {formatMessageTime(msg.createdAt)}
                       </span>
                     </div>
@@ -2541,7 +2546,7 @@ export function ActiveRoom() {
         {/* Mobile chat overlay (< lg) */}
         <div
           className={`fixed inset-0 z-50 flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:hidden ${
-            isChatOpen ? "pointer-events-auto" : "pointer-events-none invisible"
+            isChatOpen ? "pointer-events-auto" : "pointer-events-none invisible hidden"
           }`}
           aria-hidden={!isChatOpen}
         >
