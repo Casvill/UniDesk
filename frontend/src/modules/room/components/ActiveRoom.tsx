@@ -1533,23 +1533,22 @@ export function ActiveRoom() {
 
   const handleCameraClick = async () => {
     if (isScreenSharing) {
-      showToast.error(
-        "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara."
-      );
+      const msg = "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara.";
+      showToast.error(msg);
+      announce(msg);
       return;
     }
     if (isCameraBlocked) {
+      let errMsg = "";
       if (mediaPerms.video === "denied") {
-        showToast.error(
-          "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
-        );
+        errMsg = "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo.";
       } else if (mediaPerms.video === "unavailable") {
-        showToast.error("No se detectó ninguna cámara en este dispositivo.");
+        errMsg = "No se detectó ninguna cámara en este dispositivo.";
       } else {
-        showToast.error(
-          "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación."
-        );
+        errMsg = "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.";
       }
+      showToast.error(errMsg);
+      announce(errMsg);
       
       try {
         await retryMedia("video");
@@ -1557,30 +1556,31 @@ export function ActiveRoom() {
         if (videoTracks.length > 0) {
           setIsCameraOn(true);
           showToast.success("¡Cámara activada correctamente!");
+          announce("Cámara encendida.");
         }
       } catch (err) {
         console.warn("Reintento de cámara fallido:", err);
+        announce("Error al acceder a la cámara.");
       }
       return;
     }
     const nextCameraOn = !isCameraOn;
     setIsCameraOn(nextCameraOn);
-    announce(nextCameraOn ? "Encendiste tu cámara." : "Apagaste tu cámara.");
+    announce(nextCameraOn ? "Cámara encendida." : "Cámara apagada.");
   };
 
   const handleMicClick = async () => {
     if (isMicBlocked) {
+      let errMsg = "";
       if (mediaPerms.audio === "denied") {
-        showToast.error(
-          "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
-        );
+        errMsg = "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo.";
       } else if (mediaPerms.audio === "unavailable") {
-        showToast.error("No se detectó ningún micrófono en este dispositivo.");
+        errMsg = "No se detectó ningún micrófono en este dispositivo.";
       } else {
-        showToast.error(
-          "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación."
-        );
+        errMsg = "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.";
       }
+      showToast.error(errMsg);
+      announce(errMsg);
       
       try {
         await retryMedia("audio");
@@ -1588,19 +1588,17 @@ export function ActiveRoom() {
         if (audioTracks.length > 0) {
           setIsMicOn(true);
           showToast.success("¡Micrófono activado correctamente!");
+          announce("Micrófono activado.");
         }
       } catch (err) {
         console.warn("Reintento de micrófono fallido:", err);
+        announce("Error al acceder al micrófono.");
       }
       return;
     }
     const nextMicOn = !isMicOn;
     setIsMicOn(nextMicOn);
-    announce(
-      nextMicOn
-        ? "Activaste tu micrófono. Los demás participantes ya pueden escucharte."
-        : "Silenciaste tu micrófono. Los demás participantes ya no te escuchan."
-    );
+    announce(nextMicOn ? "Micrófono activado." : "Micrófono silenciado.");
   };
 
   const handleDeviceChange = async (kind: "audio" | "video", deviceId: string) => {
@@ -2157,7 +2155,7 @@ export function ActiveRoom() {
       </div>
 
       {/* Anunciador de eventos de la sala (micrófonos, cámaras, pantalla) */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
         {roomAnnouncement}
       </div>
 
@@ -2387,7 +2385,7 @@ export function ActiveRoom() {
           <div
             ref={tourStep(2)}
             role="group"
-            aria-label="Controles de la sala: encender o apagar cámara, silenciar o activar micrófono, compartir pantalla, abrir la configuración, mostrar el chat y salir de la sala."
+            aria-label="Controles de la sala"
             className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4 outline-none"
           >
             <div className="flex items-center justify-center gap-2 sm:gap-3">
@@ -2408,8 +2406,8 @@ export function ActiveRoom() {
                       ? "Cámara no disponible mientras compartes pantalla"
                       : "Cámara bloqueada por permisos del navegador. Presiona para reintentar"
                     : isCameraOn
-                      ? "Apagar cámara. Tu cámara está encendida"
-                      : "Encender cámara. Tu cámara está apagada"
+                      ? "Cámara encendida"
+                      : "Cámara apagada"
                 }
               >
                   {isCameraOn ? (
@@ -2439,8 +2437,8 @@ export function ActiveRoom() {
                   isMicBlocked
                     ? "Micrófono bloqueado por permisos del navegador. Presiona para reintentar"
                     : isMicOn
-                      ? "Silenciar micrófono. Tu micrófono está activado"
-                      : "Activar micrófono. Tu micrófono está silenciado"
+                      ? "Micrófono activado"
+                      : "Micrófono silenciado"
                 }
               >
                   {isMicOn ? (
@@ -2461,16 +2459,14 @@ export function ActiveRoom() {
                 onClick={async () => {
                   if (isScreenSharing) {
                     await stopScreenCapture();
-                    announce("Dejaste de compartir pantalla.");
+                    announce("Se dejó de compartir pantalla.");
                   } else {
                     try {
                       await startScreenCapture();
-                      announce(
-                        "Comenzaste a compartir tu pantalla. Los demás participantes ya pueden verla."
-                      );
+                      announce("Compartiendo pantalla.");
                     } catch (err) {
                       console.warn("Screen capture cancelled or failed", err);
-                      announce("No se inició la compartición de pantalla.");
+                      announce("Error al compartir pantalla.");
                     }
                   }
                 }}
@@ -2481,8 +2477,8 @@ export function ActiveRoom() {
                 }`}
                 aria-label={
                   isScreenSharing
-                    ? "Dejar de compartir pantalla. Estás compartiendo tu pantalla"
-                    : "Compartir pantalla. No estás compartiendo pantalla"
+                    ? "Compartiendo pantalla"
+                    : "Compartir pantalla apagado"
                 }
               >
                 {isScreenSharing ? (
