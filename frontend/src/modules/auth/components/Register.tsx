@@ -145,6 +145,10 @@ export function Register() {
   const { register, loginWithGoogle } = useAuth();
   const tourStep = useAutoTour();
 
+  useEffect(() => {
+    document.title = "Crear cuenta | UniDesk";
+  }, []);
+
   const [form, setForm] = useState<FormState>({
     fullName: "",
     username: "",
@@ -451,7 +455,7 @@ export function Register() {
           value={form.fullName}
           onChange={handleChange}
           placeholder="Ej: Juan Pérez"
-          className={`w-full px-4 py-3 border rounded-lg placeholder-gray-500 ${errors.fullName ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.fullName ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.fullName)}
           aria-describedby={errors.fullName ? "fullName-error" : undefined}
           autoComplete="name"
@@ -492,9 +496,9 @@ export function Register() {
           onBlur={() => setUsernameTouched(true)}
           placeholder="Ej: estudiante_123"
           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${showUsernameAsError ? "border-red-400" : ""}`}
+          autoComplete="new-password"
           aria-invalid={isUsernameError ? true : undefined}
           aria-describedby={isUsernameError ? "username-error" : undefined}
-          autoComplete="username"
           aria-required="true"
           disabled={isSubmitting}
         />
@@ -516,6 +520,8 @@ export function Register() {
                   <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                 ) : usernameAvailable === true ? (
                   <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : checkingUsername ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" aria-hidden="true" />
                 ) : null}
 
                 {usernameMessage}
@@ -546,7 +552,7 @@ export function Register() {
           value={form.email}
           onChange={handleChange}
           placeholder="ejemplo@universidad.edu.co"
-          className={`w-full px-4 py-3 border rounded-lg placeholder-gray-500 ${errors.email ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.email ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
@@ -584,7 +590,7 @@ export function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Mínimo 8 caracteres"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg placeholder-gray-500 ${errors.password ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.password ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.password)}
             aria-describedby={
               [
@@ -605,11 +611,11 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             disabled={isSubmitting}
           >
-            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
@@ -643,7 +649,7 @@ export function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             placeholder="Repite tu contraseña"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg placeholder-gray-500 ${errors.confirmPassword ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.confirmPassword ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={
               [
@@ -664,11 +670,11 @@ export function Register() {
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showConfirm ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
             disabled={isSubmitting}
           >
-            {showConfirm ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showConfirm ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
