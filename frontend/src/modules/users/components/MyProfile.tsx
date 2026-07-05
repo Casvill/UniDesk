@@ -621,7 +621,7 @@ export function MyProfile() {
                 showUsernameMessageAsError
                   ? "text-red-500"
                   : usernameAvailable === true
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-gray-500"
               }`}
             >
@@ -683,7 +683,7 @@ export function MyProfile() {
                 showEmailAsError
                   ? "text-red-500"
                   : emailAvailable === true || isEmailUnchanged
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-gray-500"
               }`}
             >
