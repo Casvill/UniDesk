@@ -195,7 +195,7 @@ export function Login() {
   };
 
   return (
-    <>
+    <main>
       <div ref={tourStep(0)} className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Bienvenido de nuevo
@@ -413,6 +413,6 @@ export function Login() {
       </p>
 
     </form>
-    </>
+    </main>
   );
 }
