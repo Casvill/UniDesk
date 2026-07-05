@@ -25,6 +25,8 @@ GEMINI.md/
 ./GEMINI.md
 ./GEMINI.md/
 AGENTS.md
+CLAUDE.md
+.claude/
 
 # Next.js build/cache
 frontend/.next/

@@ -215,6 +215,7 @@ export function CreateRoomDialog({
   };
 
   const inputDescriptionIds = [
+    "room-name-requirements",
     isEditMode ? currentRoomNameId : null,
     showRoomNameError ? "room-name-error" : null,
     roomError ? "room-error" : null,
@@ -281,6 +282,11 @@ export function CreateRoomDialog({
             </Tooltip>
           </div>
 
+          <p id="room-name-requirements" className="sr-only">
+            El nombre debe tener entre 3 y 35 caracteres. Puedes usar letras,
+            números, espacios, tildes, guiones o puntos.
+          </p>
+
           <input
             type="text"
             id={inputId}
@@ -294,7 +300,6 @@ export function CreateRoomDialog({
             maxLength={ROOM_NAME_MAX_LENGTH}
             disabled={isSaving}
             aria-invalid={Boolean(showRoomNameError || roomError)}
-            aria-label={isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
             aria-describedby={inputDescriptionIds}
             className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
               showRoomNameError || roomError

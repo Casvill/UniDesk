@@ -152,7 +152,7 @@ export function RoomCard({
               </div>
 
               {formattedDate && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-gray-400">
+                <div className="mt-1 flex items-center gap-1 text-xs text-gray-600">
                   <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="text-[15px]">{formattedDate}</span>
                 </div>
@@ -190,7 +190,7 @@ export function RoomCard({
           <div>
             <div className="h-full flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-medium tracking-widest text-gray-400 uppercase mb-0.5">
+                <p className="text-[10px] font-medium tracking-widest text-gray-600 uppercase mb-0.5">
                   ID de sala
                 </p>
 
