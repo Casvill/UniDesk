@@ -74,6 +74,10 @@ export function GooglePage() {
   const { user, status, completeProfile } = useAuth();
   const tourStep = useAutoTour({ enabled: status === "needs-profile" });
 
+  useEffect(() => {
+    document.title = "Completar perfil - UniDesk";
+  }, []);
+
   const [username, setUsername] = useState("");
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -353,6 +357,8 @@ export function GooglePage() {
                 <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
               ) : usernameAvailable === true ? (
                 <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : checkingUsername ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" aria-hidden="true" />
               ) : null}
 
               {usernameMessage}
