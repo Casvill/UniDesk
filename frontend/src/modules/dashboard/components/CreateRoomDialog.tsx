@@ -268,7 +268,7 @@ export function CreateRoomDialog({
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-full p-1.5 text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
                   aria-label="Requisitos del nombre de la sala"
                 >
                   <Info className="h-4 w-4" aria-hidden="true" />
@@ -324,6 +324,7 @@ export function CreateRoomDialog({
 
             <span
               className="text-xs text-gray-500"
+              aria-live="polite"
               aria-label={`${roomName.trim().length} de ${ROOM_NAME_MAX_LENGTH} caracteres usados`}
             >
               {roomName.trim().length}/{ROOM_NAME_MAX_LENGTH}
