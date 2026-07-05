@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
@@ -33,11 +33,11 @@ async function getManualLoginErrorMessage(
             return "Credenciales incorrectas. Verifica tu correo o contraseña e inténtalo nuevamente.";
           }
 
-          return "No pudimos iniciar sesión con correo y contraseña. Si creaste tu cuenta con Google, usa el botón Continuar con Google; si fue registro manual, verifica tus credenciales.";
+          return "No pudimos iniciar sesión. Verifica tus credenciales o usa Google.";
         } catch (providerError) {
           console.warn("No se pudieron consultar los métodos de inicio:", providerError);
 
-          return "No pudimos iniciar sesión con correo y contraseña. Si creaste tu cuenta con Google, usa el botón Continuar con Google; si fue registro manual, verifica tus credenciales.";
+          return "No pudimos iniciar sesión. Verifica tus credenciales e inténtalo de nuevo.";
         }
       }
 
@@ -95,6 +95,10 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    document.title = "Iniciar sesión | UniDesk";
+  }, []);
 
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -196,7 +200,7 @@ export function Login() {
 
   return (
     <main>
-      <div ref={tourStep(0)} className="text-center mb-6 outline-none">
+      <div className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Bienvenido de nuevo
         </h1>
@@ -207,7 +211,7 @@ export function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div
-          ref={tourStep(1)}
+          ref={tourStep(0)}
           tabIndex={-1}
           className="sr-only outline-none"
         >
@@ -318,11 +322,11 @@ export function Login() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             disabled={isSubmitting}
           >
-            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
@@ -351,7 +355,7 @@ export function Login() {
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            className="rounded border-primary-500"
+            className="rounded border-primary-500 accent-primary"
             disabled={isSubmitting}
           />
           Mantener mi sesión iniciada
