@@ -12,7 +12,6 @@ import {
 import type { ToastProps } from "react-aria-components";
 import { XIcon, Loader2 } from "lucide-react";
 import { cn } from "./utils";
-import { flushSync } from "react-dom";
 import type { CSSProperties } from "react";
 
 export type ToastType = "success" | "error" | "info" | "warning" | "loading";
@@ -63,15 +62,6 @@ function getAriaLabel(type: ToastType, title?: string, description?: string): st
 
 const queue = new ToastQueue<ToastData>({
   maxVisibleToasts: 5,
-  wrapUpdate(fn) {
-    if ("startViewTransition" in document) {
-      document.startViewTransition(() => {
-        flushSync(fn);
-      });
-    } else {
-      fn();
-    }
-  },
 });
 
 export const showToast = {

@@ -451,7 +451,7 @@ export function ActiveRoom() {
         </div>
         <div className="absolute right-3 top-3 flex gap-1.5">
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold shadow-lg ${
               camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
             }`}
             aria-label={camOn ? (p.screenSharing ? "Compartiendo pantalla" : "Cámara encendida") : "Cámara apagada"}
@@ -459,18 +459,18 @@ export function ActiveRoom() {
             {camOn ? (
               p.screenSharing ? (
                 <>
-                  <MonitorPlay className="h-3.5 w-3.5" aria-hidden="true" />
+                  <MonitorPlay className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Compartiendo pantalla</span>
                 </>
               ) : (
-                <Video className="h-3.5 w-3.5" aria-hidden="true" />
+                <Video className="h-4 w-4" aria-hidden="true" />
               )
             ) : (
-              <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+              <VideoOff className="h-4 w-4" aria-hidden="true" />
             )}
           </span>
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg transition-all duration-300 ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold shadow-lg transition-all duration-300 ${
               p.isSpeaking 
                 ? "bg-green-500 text-white animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" 
                 : micOn 
@@ -486,9 +486,9 @@ export function ActiveRoom() {
             }
           >
             {micOn ? (
-              <Mic className={`h-3.5 w-3.5 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
+              <Mic className={`h-4 w-4 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
             ) : (
-              <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
+              <MicOff className="h-4 w-4" aria-hidden="true" />
             )}
           </span>
         </div>
@@ -563,15 +563,46 @@ export function ActiveRoom() {
 
   // Al abrir el modal de configuración, mover el foco al diálogo para que el
   // lector de pantalla anuncie su título; al cerrarlo, devolverlo al botón.
+  // Además, implementa focus trapping (AR-18) para que Tab no salga del modal.
   useEffect(() => {
     if (!isSettingsOpen) return;
 
+    const dialog = settingsDialogRef.current;
+    if (!dialog) return;
+
     const timer = setTimeout(() => {
-      settingsDialogRef.current?.focus();
+      dialog.focus();
     }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+
+      const focusableSelectors =
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const focusableElements = dialog.querySelectorAll<HTMLElement>(focusableSelectors);
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (!firstElement || !lastElement) return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       clearTimeout(timer);
+      document.removeEventListener("keydown", handleKeyDown);
       settingsButtonRef.current?.focus();
     };
   }, [isSettingsOpen]);
@@ -614,6 +645,14 @@ export function ActiveRoom() {
 
     void loadRoom();
   }, [roomId, user]);
+
+  // AR-1: Establecer título de página con el nombre de la sala
+  useEffect(() => {
+    document.title = room ? `Sala: ${room.name} | UniDesk` : "Sala | UniDesk";
+    return () => {
+      document.title = "UniDesk";
+    };
+  }, [room]);
 
   useEffect(() => {
     if (!roomId || !user || !room) return;
@@ -1233,7 +1272,7 @@ export function ActiveRoom() {
       // Vaciar y reescribir para forzar que el aria-live anuncie el mensaje
       setChatAnnouncement("");
       const timer = window.setTimeout(() => {
-        setChatAnnouncement(`Nuevo mensaje de ${senderName}: ${lastMsg.text}`);
+        setChatAnnouncement(`Nuevo mensaje de ${senderName}: ${lastMsg.message}`);
       }, 50);
       return () => window.clearTimeout(timer);
     } else if (chat.unreadCount === 0) {
@@ -1618,6 +1657,7 @@ export function ActiveRoom() {
         await retryMedia("video", deviceId);
       }
     }
+    showToast.success(`Dispositivo de ${kind === "video" ? "video" : "audio"} cambiado`);
   };
 
   const handleSpeakerChange = (deviceId: string) => {
@@ -1629,6 +1669,7 @@ export function ActiveRoom() {
         );
       }
     });
+    showToast.success("Dispositivo de salida de audio cambiado");
   };
 
   const playTestSound = () => {
