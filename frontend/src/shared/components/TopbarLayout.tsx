@@ -122,6 +122,12 @@ export function TopbarLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <a
+        href="#contenido-principal"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-700 focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+      >
+        Saltar al contenido principal
+      </a>
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-7">
           <div className="h-12 flex items-center justify-between">
@@ -278,7 +284,8 @@ export function TopbarLayout() {
 
       <main
         id="contenido-principal"
-        className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+        tabIndex={-1}
+        className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 outline-none"
         aria-label="Contenido principal"
       >
         <Outlet />
