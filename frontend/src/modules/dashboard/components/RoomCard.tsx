@@ -142,7 +142,7 @@ export function RoomCard({
                       setIsEditDialogOpen(true);
                     }}
                     tabIndex={isVisible ? undefined : -1}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 transition hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
                     aria-label={`Editar nombre de la sala ${room.name}`}
                     title="Editar nombre"
                   >
@@ -167,7 +167,7 @@ export function RoomCard({
                   setIsDeleteDialogOpen(true);
                 }}
                 tabIndex={isVisible ? undefined : -1}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 cursor-pointer"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 cursor-pointer"
                 aria-label={`Eliminar sala ${room.name}`}
                 title="Eliminar sala"
               >

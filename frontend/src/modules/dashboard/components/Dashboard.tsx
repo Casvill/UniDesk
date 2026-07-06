@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAutoTour } from "@/hooks/useAutoTour";
@@ -16,6 +16,10 @@ export function Dashboard() {
   const { activeRooms, isLoadingRooms, roomsError, refetchRooms } =
     useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
+
+  useEffect(() => {
+    document.title = "Principal | UniDesk";
+  }, []);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
 

@@ -147,6 +147,11 @@ export function MyProfile() {
   const { user, profile, updateProfileData, deleteAccount } = useAuth();
   const tourStep = useAutoTour();
 
+  useEffect(() => {
+    document.title = "Mi Perfil - UniDesk";
+    return () => { document.title = "UniDesk"; };
+  }, []);
+
   const [form, setForm] = useState<ProfileForm>({
     displayName: "",
     username: "",

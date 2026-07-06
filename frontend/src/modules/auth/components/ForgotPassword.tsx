@@ -83,7 +83,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                 aria-required="true"
                 autoComplete="email"
                 placeholder="ejemplo@universidad.edu.co"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition placeholder-gray-500"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition placeholder-gray-600"
               />
             </div>
           </div>

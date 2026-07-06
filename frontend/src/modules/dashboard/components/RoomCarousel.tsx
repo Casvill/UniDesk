@@ -224,7 +224,7 @@ export function RoomCarousel({
               key={i}
               type="button"
               onClick={() => setPage(i)}
-              className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+              className={`w-4 h-4 p-1 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                 i === page
                   ? "bg-primary-600 w-6"
                   : "bg-gray-300 hover:bg-gray-400"
