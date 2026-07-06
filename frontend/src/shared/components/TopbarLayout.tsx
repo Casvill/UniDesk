@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
@@ -40,6 +40,19 @@ export function TopbarLayout() {
   const logoRef = useRef<HTMLButtonElement>(null);
 
   const username = profile?.username || "usuario";
+
+  const logoLabel = useMemo(() => {
+    if (pathname === "/dashboard") {
+      return "Logo de UniDesk. Actualmente estás en el Dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas.";
+    }
+    if (pathname === "/my-profile") {
+      return "Logo de UniDesk. Ir al Dashboard. Actualmente estás en Mi Perfil.";
+    }
+    if (pathname.startsWith("/rooms/")) {
+      return "Logo de UniDesk. Ir al Dashboard. Actualmente estás en una sala de estudio.";
+    }
+    return "Logo de UniDesk. Ir al Dashboard.";
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname === "/dashboard") {
@@ -221,8 +234,8 @@ export function TopbarLayout() {
                   ref={logoRef}
                   type="button"
                   onClick={() => navigate("/dashboard")}
-                  className="cursor-pointer rounded-lg outline-none"
-                  aria-label="Logo de UniDesk. Actualmente estás en UniDesk, en la página principal del dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas."
+                  className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  aria-label={logoLabel}
                 >
                   <img
                     src={logo}
