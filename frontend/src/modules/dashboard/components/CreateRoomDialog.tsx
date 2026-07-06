@@ -215,6 +215,7 @@ export function CreateRoomDialog({
   };
 
   const inputDescriptionIds = [
+    "room-name-requirements",
     isEditMode ? currentRoomNameId : null,
     showRoomNameError ? "room-name-error" : null,
     roomError ? "room-error" : null,
@@ -267,7 +268,7 @@ export function CreateRoomDialog({
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-full p-1.5 text-gray-400 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
                   aria-label="Requisitos del nombre de la sala"
                 >
                   <Info className="h-4 w-4" aria-hidden="true" />
@@ -280,6 +281,11 @@ export function CreateRoomDialog({
               </TooltipContent>
             </Tooltip>
           </div>
+
+          <p id="room-name-requirements" className="sr-only">
+            El nombre debe tener entre 3 y 35 caracteres. Puedes usar letras,
+            números, espacios, tildes, guiones o puntos.
+          </p>
 
           <input
             type="text"
@@ -294,7 +300,6 @@ export function CreateRoomDialog({
             maxLength={ROOM_NAME_MAX_LENGTH}
             disabled={isSaving}
             aria-invalid={Boolean(showRoomNameError || roomError)}
-            aria-label={isEditMode ? "Nuevo nombre de la sala" : "Nombre de la sala"}
             aria-describedby={inputDescriptionIds}
             className={`w-full px-4 py-3 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed ${
               showRoomNameError || roomError
@@ -319,6 +324,7 @@ export function CreateRoomDialog({
 
             <span
               className="text-xs text-gray-500"
+              aria-live="polite"
               aria-label={`${roomName.trim().length} de ${ROOM_NAME_MAX_LENGTH} caracteres usados`}
             >
               {roomName.trim().length}/{ROOM_NAME_MAX_LENGTH}

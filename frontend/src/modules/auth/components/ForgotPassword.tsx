@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCardTransition } from "@/context/CardTransitionContext";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 interface ForgotPasswordProps {
   onSubmit: () => Promise<void> | void;
@@ -10,6 +11,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
   const { navigateWithTransition } = useCardTransition();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const tourStep = useAutoTour();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,14 +29,22 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
   };
 
   return (
-    <>
-      <div className="text-center mb-6">
+    <main>
+      <div ref={tourStep(0)} className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Recuperar contraseña
         </h1>
         <p className="text-muted-foreground">
           Ingresa el correo asociado a tu cuenta y te enviaremos las instrucciones.
         </p>
+      </div>
+
+      <div
+        ref={tourStep(1)}
+        tabIndex={-1}
+        className="sr-only outline-none"
+      >
+        Estás en la pantalla de recuperación de contraseña de UniDesk. El formulario contiene, en orden de tabulación: Primero, un campo obligatorio para ingresar tu Correo Electrónico. Segundo, el botón Enviar enlace de recuperación. Y por último, un botón para volver al inicio de sesión.
       </div>
 
       {/* ANNOUNCER GLOBAL (CLAVE PARA VOICEOVER) */}
@@ -62,7 +72,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
 
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                <Mail className="h-5 w-5 text-gray-500" aria-hidden="true" />
               </div>
 
               <input
@@ -71,8 +81,9 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
                 name="email"
                 required
                 aria-required="true"
+                autoComplete="email"
                 placeholder="ejemplo@universidad.edu.co"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition placeholder-gray-600"
               />
             </div>
           </div>
@@ -143,6 +154,7 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
           <p className="text-center text-sm text-gray-600">
             ¿No recibiste el correo?{" "}
             <button
+              type="button"
               onClick={() => setSubmitted(false)}
               className="font-semibold text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-1"
             >
@@ -152,6 +164,6 @@ export function Forgot({ onSubmit }: ForgotPasswordProps) {
 
         </div>
       )}
-    </>
+    </main>
   );
 }

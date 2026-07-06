@@ -6,6 +6,7 @@ import { useCardTransition } from "@/context/CardTransitionContext";
 import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 type FormState = {
   fullName: string;
@@ -142,6 +143,11 @@ export function Register() {
   const navigate = useNavigate();
   const { navigateWithTransition } = useCardTransition();
   const { register, loginWithGoogle } = useAuth();
+  const tourStep = useAutoTour();
+
+  useEffect(() => {
+    document.title = "Crear cuenta | UniDesk";
+  }, []);
 
   const [form, setForm] = useState<FormState>({
     fullName: "",
@@ -369,8 +375,8 @@ export function Register() {
   const showUsernameAsError = usernameAvailable === false || isUsernameError;
 
   return (
-    <>
-      <div className="text-center mb-6">
+    <main>
+      <div ref={tourStep(0)} className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Crea tu cuenta
         </h1>
@@ -385,12 +391,20 @@ export function Register() {
         aria-describedby="form-status"
         noValidate
       >
+        <div
+          ref={tourStep(1)}
+          tabIndex={-1}
+          className="sr-only outline-none"
+        >
+          Estás en la pantalla de registro de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para subir tu imagen de perfil. Segundo, un campo de texto obligatorio para tu Nombre Completo. Tercero, un campo de texto obligatorio para tu Nombre de Usuario deseado. Cuarto, un campo de correo institucional o personal obligatorio. Quinto, un campo para ingresar tu contraseña de mínimo 8 caracteres. Sexto, un botón para alternar la visibilidad de la contraseña. Séptimo, un campo para confirmar tu contraseña. Octavo, un botón para alternar la visibilidad de la confirmación. Noveno, el botón Crear Cuenta. Décimo, el botón para Continuar con Google. Y por último, un enlace para ir a iniciar sesión.
+        </div>
 
       {/* AVATAR */}
       <div className="flex flex-col items-center mb-6">
         <div className="relative">
 
           <div
+            role="img"
             className="w-24 h-24 rounded-full bg-gray-100 border flex items-center justify-center overflow-hidden"
             aria-label={
               avatarPreview
@@ -401,31 +415,31 @@ export function Register() {
             {avatarPreview ? (
               <img
                 src={avatarPreview}
-                alt="Vista previa del avatar"
+                alt=""
                 className="w-full h-full object-cover"
               />
             ) : (
-              <User className="h-10 w-10 text-gray-400" aria-hidden="true" />
+              <User className="h-10 w-10 text-gray-500" aria-hidden="true" />
             )}
           </div>
-
-          <label
-            htmlFor="avatar"
-            className="absolute bottom-0 right-0 bg-primary-600 p-2 rounded-full text-white cursor-pointer"
-            aria-label="Subir imagen de perfil"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-          </label>
 
           <input
             id="avatar"
             type="file"
-            hidden
+            className="peer sr-only"
             accept="image/*"
             onChange={handleAvatarChange}
             aria-label="Seleccionar imagen de perfil"
             disabled={isSubmitting}
           />
+
+          <label
+            htmlFor="avatar"
+            className="absolute bottom-0 right-0 bg-primary-600 p-2 rounded-full text-white cursor-pointer transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-primary-500"
+            aria-label="Subir imagen de perfil"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </label>
         </div>
       </div>
 
@@ -441,10 +455,11 @@ export function Register() {
           value={form.fullName}
           onChange={handleChange}
           placeholder="Ej: Juan Pérez"
-          className={`w-full px-4 py-3 border rounded-lg ${errors.fullName ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.fullName ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.fullName)}
           aria-describedby={errors.fullName ? "fullName-error" : undefined}
           autoComplete="name"
+          aria-required="true"
           disabled={isSubmitting}
         />
 
@@ -480,10 +495,11 @@ export function Register() {
           }}
           onBlur={() => setUsernameTouched(true)}
           placeholder="Ej: estudiante_123"
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none ${showUsernameAsError ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${showUsernameAsError ? "border-red-400" : ""}`}
+          autoComplete="new-password"
           aria-invalid={isUsernameError ? true : undefined}
           aria-describedby={isUsernameError ? "username-error" : undefined}
-          autoComplete="username"
+          aria-required="true"
           disabled={isSubmitting}
         />
 
@@ -504,6 +520,8 @@ export function Register() {
                   <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                 ) : usernameAvailable === true ? (
                   <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                ) : checkingUsername ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" aria-hidden="true" />
                 ) : null}
 
                 {usernameMessage}
@@ -534,10 +552,11 @@ export function Register() {
           value={form.email}
           onChange={handleChange}
           placeholder="ejemplo@universidad.edu.co"
-          className={`w-full px-4 py-3 border rounded-lg ${errors.email ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.email ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
+          aria-required="true"
           disabled={isSubmitting}
         />
 
@@ -571,21 +590,32 @@ export function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Mínimo 8 caracteres"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.password ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.password ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.password)}
-            aria-describedby={errors.password ? "password-error" : undefined}
+            aria-describedby={
+              [
+                errors.password ? "password-error" : null,
+                "password-requirement-help"
+              ]
+                .filter(Boolean)
+                .join(" ")
+            }
             autoComplete="new-password"
+            aria-required="true"
             disabled={isSubmitting}
           />
+          <p id="password-requirement-help" className="sr-only">
+            La contraseña debe tener un mínimo de 8 caracteres.
+          </p>
 
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            tabIndex={-1}
+            disabled={isSubmitting}
           >
-            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
@@ -619,21 +649,32 @@ export function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             placeholder="Repite tu contraseña"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg ${errors.confirmPassword ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.confirmPassword ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.confirmPassword)}
-            aria-describedby={errors.confirmPassword ? "confirm-error" : undefined}
+            aria-describedby={
+              [
+                errors.confirmPassword ? "confirm-error" : null,
+                "confirm-password-help"
+              ]
+                .filter(Boolean)
+                .join(" ")
+            }
             autoComplete="new-password"
+            aria-required="true"
             disabled={isSubmitting}
           />
+          <p id="confirm-password-help" className="sr-only">
+            Repite la misma contraseña para confirmarla.
+          </p>
 
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-            aria-label={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
-            tabIndex={-1}
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+            aria-label={showConfirm ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
+            disabled={isSubmitting}
           >
-            {showConfirm ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showConfirm ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
@@ -670,8 +711,6 @@ export function Register() {
           type="submit"
           disabled={isSubmitting}
           aria-busy={loading}
-          aria-disabled={isSubmitting}
-          aria-label={loading ? "Creando cuenta, por favor espera" : "Crear cuenta"}
           className="w-full bg-primary-600 text-white py-3 rounded-lg flex justify-center gap-2 cursor-pointer"
         >
           {loading && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
@@ -684,12 +723,6 @@ export function Register() {
           onClick={handleGoogleLogin}
           disabled={isSubmitting}
           aria-busy={googleLoading}
-          aria-disabled={isSubmitting}
-          aria-label={
-            googleLoading
-              ? "Procesando registro con Google, por favor espera"
-              : "Continuar con Google"
-          }
           className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
         >
           {googleLoading ? (
@@ -722,6 +755,6 @@ export function Register() {
       </p>
 
     </form>
-    </>
+    </main>
   );
 }

@@ -1,19 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import {
-  UNSTABLE_ToastRegion as ToastRegion,
   UNSTABLE_Toast as Toast,
   UNSTABLE_ToastQueue as ToastQueue,
   UNSTABLE_ToastContent as ToastContent,
+  UNSTABLE_ToastStateContext,
   Button,
   Text,
 } from "react-aria-components";
 import type { ToastProps } from "react-aria-components";
 import { XIcon, Loader2 } from "lucide-react";
 import { cn } from "./utils";
-import { flushSync } from "react-dom";
 import type { CSSProperties } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 export type ToastType = "success" | "error" | "info" | "warning" | "loading";
 
@@ -63,15 +63,6 @@ function getAriaLabel(type: ToastType, title?: string, description?: string): st
 
 const queue = new ToastQueue<ToastData>({
   maxVisibleToasts: 5,
-  wrapUpdate(fn) {
-    if ("startViewTransition" in document) {
-      document.startViewTransition(() => {
-        flushSync(fn);
-      });
-    } else {
-      fn();
-    }
-  },
 });
 
 export const showToast = {
@@ -116,14 +107,42 @@ export const showToast = {
 };
 
 export function AppToastRegion() {
+  const visibleToasts = useSyncExternalStore(
+    (cb) => queue.subscribe(cb),
+    () => queue.visibleToasts,
+    () => queue.visibleToasts,
+  );
+
+  const state = React.useMemo(() => ({
+    visibleToasts,
+    add: (content: ToastData, options?: any) => queue.add(content, options),
+    close: (key: string) => queue.close(key),
+    pauseAll: () => queue.pauseAll(),
+    resumeAll: () => queue.resumeAll(),
+  }), [visibleToasts]);
+
   return (
-    <ToastRegion
-      queue={queue}
-      aria-label="Notificaciones del sistema"
-      className="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2 outline-none"
-    >
-      {({ toast }) => <ToastItem toast={toast} />}
-    </ToastRegion>
+    <UNSTABLE_ToastStateContext.Provider value={state}>
+      <div
+        role="region"
+        aria-label="Notificaciones del sistema"
+        className="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2 outline-none"
+      >
+        <AnimatePresence>
+          {visibleToasts.map((toast) => (
+            <motion.div
+              key={toast.key}
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              <ToastItem toast={toast} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </UNSTABLE_ToastStateContext.Provider>
   );
 }
 

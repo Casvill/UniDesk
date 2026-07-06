@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAutoTour } from "@/hooks/useAutoTour";
 import { useRooms } from "../hooks/useRooms";
 import { useFloatingAnimation } from "../hooks/useFloatingAnimation";
 import { RoomCarousel } from "./RoomCarousel";
@@ -15,8 +16,19 @@ export function Dashboard() {
   const { activeRooms, isLoadingRooms, roomsError, refetchRooms } =
     useRooms(user);
   const { animNames, animDurs } = useFloatingAnimation();
+
+  useEffect(() => {
+    document.title = "Principal | UniDesk";
+  }, []);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+
+  // El TopbarLayout autoenfoca el logo con su anuncio al llegar al dashboard;
+  // el recorrido espera a que ese anuncio termine antes de continuar.
+  const tourStep = useAutoTour({
+    enabled: !isLoadingRooms,
+    initialDelayMs: 12000,
+  });
 
   const handleRoomUpdated = (_updatedRoom: Room) => {
     void refetchRooms();
@@ -42,10 +54,10 @@ export function Dashboard() {
     <section aria-labelledby="dashboard-title" aria-busy={isLoadingRooms}>
       <header className="mb-8">
         <div
-          tabIndex={0}
+          ref={tourStep(0)}
           role="group"
           aria-label={`Sección Dashboard de UniDesk. ${dashboardStateDescription}`}
-          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 rounded-lg"
+          className="rounded-lg outline-none"
         >
           <h1
             id="dashboard-title"
@@ -60,7 +72,12 @@ export function Dashboard() {
           </p>
         </div>
 
-        <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+        <div
+          ref={tourStep(1)}
+          role="group"
+          aria-label="Acciones del dashboard: crear una nueva sala de estudio o unirse a una sala existente con su código."
+          className="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:items-center outline-none"
+        >
           {activeRooms.length > 0 && (
             <button
               type="button"
@@ -98,10 +115,9 @@ export function Dashboard() {
           role="alert"
         >
           <div
-            tabIndex={0}
             role="group"
             aria-label="Estado de error. No pudimos cargar tus salas."
-            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 rounded-lg"
+            className="rounded-lg"
           >
             <h2 className="text-red-600 font-semibold">
               No pudimos cargar tus salas
@@ -149,19 +165,33 @@ export function Dashboard() {
           <p className="text-gray-500 mt-4">Cargando tus salas...</p>
         </section>
       ) : !isLoadingRooms && activeRooms.length === 0 ? (
-        <EmptyRoomsState
-          onCreateRoom={() => setShowCreateDialog(true)}
-          onJoinRoom={() => setShowJoinDialog(true)}
-          animName={animNames[0]}
-          animDur={animDurs[0]}
-        />
+        <div
+          ref={tourStep(2)}
+          role="group"
+          aria-label="Todavía no has creado ninguna sala de estudio. Usa el botón Crear mi primera sala para comenzar, o únete a una sala existente con su código."
+          className="outline-none"
+        >
+          <EmptyRoomsState
+            onCreateRoom={() => setShowCreateDialog(true)}
+            onJoinRoom={() => setShowJoinDialog(true)}
+            animName={animNames[0]}
+            animDur={animDurs[0]}
+          />
+        </div>
       ) : (
-        <RoomCarousel
-          rooms={activeRooms}
-          user={user}
-          onRoomUpdated={handleRoomUpdated}
-          onRoomDeleted={handleRoomDeleted}
-        />
+        <div
+          ref={tourStep(2)}
+          role="group"
+          aria-label={`Listado de tus salas de estudio. ${dashboardStateDescription} Dentro de cada sala puedes copiar su ID, entrar, editar su nombre o eliminarla.`}
+          className="outline-none"
+        >
+          <RoomCarousel
+            rooms={activeRooms}
+            user={user}
+            onRoomUpdated={handleRoomUpdated}
+            onRoomDeleted={handleRoomDeleted}
+          />
+        </div>
       )}
 
       <CreateRoomDialog

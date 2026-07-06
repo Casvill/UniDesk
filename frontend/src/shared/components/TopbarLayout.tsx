@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, UserPen, LogOut, Menu, ChevronDown } from "lucide-react";
 import logo from "@/assets/logo/unified-logo-light.svg";
@@ -40,6 +40,19 @@ export function TopbarLayout() {
   const logoRef = useRef<HTMLButtonElement>(null);
 
   const username = profile?.username || "usuario";
+
+  const logoLabel = useMemo(() => {
+    if (pathname === "/dashboard") {
+      return "Logo de UniDesk. Actualmente estás en el Dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas.";
+    }
+    if (pathname === "/my-profile") {
+      return "Logo de UniDesk. Ir al Dashboard. Actualmente estás en Mi Perfil.";
+    }
+    if (pathname.startsWith("/rooms/")) {
+      return "Logo de UniDesk. Ir al Dashboard. Actualmente estás en una sala de estudio.";
+    }
+    return "Logo de UniDesk. Ir al Dashboard.";
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname === "/dashboard") {
@@ -109,6 +122,12 @@ export function TopbarLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <a
+        href="#contenido-principal"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-700 focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+      >
+        Saltar al contenido principal
+      </a>
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-7">
           <div className="h-12 flex items-center justify-between">
@@ -221,8 +240,8 @@ export function TopbarLayout() {
                   ref={logoRef}
                   type="button"
                   onClick={() => navigate("/dashboard")}
-                  className="cursor-pointer rounded-lg outline-none"
-                  aria-label="Logo de UniDesk. Actualmente estás en UniDesk, en la página principal del dashboard. Aquí puedes crear, consultar y entrar a tus salas de estudio colaborativas."
+                  className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  aria-label={logoLabel}
                 >
                   <img
                     src={logo}
@@ -265,7 +284,8 @@ export function TopbarLayout() {
 
       <main
         id="contenido-principal"
-        className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+        tabIndex={-1}
+        className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 outline-none"
         aria-label="Contenido principal"
       >
         <Outlet />

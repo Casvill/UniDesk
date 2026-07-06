@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
@@ -8,6 +8,7 @@ import { useCardTransition } from "@/context/CardTransitionContext";
 import { auth } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 async function getManualLoginErrorMessage(
   error: unknown,
@@ -32,11 +33,11 @@ async function getManualLoginErrorMessage(
             return "Credenciales incorrectas. Verifica tu correo o contraseña e inténtalo nuevamente.";
           }
 
-          return "No pudimos iniciar sesión con correo y contraseña. Si creaste tu cuenta con Google, usa el botón Continuar con Google; si fue registro manual, verifica tus credenciales.";
+          return "No pudimos iniciar sesión. Verifica tus credenciales o usa Google.";
         } catch (providerError) {
           console.warn("No se pudieron consultar los métodos de inicio:", providerError);
 
-          return "No pudimos iniciar sesión con correo y contraseña. Si creaste tu cuenta con Google, usa el botón Continuar con Google; si fue registro manual, verifica tus credenciales.";
+          return "No pudimos iniciar sesión. Verifica tus credenciales e inténtalo de nuevo.";
         }
       }
 
@@ -87,12 +88,17 @@ export function Login() {
   const navigate = useNavigate();
   const { navigateWithTransition } = useCardTransition();
   const { login, loginWithGoogle } = useAuth();
+  const tourStep = useAutoTour();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    document.title = "Iniciar sesión | UniDesk";
+  }, []);
 
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -193,8 +199,8 @@ export function Login() {
   };
 
   return (
-    <>
-      <div className="text-center mb-6">
+    <main>
+      <div className="text-center mb-6 outline-none">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
           Bienvenido de nuevo
         </h1>
@@ -204,6 +210,13 @@ export function Login() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div
+          ref={tourStep(0)}
+          tabIndex={-1}
+          className="sr-only outline-none"
+        >
+          Estás en la pantalla de inicio de sesión de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un campo obligatorio para ingresar tu Correo Electrónico. Segundo, un campo obligatorio para ingresar tu Contraseña. Tercero, un botón para alternar la visibilidad de tu contraseña. Cuarto, una casilla para mantener tu sesión iniciada en este dispositivo. Quinto, el botón Iniciar sesión. Sexto, el botón Continuar con Google. Y por último, el botón Crear cuenta para registrarte si aún no tienes una.
+        </div>
 
       {/* EMAIL */}
       <div>
@@ -216,7 +229,7 @@ export function Login() {
 
         <div className="relative">
           <Mail
-            className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+            className="absolute left-3 top-3.5 h-5 w-5 text-gray-500"
             aria-hidden="true"
           />
 
@@ -229,14 +242,14 @@ export function Login() {
               clearFieldError("email");
             }}
             placeholder="ejemplo@universidad.edu.co"
-            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none ${
+            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-600 ${
               errors.email
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"
             }`}
             disabled={isSubmitting}
             autoComplete="email"
-            aria-label="Campo de correo electrónico"
+            aria-required="true"
             aria-invalid={Boolean(errors.email)}
             aria-describedby={errors.email ? "email-error" : undefined}
           />
@@ -281,7 +294,7 @@ export function Login() {
 
         <div className="relative">
           <Lock
-            className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+            className="absolute left-3 top-3.5 h-5 w-5 text-gray-500"
             aria-hidden="true"
           />
 
@@ -294,14 +307,14 @@ export function Login() {
               clearFieldError("password");
             }}
             placeholder="Ingresa tu contraseña"
-            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none ${
+            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-600 ${
               errors.password
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"
             }`}
             disabled={isSubmitting}
             autoComplete="current-password"
-            aria-label="Campo de contraseña"
+            aria-required="true"
             aria-invalid={Boolean(errors.password)}
             aria-describedby={errors.password ? "password-error" : undefined}
           />
@@ -309,11 +322,11 @@ export function Login() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-3.5 h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="absolute right-2 top-2 p-2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            tabIndex={-1}
+            disabled={isSubmitting}
           >
-            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
 
@@ -342,8 +355,7 @@ export function Login() {
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            className="rounded border-primary-500"
-            aria-label="Recordar sesión en este dispositivo"
+            className="rounded border-primary-500 accent-primary"
             disabled={isSubmitting}
           />
           Mantener mi sesión iniciada
@@ -356,8 +368,6 @@ export function Login() {
           type="submit"
           disabled={isSubmitting}
           aria-busy={loading}
-          aria-disabled={isSubmitting}
-          aria-label={loading ? "Iniciando sesión, por favor espera" : "Iniciar sesión"}
           className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
         >
           {loading ? (
@@ -376,8 +386,6 @@ export function Login() {
           onClick={handleGoogleLogin}
           disabled={isSubmitting}
           aria-busy={googleLoading}
-          aria-disabled={isSubmitting}
-          aria-label={googleLoading ? "Autenticando con Google, por favor espera" : "Iniciar sesión con Google"}
           className="w-full border py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50 font-normal cursor-pointer"
         >
           {googleLoading ? (
@@ -402,7 +410,6 @@ export function Login() {
           type="button"
           onClick={() => navigateWithTransition("/register")}
           className="text-primary-600 font-semibold hover:underline text-sm cursor-pointer"
-          aria-label="Ir a registro"
           disabled={isSubmitting}
         >
           Crear cuenta
@@ -410,6 +417,6 @@ export function Login() {
       </p>
 
     </form>
-    </>
+    </main>
   );
 }

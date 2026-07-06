@@ -16,6 +16,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/AuthContext";
 import { api, type Room } from "@/services/api";
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
@@ -113,6 +114,11 @@ export function JoinRoom() {
   const [isConnected, setIsConnected] = useState(false);
   const [joinCamera, setJoinCamera] = useState(false);
   const [joinMicrophone, setJoinMicrophone] = useState(true);
+
+  // Recorrido automático: encabezado → información de la sala → participantes.
+  const tourStep = useAutoTour({
+    enabled: !isLoadingRoom && !roomError && Boolean(room),
+  });
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -409,7 +415,11 @@ export function JoinRoom() {
         Volver a salas
       </button>
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div
+        ref={tourStep(0)}
+        className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between outline-none"
+        aria-label={`Estás en la vista previa de la sala ${room?.name || ""}. Aquí puedes revisar la información de la sala, configurar tu cámara y micrófono, y entrar cuando estés listo.`}
+      >
         <div>
           <h1
             id="room-title"
@@ -446,7 +456,12 @@ export function JoinRoom() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden">
+        <div
+          ref={tourStep(1)}
+          role="group"
+          aria-label="Información de la sala: ID, anfitrión, participantes conectados, fecha de creación, herramientas disponibles, configuración de cámara y micrófono, y los botones para entrar a la sala o volver al dashboard."
+          className="rounded-2xl border border-gray-100 bg-white shadow-xl overflow-hidden outline-none"
+        >
           <div className="h-2 bg-gradient-to-r from-blue-500 to-cyan-500" />
 
           <div className="p-6 sm:p-8 space-y-6">
@@ -628,8 +643,9 @@ export function JoinRoom() {
         </div>
 
         <aside
-          className="rounded-2xl border border-gray-100 bg-white p-6 shadow-xl"
-          aria-labelledby="participants-title"
+          ref={tourStep(2)}
+          className="rounded-2xl border border-gray-100 bg-white p-6 shadow-xl outline-none"
+          aria-label="Usuarios en sala. Lista de participantes conectados, actualizada en tiempo real."
         >
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -698,8 +714,9 @@ export function JoinRoom() {
 
                     <span
                       className="h-2.5 w-2.5 rounded-full bg-green-500"
-                      aria-label={`${participantName} está conectado`}
+                      aria-hidden="true"
                     />
+                    <span className="sr-only">{`${participantName} está conectado`}</span>
                   </li>
                 );
               })}

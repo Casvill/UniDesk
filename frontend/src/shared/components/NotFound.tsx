@@ -64,43 +64,45 @@ export function NotFound() {
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-8">
       <main className="max-w-[600px] text-center">
         <div className="mb-8">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-600 to-purple-600 rounded-3xl mb-6 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary-600 to-purple-600 rounded-3xl mb-6 shadow-2xl" aria-hidden="true">
             <span className="text-white text-5xl font-bold">?</span>
           </div>
           <h1 className="text-6xl sm:text-8xl lg:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600 mb-4">
             404
           </h1>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Page Not Found</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Página no encontrada</h2>
           <p className="text-base sm:text-lg text-gray-600 mb-8">
-            The page you're looking for doesn't exist or has been moved to a different location.
+            La página que buscas no existe o fue movida a otra ubicación.
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-100">
           <div className="flex items-center gap-2 text-gray-600 mb-6">
             <IconSearch className="h-5 w-5" />
-            <p className="font-semibold">Looking for something?</p>
+            <p className="font-semibold">¿Buscabas algo?</p>
           </div>
           <div className="flex flex-col gap-3">
             <button
+              type="button"
               onClick={() => navigate("/dashboard")}
               className="w-full bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
             >
               <IconHome className="h-5 w-5" />
-              Go to Dashboard
+              Ir al dashboard
             </button>
             <button
+              type="button"
               onClick={() => navigate("/")}
               className="w-full bg-white border border-gray-300 px-6 py-3 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition flex items-center justify-center gap-2"
             >
-              <LogIn className="h-5 w-5" />
-              Go to Login
+              <LogIn className="h-5 w-5" aria-hidden="true" />
+              Ir a iniciar sesión
             </button>
           </div>
         </div>
 
         <div className="mt-8 text-sm text-gray-500">
-          <p>Need help? Contact support or check our help center.</p>
+          <p>¿Necesitas ayuda? Contacta al soporte de la plataforma.</p>
         </div>
       </main>
     </div>

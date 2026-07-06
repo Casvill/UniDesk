@@ -15,6 +15,7 @@ import { storage } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
 import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { api } from "@/services/api";
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 type ProfileForm = {
   displayName: string;
@@ -144,6 +145,12 @@ async function uploadAvatarToStorage(userId: string, file: File): Promise<string
 
 export function MyProfile() {
   const { user, profile, updateProfileData, deleteAccount } = useAuth();
+  const tourStep = useAutoTour();
+
+  useEffect(() => {
+    document.title = "Mi Perfil - UniDesk";
+    return () => { document.title = "UniDesk"; };
+  }, []);
 
   const [form, setForm] = useState<ProfileForm>({
     displayName: "",
@@ -531,7 +538,7 @@ export function MyProfile() {
   const avatarContent = avatarPreview ? (
     <img
       src={avatarPreview}
-      alt="Vista previa del avatar"
+      alt=""
       className="w-full h-full object-cover"
     />
   ) : (
@@ -540,10 +547,12 @@ export function MyProfile() {
     </span>
   );
 
-  const renderForm = () => (
+  const renderForm = (tourIndex: number) => (
     <form
+      ref={tourStep(tourIndex)}
       onSubmit={handleSave}
-      className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8"
+      className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8 outline-none"
+      aria-label="Formulario de información de la cuenta: nombre para mostrar, nombre de usuario, correo electrónico, universidad y el botón guardar cambios."
       aria-describedby="settings-status"
       noValidate
     >
@@ -570,6 +579,7 @@ export function MyProfile() {
             aria-invalid={Boolean(errors.displayName)}
             aria-describedby={errors.displayName ? "display-name-error" : undefined}
             autoComplete="name"
+            aria-required="true"
             disabled={loading || deletingAccount}
           />
 
@@ -605,6 +615,7 @@ export function MyProfile() {
             aria-invalid={isUsernameError ? true : undefined}
             aria-describedby={isUsernameError ? "settings-username-error" : undefined}
             autoComplete="username"
+            aria-required="true"
             disabled={loading || deletingAccount}
           />
 
@@ -615,7 +626,7 @@ export function MyProfile() {
                 showUsernameMessageAsError
                   ? "text-red-500"
                   : usernameAvailable === true
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-gray-500"
               }`}
             >
@@ -657,6 +668,7 @@ export function MyProfile() {
               aria-invalid={isEmailError ? true : undefined}
               aria-describedby={isEmailError ? "settings-email-error" : undefined}
               autoComplete="email"
+              aria-required="true"
               disabled={loading || deletingAccount || isGoogleUser}
               title={isGoogleUser ? "No puedes cambiar el correo de una cuenta de Google" : undefined}
             />
@@ -676,7 +688,7 @@ export function MyProfile() {
                 showEmailAsError
                   ? "text-red-500"
                   : emailAvailable === true || isEmailUnchanged
-                  ? "text-green-600"
+                  ? "text-green-700"
                   : "text-gray-500"
               }`}
             >
@@ -722,14 +734,6 @@ export function MyProfile() {
             type="submit"
             disabled={!isFormValid}
             aria-busy={loading}
-            aria-disabled={!isFormValid}
-            aria-label={
-              loading
-                ? "Guardando cambios, por favor espera"
-                : !isFormValid
-                ? "Completa todos los campos correctamente para guardar"
-                : "Guardar cambios del perfil"
-            }
             className="w-full sm:w-auto bg-primary text-white py-3 px-6 rounded-lg font-semibold hover:focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? (
@@ -751,6 +755,14 @@ export function MyProfile() {
 
   return (
     <div>
+      <div
+        ref={tourStep(0)}
+        tabIndex={-1}
+        className="sr-only outline-none"
+      >
+        Estás en la pantalla de configuración de tu Perfil. Esta página contiene un formulario para editar tus datos personales y una zona peligrosa para eliminar tu cuenta. En orden de tabulación encontrarás: Primero, un botón para cambiar tu imagen de perfil. Segundo, un campo obligatorio para tu Nombre para Mostrar. Tercero, un campo obligatorio para tu Nombre de Usuario. Cuarto, un campo para tu Correo Electrónico, que está bloqueado y no es editable si usas una cuenta de Google. Quinto, un campo opcional para tu Universidad. Sexto, el botón Guardar Cambios. Y por último, el botón Eliminar Cuenta dentro de la zona peligrosa.
+      </div>
+
       <div className="mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Mi perfil
@@ -763,35 +775,37 @@ export function MyProfile() {
 
       <div className="flex flex-col gap-6 lg:hidden">
         <section
-          className="bg-white rounded-2xl shadow-md border border-gray-100 p-6"
-          aria-label="Foto de perfil"
+          ref={tourStep(1)}
+          className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 outline-none"
+          aria-label="Foto de perfil. Usa el botón de lápiz para cambiar tu imagen."
         >
           <div className="flex flex-col items-center">
             <div className="relative">
-              <div
-                className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
-                aria-label="Vista previa del avatar"
-              >
-                {avatarContent}
-              </div>
+                <div
+                  role="img"
+                  className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
+                  aria-label="Vista previa del avatar"
+                >
+                  {avatarContent}
+                </div>
 
-              <label
-                htmlFor="settings-avatar"
-                className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
-                aria-label="Cambiar imagen de perfil"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </label>
+                <input
+                  id="settings-avatar"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="peer sr-only"
+                  aria-label="Seleccionar imagen de perfil"
+                  disabled={loading || deletingAccount}
+                />
 
-              <input
-                id="settings-avatar"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-                aria-label="Seleccionar imagen de perfil"
-                disabled={loading || deletingAccount}
-              />
+                <label
+                  htmlFor="settings-avatar"
+                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-indigo-500 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 shadow-lg"
+                  aria-label="Cambiar imagen de perfil"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </label>
             </div>
 
             <p className="text-sm text-gray-600 mt-3">
@@ -800,11 +814,12 @@ export function MyProfile() {
           </div>
         </section>
 
-        {renderForm()}
+        {renderForm(2)}
 
         <section
-          className="bg-white rounded-2xl shadow-md border border-red-200 p-6"
-          aria-labelledby="danger-zone-heading"
+          ref={tourStep(3)}
+          className="bg-white rounded-2xl shadow-md border border-red-200 p-6 outline-none"
+          aria-label="Zona peligrosa. Aquí puedes eliminar tu cuenta de forma permanente."
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
@@ -836,35 +851,37 @@ export function MyProfile() {
       <div className="hidden lg:grid lg:grid-cols-[300px_1fr] lg:gap-8">
         <div className="space-y-6 lg:sticky lg:top-24 self-start">
           <section
-            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6"
-            aria-label="Foto de perfil"
+            ref={tourStep(4)}
+            className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 outline-none"
+            aria-label="Foto de perfil. Usa el botón de lápiz para cambiar tu imagen."
           >
             <div className="flex flex-col items-center">
               <div className="relative">
                 <div
+                  role="img"
                   className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-lg overflow-hidden"
                   aria-label="Vista previa del avatar"
                 >
                   {avatarContent}
                 </div>
 
-                <label
-                  htmlFor="settings-avatar-desktop"
-                  className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 transition shadow-lg"
-                  aria-label="Cambiar imagen de perfil"
-                >
-                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                </label>
-
                 <input
                   id="settings-avatar-desktop"
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  className="hidden"
+                  className="peer sr-only"
                   aria-label="Seleccionar imagen de perfil"
                   disabled={loading || deletingAccount}
                 />
+
+                <label
+                   htmlFor="settings-avatar-desktop"
+                   className="absolute bottom-1 right-1 bg-gray-900 text-white p-3 rounded-full cursor-pointer hover:bg-gray-700 transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-indigo-500 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 shadow-lg"
+                   aria-label="Cambiar imagen de perfil"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </label>
               </div>
 
               <p className="text-sm text-gray-600 mt-3">
@@ -874,8 +891,9 @@ export function MyProfile() {
           </section>
 
           <section
-            className="bg-white rounded-2xl shadow-md border border-red-200 p-6"
-            aria-labelledby="danger-zone-heading-desktop"
+            ref={tourStep(6)}
+            className="bg-white rounded-2xl shadow-md border border-red-200 p-6 outline-none"
+            aria-label="Zona peligrosa. Aquí puedes eliminar tu cuenta de forma permanente."
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
@@ -905,7 +923,7 @@ export function MyProfile() {
         </div>
 
         <div>
-          {renderForm()}
+          {renderForm(5)}
         </div>
       </div>
 

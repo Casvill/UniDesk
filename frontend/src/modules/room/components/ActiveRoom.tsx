@@ -60,6 +60,7 @@ import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { useMedia } from "@/hooks/useMedia";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useChat } from "@/hooks/useChat";
+import { useAutoTour } from "@/hooks/useAutoTour";
 
 function renderMessageWithLinks(text: string) {
   const urlRegex = /(https?:\/\/[^\s)"'\]}>]+)/g;
@@ -118,6 +119,8 @@ export function ActiveRoom() {
   isChatOpenRef.current = isChatOpen;
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsDialogRef = useRef<HTMLDivElement | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
@@ -304,7 +307,14 @@ export function ActiveRoom() {
             : "ring-0 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
         }`}
         style={gridColumn ? ({ gridColumn } as React.CSSProperties) : undefined}
-        aria-label={hasMediaError ? `Error en transmisión de ${name}.` : p.isSpeaking ? `${name} hablando.` : name}
+        aria-label={
+          hasMediaError
+            ? `Error en transmisión de ${name}.`
+            : `${name}${isCurrent ? " (Tú)" : ""}${p.isHost ? ", anfitrión" : ""}. ` +
+              `${p.screenSharing ? "Compartiendo pantalla. " : `Cámara ${camOn ? "encendida" : "apagada"}. `}` +
+              `Micrófono ${micOn ? "activado" : "silenciado"}.` +
+              `${p.isSpeaking ? " Está hablando." : ""}`
+        }
       >
         {isCurrent && camOn && mediaInitStatus === "ready" && localStreamRef.current?.getVideoTracks().length ? (
           <video
@@ -312,6 +322,8 @@ export function ActiveRoom() {
             muted
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
+            aria-label={`Transmisión de video de ${name} (Tú)`}
+            title={`Transmisión de video de ${name} (Tú)`}
             ref={(el) => {
               if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
                 el.srcObject = localStreamRef.current;
@@ -325,6 +337,8 @@ export function ActiveRoom() {
               playsInline
               muted
               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${!camOn ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+              aria-label={`Transmisión de video de ${name}`}
+              title={`Transmisión de video de ${name}`}
               ref={(el) => {
                 if (el) {
                   if (remoteStream && el.srcObject !== remoteStream) {
@@ -437,7 +451,7 @@ export function ActiveRoom() {
         </div>
         <div className="absolute right-3 top-3 flex gap-1.5">
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold shadow-lg ${
               camOn ? "bg-green-600 text-white" : "bg-black/60 text-gray-400"
             }`}
             aria-label={camOn ? (p.screenSharing ? "Compartiendo pantalla" : "Cámara encendida") : "Cámara apagada"}
@@ -445,18 +459,18 @@ export function ActiveRoom() {
             {camOn ? (
               p.screenSharing ? (
                 <>
-                  <MonitorPlay className="h-3.5 w-3.5" aria-hidden="true" />
+                  <MonitorPlay className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Compartiendo pantalla</span>
                 </>
               ) : (
-                <Video className="h-3.5 w-3.5" aria-hidden="true" />
+                <Video className="h-4 w-4" aria-hidden="true" />
               )
             ) : (
-              <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+              <VideoOff className="h-4 w-4" aria-hidden="true" />
             )}
           </span>
           <span
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold shadow-lg transition-all duration-300 ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold shadow-lg transition-all duration-300 ${
               p.isSpeaking 
                 ? "bg-green-500 text-white animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" 
                 : micOn 
@@ -472,9 +486,9 @@ export function ActiveRoom() {
             }
           >
             {micOn ? (
-              <Mic className={`h-3.5 w-3.5 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
+              <Mic className={`h-4 w-4 transition-transform duration-300 ${p.isSpeaking ? "scale-110" : ""}`} aria-hidden="true" />
             ) : (
-              <MicOff className="h-3.5 w-3.5" aria-hidden="true" />
+              <MicOff className="h-4 w-4" aria-hidden="true" />
             )}
           </span>
         </div>
@@ -511,6 +525,87 @@ export function ActiveRoom() {
   };
 
   const [chatAnnouncement, setChatAnnouncement] = useState("");
+
+  // Anunciador de eventos de la sala para lectores de pantalla: narra quién
+  // activa/silencia su micrófono, quién enciende/apaga cámara, quién comparte
+  // pantalla y las acciones propias del usuario.
+  const [roomAnnouncement, setRoomAnnouncement] = useState("");
+  const participantsRef = useRef<RoomParticipant[]>([]);
+  participantsRef.current = participants;
+
+  const announce = (message: string) => {
+    // Vaciar y volver a escribir para que la región aria-live re-anuncie
+    // incluso si el mensaje se repite.
+    setRoomAnnouncement("");
+    window.setTimeout(() => setRoomAnnouncement(message), 50);
+  };
+
+  /** Anuncia un evento de otro participante, resolviendo su nombre. */
+  const announceForPeer = (
+    socketId: string,
+    uid: string,
+    buildMessage: (name: string) => string
+  ) => {
+    const participant = participantsRef.current.find(
+      (p) => p.socketId === socketId
+    );
+    const name =
+      (participant && getParticipantName(participant)) ||
+      userProfilesCacheRef.current.get(uid)?.username ||
+      "Un participante";
+    announce(buildMessage(name));
+  };
+
+  // Recorrido automático de la sala: encabezado → área de video → controles.
+  const tourStep = useAutoTour({
+    enabled: !isLoadingRoom && !roomError && Boolean(room),
+  });
+
+  // Al abrir el modal de configuración, mover el foco al diálogo para que el
+  // lector de pantalla anuncie su título; al cerrarlo, devolverlo al botón.
+  // Además, implementa focus trapping (AR-18) para que Tab no salga del modal.
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+
+    const dialog = settingsDialogRef.current;
+    if (!dialog) return;
+
+    const timer = setTimeout(() => {
+      dialog.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+
+      const focusableSelectors =
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const focusableElements = dialog.querySelectorAll<HTMLElement>(focusableSelectors);
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (!firstElement || !lastElement) return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("keydown", handleKeyDown);
+      settingsButtonRef.current?.focus();
+    };
+  }, [isSettingsOpen]);
 
   const currentUserName =
     profile?.displayName || profile?.username || user?.email || "Tú";
@@ -550,6 +645,14 @@ export function ActiveRoom() {
 
     void loadRoom();
   }, [roomId, user]);
+
+  // AR-1: Establecer título de página con el nombre de la sala
+  useEffect(() => {
+    document.title = room ? `Sala: ${room.name} | UniDesk` : "Sala | UniDesk";
+    return () => {
+      document.title = "UniDesk";
+    };
+  }, [room]);
 
   useEffect(() => {
     if (!roomId || !user || !room) return;
@@ -856,6 +959,11 @@ export function ActiveRoom() {
         }
 
         socket.on("user-muted", (payload: { socketId: string; uid: string }) => {
+          // Solo anunciar cambios reales (el servidor reemite el estado en cada sync).
+          const prev = participantsRef.current.find((p) => matchBySocketIdOnly(p, payload.socketId));
+          if (prev && prev.microphoneEnabled !== false) {
+            announceForPeer(payload.socketId, payload.uid, (name) => `${name} silenció su micrófono.`);
+          }
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: false } : p
@@ -864,6 +972,10 @@ export function ActiveRoom() {
         });
 
         socket.on("user-unmuted", (payload: { socketId: string; uid: string }) => {
+          const prev = participantsRef.current.find((p) => matchBySocketIdOnly(p, payload.socketId));
+          if (prev && prev.microphoneEnabled !== true) {
+            announceForPeer(payload.socketId, payload.uid, (name) => `${name} activó su micrófono.`);
+          }
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, microphoneEnabled: true } : p
@@ -872,6 +984,10 @@ export function ActiveRoom() {
         });
 
         socket.on("camera-on", (payload: { socketId: string; uid: string }) => {
+          const prev = participantsRef.current.find((p) => matchBySocketIdOnly(p, payload.socketId));
+          if (prev && prev.cameraEnabled !== true) {
+            announceForPeer(payload.socketId, payload.uid, (name) => `${name} encendió su cámara.`);
+          }
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: true } : p
@@ -880,6 +996,10 @@ export function ActiveRoom() {
         });
 
         socket.on("camera-off", (payload: { socketId: string; uid: string }) => {
+          const prev = participantsRef.current.find((p) => matchBySocketIdOnly(p, payload.socketId));
+          if (prev && prev.cameraEnabled !== false) {
+            announceForPeer(payload.socketId, payload.uid, (name) => `${name} apagó su cámara.`);
+          }
           setParticipants((prev) =>
             prev.map((p) =>
               matchBySocketIdOnly(p, payload.socketId) ? { ...p, cameraEnabled: false } : p
@@ -1149,7 +1269,12 @@ export function ActiveRoom() {
     if (chat.unreadCount > prevUnreadRef.current && chat.chatMessages.length > 0) {
       const lastMsg = chat.chatMessages[chat.chatMessages.length - 1];
       const senderName = chat.getMessageUsername(lastMsg, participants, user, currentUsername);
-      setChatAnnouncement(`Nuevo mensaje de ${senderName}.`);
+      // Vaciar y reescribir para forzar que el aria-live anuncie el mensaje
+      setChatAnnouncement("");
+      const timer = window.setTimeout(() => {
+        setChatAnnouncement(`Nuevo mensaje de ${senderName}: ${lastMsg.message}`);
+      }, 50);
+      return () => window.clearTimeout(timer);
     } else if (chat.unreadCount === 0) {
       setChatAnnouncement("");
     }
@@ -1452,23 +1577,22 @@ export function ActiveRoom() {
 
   const handleCameraClick = async () => {
     if (isScreenSharing) {
-      showToast.error(
-        "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara."
-      );
+      const msg = "No puedes encender la cámara mientras compartes pantalla. Detén la presentación de pantalla para activar la cámara.";
+      showToast.error(msg);
+      announce(msg);
       return;
     }
     if (isCameraBlocked) {
+      let errMsg = "";
       if (mediaPerms.video === "denied") {
-        showToast.error(
-          "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo."
-        );
+        errMsg = "No es posible acceder a la cámara. Por favor, borra/reinicia los permisos de cámara en la configuración de tu navegador e inténtalo de nuevo.";
       } else if (mediaPerms.video === "unavailable") {
-        showToast.error("No se detectó ninguna cámara en este dispositivo.");
+        errMsg = "No se detectó ninguna cámara en este dispositivo.";
       } else {
-        showToast.error(
-          "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación."
-        );
+        errMsg = "Error al acceder a la cámara. Asegúrate de que no esté siendo usada por otra aplicación.";
       }
+      showToast.error(errMsg);
+      announce(errMsg);
       
       try {
         await retryMedia("video");
@@ -1476,28 +1600,31 @@ export function ActiveRoom() {
         if (videoTracks.length > 0) {
           setIsCameraOn(true);
           showToast.success("¡Cámara activada correctamente!");
+          announce("Cámara encendida.");
         }
       } catch (err) {
         console.warn("Reintento de cámara fallido:", err);
+        announce("Error al acceder a la cámara.");
       }
       return;
     }
-    setIsCameraOn((value) => !value);
+    const nextCameraOn = !isCameraOn;
+    setIsCameraOn(nextCameraOn);
+    announce(nextCameraOn ? "Cámara encendida." : "Cámara apagada.");
   };
 
   const handleMicClick = async () => {
     if (isMicBlocked) {
+      let errMsg = "";
       if (mediaPerms.audio === "denied") {
-        showToast.error(
-          "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo."
-        );
+        errMsg = "No es posible acceder al micrófono. Por favor, borra/reinicia los permisos de micrófono en la configuración de tu navegador e inténtalo de nuevo.";
       } else if (mediaPerms.audio === "unavailable") {
-        showToast.error("No se detectó ningún micrófono en este dispositivo.");
+        errMsg = "No se detectó ningún micrófono en este dispositivo.";
       } else {
-        showToast.error(
-          "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación."
-        );
+        errMsg = "Error al acceder al micrófono. Asegúrate de que no esté siendo usado por otra aplicación.";
       }
+      showToast.error(errMsg);
+      announce(errMsg);
       
       try {
         await retryMedia("audio");
@@ -1505,13 +1632,17 @@ export function ActiveRoom() {
         if (audioTracks.length > 0) {
           setIsMicOn(true);
           showToast.success("¡Micrófono activado correctamente!");
+          announce("Micrófono activado.");
         }
       } catch (err) {
         console.warn("Reintento de micrófono fallido:", err);
+        announce("Error al acceder al micrófono.");
       }
       return;
     }
-    setIsMicOn((value) => !value);
+    const nextMicOn = !isMicOn;
+    setIsMicOn(nextMicOn);
+    announce(nextMicOn ? "Micrófono activado." : "Micrófono silenciado.");
   };
 
   const handleDeviceChange = async (kind: "audio" | "video", deviceId: string) => {
@@ -1526,6 +1657,7 @@ export function ActiveRoom() {
         await retryMedia("video", deviceId);
       }
     }
+    showToast.success(`Dispositivo de ${kind === "video" ? "video" : "audio"} cambiado`);
   };
 
   const handleSpeakerChange = (deviceId: string) => {
@@ -1537,6 +1669,7 @@ export function ActiveRoom() {
         );
       }
     });
+    showToast.success("Dispositivo de salida de audio cambiado");
   };
 
   const playTestSound = () => {
@@ -1865,7 +1998,7 @@ export function ActiveRoom() {
                         {messageUsername}
                       </span>
 
-                      <span className="text-[11px] text-gray-500">
+                      <span className="text-[11px] text-gray-600">
                         {formatMessageTime(msg.createdAt)}
                       </span>
                     </div>
@@ -1991,7 +2124,11 @@ export function ActiveRoom() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
-      <header className="flex-shrink-0 border-b border-gray-700 bg-gray-900/90 shadow-lg backdrop-blur-sm">
+      <header
+        ref={tourStep(0)}
+        className="flex-shrink-0 border-b border-gray-700 bg-gray-900/90 shadow-lg backdrop-blur-sm outline-none"
+        aria-label={`Estás en la sala de estudio ${room?.name || ""}. En el encabezado encuentras el ID de la sala con un botón para copiarlo, el número de participantes conectados y el estado de la conexión en tiempo real.`}
+      >
         <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-10 sm:py-6 lg:px-12">
           <div>
             <h1 className="text-xl font-bold text-white sm:text-2xl">
@@ -2026,7 +2163,11 @@ export function ActiveRoom() {
 
               <div className="flex items-center gap-1.5 text-sm text-gray-400 sm:gap-2">
                 <Users className="h-4 w-4" aria-hidden="true" />
-                <span>{participants.length}<span className="hidden sm:inline"> participantes</span></span>
+                <span>
+                  {participants.length}
+                  <span className="hidden sm:inline"> participantes</span>
+                  <span className="sr-only sm:hidden"> participantes</span>
+                </span>
               </div>
 
               <div
@@ -2040,11 +2181,13 @@ export function ActiveRoom() {
                   <>
                     <Wifi className="h-4 w-4" aria-hidden="true" />
                     <span className="hidden sm:inline">{connectionStatus}</span>
+                    <span className="sr-only sm:hidden">{connectionStatus}</span>
                   </>
                 ) : (
                   <>
                     <WifiOff className="h-4 w-4" aria-hidden="true" />
                     <span className="hidden sm:inline">{connectionStatus}</span>
+                    <span className="sr-only sm:hidden">{connectionStatus}</span>
                   </>
                 )}
               </div>
@@ -2057,6 +2200,11 @@ export function ActiveRoom() {
         {chatAnnouncement}
       </div>
 
+      {/* Anunciador de eventos de la sala (micrófonos, cámaras, pantalla) */}
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {roomAnnouncement}
+      </div>
+
       {!isConnected && (
         <div 
           className="flex-shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-amber-200 text-sm shadow-md flex items-center justify-between gap-3"
@@ -2064,7 +2212,7 @@ export function ActiveRoom() {
           aria-live="assertive"
         >
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 animate-pulse" />
+            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 animate-pulse" aria-hidden="true" />
             <span>
               <span className="font-semibold text-amber-400">Sin conexión en tiempo real:</span>{" "}
               {socketError || "Intentando establecer la conexión con la sala. Verifica tu red."}
@@ -2110,8 +2258,9 @@ export function ActiveRoom() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-visible lg:flex-row">
         <main
-          className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6"
-          aria-label="Área de video"
+          ref={tourStep(1)}
+          className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 outline-none"
+          aria-label="Área de video. Aquí se muestran los mosaicos de cada participante con su cámara, pantalla compartida o avatar, junto con el estado de su micrófono."
         >
           {isPinned && isLg && pinnedSharersocketId ? (
             <div className="grid min-h-0 flex-1 auto-rows-fr gap-2 overflow-visible pr-1 sm:gap-4 lg:grid-cols-[2fr_1fr]">
@@ -2153,7 +2302,7 @@ export function ActiveRoom() {
                       {sortedParticipants.length === 1 && (
                         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-0">
                           <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
-                            <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                            <Users className="h-8 w-8 text-primary-400 animate-pulse" aria-hidden="true" />
                           </div>
                           <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
                           <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
@@ -2166,12 +2315,12 @@ export function ActiveRoom() {
                           >
                             {waitingCopied ? (
                               <>
-                                <Check className="h-3.5 w-3.5 text-green-400" />
+                                <Check className="h-3.5 w-3.5 text-green-400" aria-hidden="true" />
                                 <span> Copiado </span>
                               </>
                             ) : (
                               <>
-                                <Copy className="h-3.5 w-3.5" />
+                                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                                 <span>Copiar ID</span>
                               </>
                             )}
@@ -2215,7 +2364,7 @@ export function ActiveRoom() {
                       className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-700 bg-gray-800/40 p-6 text-center backdrop-blur-sm min-h-[180px] sm:min-h-[240px] lg:min-h-[280px]"
                     >
                       <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10 text-primary-400 mb-4">
-                        <Users className="h-8 w-8 text-primary-400 animate-pulse" />
+                        <Users className="h-8 w-8 text-primary-400 animate-pulse" aria-hidden="true" />
                       </div>
                       <h3 className="text-base font-semibold text-white">Esperando a otros participantes</h3>
                       <p className="mt-2 text-xs text-gray-400 max-w-xs mx-auto">
@@ -2228,12 +2377,12 @@ export function ActiveRoom() {
                       >
                         {waitingCopied ? (
                           <>
-                            <Check className="h-3.5 w-3.5 text-green-400" />
+                            <Check className="h-3.5 w-3.5 text-green-400" aria-hidden="true" />
                             <span> Copiado </span>
                           </>
                         ) : (
                           <>
-                            <Copy className="h-3.5 w-3.5" />
+                            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>Copiar ID</span>
                           </>
                         )}
@@ -2279,7 +2428,12 @@ export function ActiveRoom() {
             </div>
           )}
 
-          <div className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4">
+          <div
+            ref={tourStep(2)}
+            role="group"
+            aria-label="Controles de la sala"
+            className="flex-shrink-0 rounded-2xl border border-gray-700 bg-gray-900/90 px-4 py-3 shadow-2xl backdrop-blur-sm sm:px-6 sm:py-4 outline-none"
+          >
             <div className="flex items-center justify-center gap-2 sm:gap-3">
               {/* Camera */}
               <button
@@ -2292,15 +2446,14 @@ export function ActiveRoom() {
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
-                aria-pressed={isCameraOn}
                 aria-label={
                   showCameraAlert
                     ? isScreenSharing
-                      ? "Cámara desactivada mientras compartes pantalla"
-                      : "Cámara bloqueada por permisos"
+                      ? "Cámara no disponible mientras compartes pantalla"
+                      : "Cámara bloqueada por permisos del navegador. Presiona para reintentar"
                     : isCameraOn
-                      ? "Apagar cámara"
-                      : "Encender cámara"
+                      ? "Cámara encendida"
+                      : "Cámara apagada"
                 }
               >
                   {isCameraOn ? (
@@ -2326,13 +2479,12 @@ export function ActiveRoom() {
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
-                aria-pressed={isMicOn}
                 aria-label={
                   isMicBlocked
-                    ? "Micrófono bloqueado por permisos"
+                    ? "Micrófono bloqueado por permisos del navegador. Presiona para reintentar"
                     : isMicOn
-                      ? "Silenciar micrófono"
-                      : "Activar micrófono"
+                      ? "Micrófono activado"
+                      : "Micrófono silenciado"
                 }
               >
                   {isMicOn ? (
@@ -2353,11 +2505,14 @@ export function ActiveRoom() {
                 onClick={async () => {
                   if (isScreenSharing) {
                     await stopScreenCapture();
+                    announce("Se dejó de compartir pantalla.");
                   } else {
                     try {
                       await startScreenCapture();
+                      announce("Compartiendo pantalla.");
                     } catch (err) {
                       console.warn("Screen capture cancelled or failed", err);
+                      announce("Error al compartir pantalla.");
                     }
                   }
                 }}
@@ -2366,8 +2521,11 @@ export function ActiveRoom() {
                     ? "bg-primary-600 text-white hover:bg-primary-700"
                     : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
-                aria-pressed={isScreenSharing}
-                aria-label={isScreenSharing ? "Detener compartir pantalla" : "Compartir pantalla"}
+                aria-label={
+                  isScreenSharing
+                    ? "Compartiendo pantalla"
+                    : "Compartir pantalla apagado"
+                }
               >
                 {isScreenSharing ? (
                   <ScreenShare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
@@ -2378,6 +2536,7 @@ export function ActiveRoom() {
 
               {/* Settings */}
               <button
+                ref={settingsButtonRef}
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
                 className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 sm:h-14 sm:w-14"
@@ -2397,8 +2556,8 @@ export function ActiveRoom() {
                       ? "bg-primary-600 text-white hover:bg-primary-700"
                       : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                   }`}
-                  aria-pressed={isChatOpen}
-                  aria-label={isChatOpen ? "Ocultar chat" : "Mostrar chat"}
+                  aria-expanded={isChatOpen}
+                  aria-label={isChatOpen ? "Ocultar chat de la sala" : "Mostrar chat de la sala"}
                 >
                   <MessageSquare className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />
                 </button>
@@ -2428,7 +2587,7 @@ export function ActiveRoom() {
         {/* Mobile chat overlay (< lg) */}
         <div
           className={`fixed inset-0 z-50 flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:hidden ${
-            isChatOpen ? "pointer-events-auto" : "pointer-events-none"
+            isChatOpen ? "pointer-events-auto" : "pointer-events-none invisible hidden"
           }`}
           aria-hidden={!isChatOpen}
         >
@@ -2465,7 +2624,7 @@ export function ActiveRoom() {
                     className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
                     aria-label="Cerrar chat"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -2579,9 +2738,16 @@ export function ActiveRoom() {
 
             {/* Modal Card */}
             <motion.div
+              ref={settingsDialogRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby="settings-dialog-title"
+              tabIndex={-1}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setIsSettingsOpen(false);
+                }
+              }}
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -2591,7 +2757,7 @@ export function ActiveRoom() {
               {/* Header */}
               <div className="flex items-center justify-between border-b border-gray-800 px-6 py-4">
                 <h2 id="settings-dialog-title" className="text-lg font-bold flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-primary-400" />
+                  <Settings className="h-5 w-5 text-primary-400" aria-hidden="true" />
                   Configuración de la Sala
                 </h2>
                 <button
@@ -2600,7 +2766,7 @@ export function ActiveRoom() {
                   className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition cursor-pointer"
                   aria-label="Cerrar configuración"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -2744,7 +2910,7 @@ export function ActiveRoom() {
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-800 border border-gray-700 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-750 transition cursor-pointer"
                         aria-label="Probar sonido de salida. Reproducirá un tono de prueba en el altavoz seleccionado."
                       >
-                        <Volume2 className="h-4.5 w-4.5 text-primary-400" />
+                        <Volume2 className="h-4.5 w-4.5 text-primary-400" aria-hidden="true" />
                         Probar sonido de salida
                       </button>
                     </div>
@@ -2773,7 +2939,7 @@ export function ActiveRoom() {
                     >
                       {isSavingRoom ? (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                           Guardando cambios...
                         </>
                       ) : (
