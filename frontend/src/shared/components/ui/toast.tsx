@@ -30,7 +30,7 @@ function getTimeout(type: ToastType): number {
     case "warning":
       return 5000;
     case "loading":
-      return 86400000;
+      return 10000;
     default:
       return 5000;
   }

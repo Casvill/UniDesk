@@ -396,7 +396,7 @@ export function Register() {
           tabIndex={-1}
           className="sr-only outline-none"
         >
-          Estás en la pantalla de registro de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para subir tu imagen de perfil. Segundo, un campo de texto obligatorio para tu Nombre Completo. Tercero, un campo de texto obligatorio para tu Nombre de Usuario deseado. Cuarto, un campo de correo institucional o personal obligatorio. Quinto, un campo para ingresar tu contraseña de mínimo 8 caracteres. Sexto, un botón para alternar la visibilidad de la contraseña. Séptimo, un campo para confirmar tu contraseña. Octavo, un botón para alternar la visibilidad de la confirmación. Noveno, el botón Crear Cuenta. Décimo, el botón para Continuar con Google. Y por último, un enlace para ir a iniciar sesión.
+          Estás en la pantalla de registro de UniDesk. El formulario contiene los siguientes campos y botones en orden de tabulación: Primero, un botón para subir tu imagen de perfil. Segundo, un campo de texto obligatorio para tu Nombre Completo. Tercero, un campo de texto obligatorio para tu Nombre de Usuario deseado. Cuarto, un campo de correo institucional obligatorio. Quinto, un campo para ingresar tu contraseña de mínimo 8 caracteres. Sexto, un botón para alternar la visibilidad de la contraseña. Séptimo, un campo para confirmar tu contraseña. Octavo, un botón para alternar la visibilidad de la confirmación. Noveno, el botón Crear Cuenta. Décimo, el botón para Continuar con Google. Y por último, un enlace para ir a iniciar sesión.
         </div>
 
       {/* AVATAR */}
@@ -542,7 +542,7 @@ export function Register() {
       {/* EMAIL */}
       <div>
         <label className="text-sm font-semibold" htmlFor="email">
-          Correo institucional o personal
+          Correo institucional
         </label>
 
         <input
