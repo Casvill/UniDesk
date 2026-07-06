@@ -242,7 +242,7 @@ export function Login() {
               clearFieldError("email");
             }}
             placeholder="ejemplo@universidad.edu.co"
-            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-500 ${
+            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-600 ${
               errors.email
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"
@@ -307,7 +307,7 @@ export function Login() {
               clearFieldError("password");
             }}
             placeholder="Ingresa tu contraseña"
-            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-500 ${
+            className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 outline-none placeholder-gray-600 ${
               errors.password
                 ? "border-red-400 focus:ring-red-500"
                 : "focus:ring-primary-500"

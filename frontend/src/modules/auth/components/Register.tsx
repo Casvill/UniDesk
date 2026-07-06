@@ -455,7 +455,7 @@ export function Register() {
           value={form.fullName}
           onChange={handleChange}
           placeholder="Ej: Juan Pérez"
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.fullName ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.fullName ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.fullName)}
           aria-describedby={errors.fullName ? "fullName-error" : undefined}
           autoComplete="name"
@@ -495,7 +495,7 @@ export function Register() {
           }}
           onBlur={() => setUsernameTouched(true)}
           placeholder="Ej: estudiante_123"
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${showUsernameAsError ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${showUsernameAsError ? "border-red-400" : ""}`}
           autoComplete="new-password"
           aria-invalid={isUsernameError ? true : undefined}
           aria-describedby={isUsernameError ? "username-error" : undefined}
@@ -552,7 +552,7 @@ export function Register() {
           value={form.email}
           onChange={handleChange}
           placeholder="ejemplo@universidad.edu.co"
-          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.email ? "border-red-400" : ""}`}
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.email ? "border-red-400" : ""}`}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
@@ -590,7 +590,7 @@ export function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Mínimo 8 caracteres"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.password ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.password ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.password)}
             aria-describedby={
               [
@@ -649,7 +649,7 @@ export function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             placeholder="Repite tu contraseña"
-            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-500 ${errors.confirmPassword ? "border-red-400" : ""}`}
+            className={`w-full px-4 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none placeholder-gray-600 ${errors.confirmPassword ? "border-red-400" : ""}`}
             aria-invalid={Boolean(errors.confirmPassword)}
             aria-describedby={
               [
