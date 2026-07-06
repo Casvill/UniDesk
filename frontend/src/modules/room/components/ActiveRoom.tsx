@@ -5,7 +5,6 @@ import {
   AlertCircle,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Copy,
@@ -2663,7 +2662,7 @@ export function ActiveRoom() {
             {isChatOpen ? (
               <ChevronRight className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             ) : (
-              <ChevronLeft className="hidden h-6 w-6 lg:block" aria-hidden="true" />
+              <MessageSquare className="hidden h-6 w-6 lg:block" aria-hidden="true" />
             )}
 
             {chat.unreadCount > 0 && !isChatOpen && (
