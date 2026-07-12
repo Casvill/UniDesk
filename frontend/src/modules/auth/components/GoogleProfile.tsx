@@ -57,6 +57,10 @@ function getCompleteProfileErrorMessage(error: unknown): string {
     return "Este nombre de usuario ya está en uso";
   }
 
+  if (message.includes("institucional")) {
+    return getErrorMessage(error);
+  }
+
   if (
     message.includes("failed to fetch") ||
     message.includes("networkerror") ||

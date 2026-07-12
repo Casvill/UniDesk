@@ -77,11 +77,11 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
       : "password" as const;
 
     const email = req.user.email ?? "";
-    const allowedDomains = [".edu", ".edu.co", ".gov", ".gov.co", ".com.co", ".co"];
-    const isInstitutional = allowedDomains.some(domain => email.endsWith(domain));
+    const domain = email.split('@')[1]?.toLowerCase() || '';
+    const isEducational = domain.includes('.edu') || domain.includes('.ac.');
 
-    if (!isInstitutional) {
-      res.status(400).json({ message: "El correo debe ser institucional (.edu, .edu.co, .gov, .gov.co, .com.co, .co)" });
+    if (!isEducational) {
+      res.status(400).json({ message: "El correo debe ser institucional (.edu o .ac.)" });
       return;
     }
 
@@ -309,11 +309,11 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
 
     if (req.body.email) {
       const email = req.body.email;
-      const allowedDomains = [".edu", ".edu.co", ".gov", ".gov.co", ".com.co", ".co"];
-      const isInstitutional = allowedDomains.some(domain => email.endsWith(domain));
+      const domain = email.split('@')[1]?.toLowerCase() || '';
+      const isEducational = domain.includes('.edu') || domain.includes('.ac.');
 
-      if (!isInstitutional) {
-        res.status(400).json({ message: "El correo debe ser institucional (.edu, .edu.co, .gov, .gov.co, .com.co, .co)" });
+      if (!isEducational) {
+        res.status(400).json({ message: "El correo debe ser institucional (.edu o .ac.)" });
         return;
       }
     }

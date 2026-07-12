@@ -85,6 +85,10 @@ function getBackendErrorCode(error: unknown): string {
     return 'backend/username-already-exists';
   }
 
+  if (message.includes('institucional')) {
+    return 'backend/email-not-institutional';
+  }
+
   if (
     message.includes('email') ||
     message.includes('correo')
@@ -143,6 +147,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+
+      const email = result.user.email ?? '';
+      const domain = email.split('@')[1]?.toLowerCase() || '';
+      if (!domain.includes('.edu') && !domain.includes('.ac.')) {
+        await result.user.delete();
+        throw new Error("El correo debe ser institucional (.edu o .ac.)");
+      }
 
       const token = await result.user.getIdToken();
       const existingProfile = await api.getProfile(result.user.uid, token);

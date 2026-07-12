@@ -103,6 +103,10 @@ function getRegisterErrorMessage(error: unknown): string {
     return "El nombre de usuario ya está en uso. Intenta con otro.";
   }
 
+  if (message.includes("institucional")) {
+    return getErrorMessage(error);
+  }
+
   return "No pudimos crear la cuenta. Revisa los datos e inténtalo nuevamente.";
 }
 
@@ -134,6 +138,10 @@ function getGoogleRegisterErrorMessage(error: unknown): string {
     message.includes("err_connection_refused")
   ) {
     return "Iniciaste sesión con Google, pero no pudimos completar tu perfil porque el servidor no está disponible.";
+  }
+
+  if (message.includes("institucional")) {
+    return getErrorMessage(error);
   }
 
   return "No pudimos registrar la cuenta con Google. Inténtalo nuevamente.";

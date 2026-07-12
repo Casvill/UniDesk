@@ -81,6 +81,15 @@ function getGoogleLoginErrorMessage(error: unknown): string {
     }
   }
 
+  const msg =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as Record<string, unknown>).message)
+      : '';
+
+  if (msg.toLowerCase().includes("institucional")) {
+    return msg;
+  }
+
   return "Error al autenticar con Google.";
 }
 
