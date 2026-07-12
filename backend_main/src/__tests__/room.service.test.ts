@@ -39,7 +39,11 @@ describe("room.service", () => {
         docs: mockDocs
       });
       mockWhere.mockReturnValue({ get: mockGet });
-      (db.collection as jest.Mock).mockReturnValue({ where: mockWhere });
+      const messagesMockGet = jest.fn().mockResolvedValue({ empty: true, docs: [] });
+      const messagesMockWhere = jest.fn().mockReturnValue({ get: messagesMockGet });
+      (db.collection as jest.Mock).mockImplementation((name: string) =>
+        name === "messages" ? { where: messagesMockWhere } : { where: mockWhere }
+      );
 
       const result = await deleteRoomsByOwner("owner-123");
 
