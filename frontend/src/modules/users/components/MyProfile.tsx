@@ -183,7 +183,14 @@ export function MyProfile() {
   const cleanUniversity = form.university.trim();
 
   const currentUsername = profile?.username || "";
-  const isUsernameUnchanged = cleanUsername === currentUsername;
+  const isUsernameUnchanged = cleanUsername.toLowerCase() === currentUsername.toLowerCase();
+
+  const hasChanges =
+    cleanDisplayName !== (profile?.displayName || "") ||
+    !isUsernameUnchanged ||
+    cleanEmail.toLowerCase() !== (profile?.email || "").toLowerCase() ||
+    cleanUniversity !== (profile?.university || "") ||
+    selectedAvatarFile !== null;
 
   const isUsernameFormatValid =
     cleanUsername.length >= 3 && cleanUsername.length <= 15 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
@@ -207,7 +214,8 @@ export function MyProfile() {
     isUsernameValid &&
     isEmailValid &&
     !loading &&
-    !deletingAccount;
+    !deletingAccount &&
+    hasChanges;
 
   useEffect(() => {
     const currentPhotoURL = profile?.photoURL || user?.photoURL || "";
