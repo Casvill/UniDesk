@@ -186,7 +186,7 @@ export function MyProfile() {
   const isUsernameUnchanged = cleanUsername === currentUsername;
 
   const isUsernameFormatValid =
-    cleanUsername.length >= 3 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
+    cleanUsername.length >= 3 && cleanUsername.length <= 15 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
 
   const isUsernameValid =
     isUsernameFormatValid &&
@@ -237,7 +237,7 @@ export function MyProfile() {
       return;
     }
 
-    if (cleanUsername.length < 3) {
+    if (cleanUsername.length < 3 || cleanUsername.length > 15) {
       setUsernameAvailable(null);
       setCheckingUsername(false);
       return;
@@ -314,6 +314,7 @@ export function MyProfile() {
 
     if (!cleanUsername) return "El nombre de usuario es obligatorio.";
     if (cleanUsername.length < 3) return "Mínimo 3 caracteres.";
+    if (cleanUsername.length > 15) return "Máximo 15 caracteres.";
     if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
       return "Solo puedes usar letras, números y guiones bajos.";
     }
@@ -413,6 +414,8 @@ export function MyProfile() {
       newErrors.username = "El nombre de usuario es obligatorio.";
     } else if (cleanUsername.length < 3) {
       newErrors.username = "Mínimo 3 caracteres.";
+    } else if (cleanUsername.length > 15) {
+      newErrors.username = "Máximo 15 caracteres.";
     } else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
       newErrors.username = "Solo puedes usar letras, números y guiones bajos.";
     } else if (!isUsernameValid) {

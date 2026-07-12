@@ -71,6 +71,14 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
       res.status(400).json({ message: "username y displayName son requeridos" });
       return;
     }
+    if (username.length < 3 || username.length > 15) {
+      res.status(400).json({ message: "El nombre de usuario debe tener entre 3 y 15 caracteres" });
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      res.status(400).json({ message: "El nombre de usuario solo puede contener letras, números, guiones y guiones bajos" });
+      return;
+    }
 
     const provider = req.user.firebase?.sign_in_provider === "google.com"
       ? "google.com" as const
@@ -314,6 +322,18 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
 
       if (!isEducational) {
         res.status(400).json({ message: "El correo debe ser institucional (.edu o .ac.)" });
+        return;
+      }
+    }
+
+    if (req.body.username) {
+      const username = req.body.username;
+      if (username.length < 3 || username.length > 15) {
+        res.status(400).json({ message: "El nombre de usuario debe tener entre 3 y 15 caracteres" });
+        return;
+      }
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        res.status(400).json({ message: "El nombre de usuario solo puede contener letras, números, guiones y guiones bajos" });
         return;
       }
     }

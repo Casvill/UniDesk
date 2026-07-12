@@ -78,7 +78,15 @@ function getBackendErrorCode(error: unknown): string {
 
   if (
     message.includes('username') ||
-    message.includes('usuario') ||
+    message.includes('usuario')
+  ) {
+    if (message.includes('caracteres') || message.includes('permitidos')) {
+      return 'backend/username-invalid';
+    }
+    return 'backend/username-already-exists';
+  }
+
+  if (
     message.includes('already exists') ||
     message.includes('ocupado')
   ) {

@@ -70,6 +70,9 @@ function getRegisterErrorMessage(error: unknown): string {
     case "backend/profile-create-failed":
       return "No pudimos completar el registro porque el servidor de perfiles no está disponible. Verifica que el backend esté corriendo e inténtalo nuevamente.";
 
+    case "backend/username-invalid":
+      return getErrorMessage(error);
+
     case "backend/username-already-exists":
       return "El nombre de usuario ya está en uso. Intenta con otro.";
 
@@ -104,6 +107,10 @@ function getRegisterErrorMessage(error: unknown): string {
   }
 
   if (message.includes("institucional")) {
+    return getErrorMessage(error);
+  }
+
+  if (message.includes("caracteres") || message.includes("permitidos")) {
     return getErrorMessage(error);
   }
 
