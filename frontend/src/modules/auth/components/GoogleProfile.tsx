@@ -7,6 +7,8 @@ import { showToast } from "@/shared/components/ui/toast";
 import { useAutoTour } from "@/hooks/useAutoTour";
 import { storage } from "@/shared/services/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { validateImage, resizeAndCompress, revokeObjectUrl } from "@/shared/utils/image";
+import { AvatarCropDialog } from "@/shared/components/AvatarCropDialog";
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -89,6 +91,8 @@ export function GooglePage() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
 
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -203,9 +207,7 @@ export function GooglePage() {
       let photoURL = user?.photoURL || "";
 
       if (selectedAvatarFile) {
-        const extension = selectedAvatarFile.name.split(".").pop() || "jpg";
-        const fileName = `avatar-${Date.now()}.${extension}`;
-        const avatarRef = ref(storage, `avatars/${fileName}`);
+        const avatarRef = ref(storage, `avatars/${user!.uid}/profile.jpg`);
         await uploadBytes(avatarRef, selectedAvatarFile);
         photoURL = await getDownloadURL(avatarRef);
       }
@@ -243,11 +245,37 @@ export function GooglePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
-    setAvatarPreview(imageUrl);
-    setSelectedAvatarFile(file);
+    try {
+      validateImage(file);
+      revokeObjectUrl(avatarPreview ?? "");
+      setCropImageUrl(URL.createObjectURL(file));
+      setCropDialogOpen(true);
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
+    }
+  };
 
-    showToast.success("Imagen de perfil seleccionada correctamente");
+  const handleCropConfirm = async (croppedBlob: Blob) => {
+    try {
+      const processed = await resizeAndCompress(croppedBlob);
+      const processedFile = new File([processed], "avatar.jpg", { type: "image/jpeg" });
+      setSelectedAvatarFile(processedFile);
+      setAvatarPreview(URL.createObjectURL(processed));
+
+      revokeObjectUrl(cropImageUrl ?? "");
+      setCropImageUrl(null);
+      setCropDialogOpen(false);
+
+      showToast.success("Imagen de perfil seleccionada correctamente");
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
+    }
+  };
+
+  const handleCropCancel = () => {
+    revokeObjectUrl(cropImageUrl ?? "");
+    setCropImageUrl(null);
+    setCropDialogOpen(false);
   };
 
   if (status !== "needs-profile" || !user) return null;
@@ -444,6 +472,15 @@ export function GooglePage() {
         </button>
 
       </form>
+
+      {cropImageUrl && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          imageUrl={cropImageUrl}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </>
   );
 }
