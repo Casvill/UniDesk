@@ -5,6 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
 import { useAutoTour } from "@/hooks/useAutoTour";
+import { storage } from "@/shared/services/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 function getErrorCode(error: unknown): string | undefined {
   if (
@@ -86,6 +88,7 @@ export function GooglePage() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
 
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -197,10 +200,20 @@ export function GooglePage() {
     setSuccess(false);
 
     try {
+      let photoURL = user?.photoURL || "";
+
+      if (selectedAvatarFile) {
+        const extension = selectedAvatarFile.name.split(".").pop() || "jpg";
+        const fileName = `avatar-${Date.now()}.${extension}`;
+        const avatarRef = ref(storage, `avatars/${fileName}`);
+        await uploadBytes(avatarRef, selectedAvatarFile);
+        photoURL = await getDownloadURL(avatarRef);
+      }
+
       await completeProfile({
         username: cleanUsername,
         displayName: user?.displayName || "Usuario de Google",
-        photoURL: avatarPreview || user?.photoURL || "",
+        photoURL,
       });
 
       setSuccess(true);
@@ -232,6 +245,7 @@ export function GooglePage() {
 
     const imageUrl = URL.createObjectURL(file);
     setAvatarPreview(imageUrl);
+    setSelectedAvatarFile(file);
 
     showToast.success("Imagen de perfil seleccionada correctamente");
   };

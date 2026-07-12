@@ -208,7 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (email: string, pass: string, name: string, username: string) => {
+  const register = async (email: string, pass: string, name: string, username: string, photoURL?: string) => {
     setIsProcessing(true);
     let userCredential;
 
@@ -222,7 +222,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const newProfile = await api.createProfile(
         {
           username,
-          displayName: name
+          displayName: name,
+          ...(photoURL && { photoURL }),
         },
         token
       );

@@ -7,6 +7,8 @@ import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
 import { useAutoTour } from "@/hooks/useAutoTour";
+import { storage } from "@/shared/services/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 type FormState = {
   fullName: string;
@@ -174,6 +176,7 @@ export function Register() {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -290,11 +293,22 @@ export function Register() {
     setLoading(true);
 
     try {
+      let photoURL: string | undefined;
+
+      if (selectedAvatarFile) {
+        const extension = selectedAvatarFile.name.split(".").pop() || "jpg";
+        const fileName = `avatar-${Date.now()}.${extension}`;
+        const avatarRef = ref(storage, `avatars/${fileName}`);
+        await uploadBytes(avatarRef, selectedAvatarFile);
+        photoURL = await getDownloadURL(avatarRef);
+      }
+
       await register(
         form.email.trim(),
         form.password,
         form.fullName.trim(),
-        form.username.trim()
+        form.username.trim(),
+        photoURL
       );
 
       showToast.success("Cuenta creada exitosamente");
@@ -363,6 +377,7 @@ export function Register() {
     if (!file) return;
 
     setAvatarPreview(URL.createObjectURL(file));
+    setSelectedAvatarFile(file);
 
     showToast.success("Imagen de perfil seleccionada correctamente.");
   };
