@@ -3,6 +3,7 @@ import Cropper, { Area } from "react-easy-crop";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
@@ -40,12 +41,15 @@ export function AvatarCropDialog({ open, imageUrl, onConfirm, onCancel }: Avatar
 
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby="crop-desc">
         <DialogHeader>
           <DialogTitle>Ajusta tu foto de perfil</DialogTitle>
+          <DialogDescription id="crop-desc">
+            Arrastra para ajustar el área de recorte y usa el control deslizante para hacer zoom. Luego presiona Aplicar para guardar los cambios.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-black/5">
+        <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-black/5" aria-hidden="true">
           <Cropper
             image={imageUrl}
             crop={crop}
@@ -73,11 +77,16 @@ export function AvatarCropDialog({ open, imageUrl, onConfirm, onCancel }: Avatar
           />
         </div>
 
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {loading ? "Procesando el recorte de la imagen. Por favor espera." : ""}
+        </div>
+
         <div className="flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
+            aria-label="Cancelar el ajuste de la foto de perfil"
             className="inline-flex cursor-pointer items-center gap-2 px-5 py-2.5 rounded-lg border border-input bg-background hover:bg-accent text-sm font-medium transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2"
           >
             Cancelar
@@ -86,6 +95,8 @@ export function AvatarCropDialog({ open, imageUrl, onConfirm, onCancel }: Avatar
             type="button"
             onClick={handleConfirm}
             disabled={loading || !pixelCrop}
+            aria-label="Aplicar el recorte a la foto de perfil"
+            aria-busy={loading}
             className="inline-flex cursor-pointer items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
