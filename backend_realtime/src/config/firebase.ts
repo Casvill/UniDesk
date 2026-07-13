@@ -13,6 +13,14 @@ if (!admin.apps.length) {
   });
 }
 
+/**
+ * Instancia de Firestore inicializada con las credenciales del proyecto,
+ * usada para persistir y consultar mensajes y perfiles.
+ */
 export const db = admin.firestore();
+
+/**
+ * Instancia de Firebase Auth para verificar tokens de ID emitidos a los clientes.
+ */
 export const auth = admin.auth();
-export default admin;
+

@@ -1,5 +1,6 @@
 import { createRoom } from "../services/room.service";
-import admin from "../config/firebase";
+import * as admin from "firebase-admin";
+import "../config/firebase"; // side-effect: inicializa admin.initializeApp
 
 /**
  * Script para inicializar la colección 'rooms' en Firestore.

@@ -55,6 +55,23 @@ Todos los endpoints (excepto `/`) requieren el header `Authorization: Bearer <to
 
 ---
 
+## Documentación del Código (JSDoc / TypeDoc)
+
+La documentación completa del código fuente (servicios, middleware, rutas, tipos y utilidades) se genera automáticamente a partir de los JSDoc con **TypeDoc**.
+
+```bash
+npm run docs        # genera backend_main/docs/html/index.html
+open docs/html       # ábrela en tu navegador
+```
+
+Para reconstruir después de un cambio:
+
+```bash
+npm run docs
+```
+
+---
+
 ## Documentación Interactiva (Swagger)
 Puedes probar todos los endpoints en vivo en:
 `http://localhost:3000/api-docs`

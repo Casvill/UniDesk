@@ -53,6 +53,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
+/** Handler de `POST /users`: valida body, dominio institucional y unicidad de username antes de crear el perfil. */
 router.post("/", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -135,6 +136,7 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
+/** Handler de `GET /users/username/:username/available`: endpoint público que indica si el username está libre. */
 router.get("/username/:username/available", async (req: Request, res: Response) => {
   try {
     const available = await checkUsernameAvailability(String(req.params.username));
@@ -179,6 +181,7 @@ router.get("/username/:username/available", async (req: Request, res: Response) 
  *                   type: boolean
  *                   example: true
  */
+/** Handler de `GET /users/email/:email/available`: endpoint público; admite `?excludeUid=` para ignorar al propio usuario. */
 router.get("/email/:email/available", async (req: Request, res: Response) => {
   try {
     const email = String(req.params.email);
@@ -226,6 +229,7 @@ router.get("/email/:email/available", async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
+/** Handler de `GET /users/:uid`: devuelve el perfil público del usuario indicado. */
 router.get("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
     const profile = await getUserProfile(String(req.params.uid));
@@ -295,6 +299,7 @@ router.get("/:uid", verifyToken, async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
+/** Handler de `PUT /users/:uid`: actualiza el perfil propio (verifica propiedad y dominio institucional si cambia el email). */
 router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -374,6 +379,7 @@ router.put("/:uid", verifyToken, async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
+/** Handler de `DELETE /users/:uid`: elimina la cuenta, su perfil y sus salas en cascada (solo el dueño). */
 router.delete("/:uid", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
