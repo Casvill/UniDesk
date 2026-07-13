@@ -50,6 +50,7 @@ const router = Router();
  *       401:
  *         description: No autenticado
  */
+/** Handler de `POST /rooms`: crea una sala vinculada al usuario autenticado. */
 router.post("/", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -109,6 +110,12 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  *               items:
  *                 $ref: '#/components/schemas/Room'
  */
+/**
+ * Handler de `GET /rooms`.
+ *
+ * - Sin `all` (o `all=false`): devuelve las salas del usuario autenticado.
+ * - Con `all=true`: lista paginada de todas las salas (`limit`, `startAfter`).
+ */
 router.get("/", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -150,6 +157,7 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
  *       404:
  *         description: Sala no encontrada
  */
+/** Handler de `GET /rooms/:id`: devuelve el detalle de una sala. */
 router.get("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
     const room = await getRoom(req.params.id as string);
@@ -187,6 +195,7 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
  *       403:
  *         description: No tienes permiso para editar esta sala
  */
+/** Handler de `PUT /rooms/:id`: actualiza la sala (solo el propietario). */
 router.put("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -238,6 +247,7 @@ router.put("/:id", verifyToken, async (req: Request, res: Response) => {
  *       401:
  *         description: No autenticado
  */
+/** Handler de `DELETE /rooms`: elimina en masa todas las salas del usuario autenticado. */
 router.delete("/", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -273,6 +283,7 @@ router.delete("/", verifyToken, async (req: Request, res: Response) => {
  *       403:
  *         description: No tienes permiso para eliminar esta sala
  */
+/** Handler de `DELETE /rooms/:id`: elimina una sala (solo el propietario). */
 router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {

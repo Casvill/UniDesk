@@ -2,13 +2,24 @@ import { Request, Response, NextFunction } from "express";
 import { auth } from "../config/firebase.js";
 import { DecodedIdToken } from "firebase-admin/auth";
 
+/**
+ * Request de Express extendido con el usuario decodificado cuando el token
+ * de Firebase es válido.
+ */
 export interface AuthenticatedRequest extends Request {
   user?: DecodedIdToken;
 }
 
 /**
- * Middleware de Express para verificar el token de Firebase.
- * El token debe enviarse en el header `Authorization: Bearer <token>`.
+ * Middleware de Express que verifica el token JWT de Firebase presente en el
+ * header `Authorization: Bearer <token>`.
+ *
+ * Si el token es válido, asigna los datos decodificados a `req.user` y llama a
+ * `next()`. Si falta o es inválido, responde con 401.
+ *
+ * @param req - Request de Express
+ * @param res - Response de Express
+ * @param next - Función next de Express
  */
 export async function httpAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;

@@ -20,6 +20,10 @@ import {
 
 dotenv.config();
 
+/**
+ * Aplicación Express base del servidor de tiempo real.
+ * Se usa principalmente como envoltorio HTTP para Socket.IO.
+ */
 const app = express();
 app.use(cors());
 
@@ -34,15 +38,30 @@ const io = new Server(server, {
 // Middleware de autenticación global para Socket.IO
 io.use(socketAuthMiddleware);
 
+/**
+ * Puerto de escucha del servidor de tiempo real.
+ * Lee `PORT`/`REALTIME_PORT` del entorno y por defecto usa 3001.
+ */
 const PORT = process.env.PORT || process.env.REALTIME_PORT || 3001;
 
-// Map<roomId, Map<socketId, UserInfo>> — shared with signaling relays.
+/**
+ * Índice de membresía en memoria: `roomId → (socketId → UserInfo)`.
+ * Compartido con los relés de señalización definidos en {@link signaling}.
+ */
 const rooms = new Map<string, Map<string, UserInfo>>();
 
-// ponytail: Design and implement a data structure to track multiple WebRTC peer connections per participant
+/**
+ * Registro de conexiones peer activas: `socketId → Set<socketId peer>`.
+ * Sirve para limpiar referencias cuando un peer se va o se desconecta.
+ */
 const activePeerConnections = new Map<string, Set<string>>();
 
-// Helper to get array of users in a room
+/**
+ * Devuelve la lista de participantes de una sala, cada uno con su `socketId`.
+ *
+ * @param roomId - ID de la sala
+ * @returns Arreglo de participantes (vacío si la sala no existe)
+ */
 function getParticipantsInRoom(roomId: string): (UserInfo & { socketId: string })[] {
   const roomUsers = rooms.get(roomId);
   return roomUsers
@@ -50,9 +69,24 @@ function getParticipantsInRoom(roomId: string): (UserInfo & { socketId: string }
     : [];
 }
 
+/**
+ * Conexión entrante de un cliente Socket.IO.
+ *
+ * Cada socket autenticado escucha eventos de sala (chat, media state) y de
+ * señalización WebRTC (offer/answer/ICE). El servidor actúa como **relay
+ * mudo**: nunca inspecciona el contenido de SDP/ICE, solo garantiza que
+ * emisor y destino compartan la misma sala.
+ *
+ * @param socket - Socket autenticado del cliente
+ */
 io.on("connection", (socket: AuthenticatedSocket) => {
   console.log("Usuario conectado:", socket.id, "UID:", socket.user?.uid);
 
+  /**
+   * `join-room`: registra al usuario en la sala, envía el historial de chat,
+   * notifica a los demás participantes (`user-joined`) y emite la lista
+   * actualizada (`room-participants-update`).
+   */
   socket.on("join-room", (data: { roomId: string; username?: string; microphoneEnabled?: boolean; cameraEnabled?: boolean }) => {
     if (!socket.user) {
       return;
@@ -102,6 +136,10 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     io.to(roomId).emit("room-participants-update", getParticipantsInRoom(roomId));
   });
 
+  /**
+   * `send-message`: valida autenticación y pertenencia a una sala, persiste el
+   * mensaje en Firestore y lo difunde a la sala con `new-message`.
+   */
   socket.on("send-message", (data: { content: string }) => {
     const { content } = data;
     
@@ -159,6 +197,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     });
   });
 
+  /**
+   * `edit-message`: verifica propiedad del mensaje contra Firestore, lo
+   * actualiza y difunde `message-updated` a la sala. Silencioso si falla la
+   * verificación o los argumentos.
+   */
   socket.on("edit-message", async (data: { messageId: string; newContent: string }) => {
     const { messageId, newContent } = data;
 
@@ -267,6 +310,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     logDiagnostic("WARN", event, `Relay rechazado: ${reason}`, socket.id, target);
   };
 
+  /** `send-offer`: relé de oferta SDP WebRTC hacia el par destino (verificado por `validateRelay`). */
   socket.on("send-offer", (data: SendOfferPayload) => {
     const v = validateRelay(data ?? {});
     if (!v.ok) { rejectRelay("send-offer", v.reason, data?.to, true); return; }
@@ -283,6 +327,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     logDiagnostic("INFO", "send-offer", "Offer relayed successfully", socket.id, v.target);
   });
 
+  /** `send-answer`: relé de respuesta SDP WebRTC hacia el par destino. */
   socket.on("send-answer", (data: SendAnswerPayload) => {
     const v = validateRelay(data ?? {});
     if (!v.ok) { rejectRelay("send-answer", v.reason, data?.to, true); return; }
@@ -292,6 +337,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     logDiagnostic("INFO", "send-answer", "Answer relayed successfully", socket.id, v.target);
   });
 
+  /** `send-ice-candidate`: relé de candidato ICE WebRTC hacia el par destino (alto volumen: solo loguea con `DEBUG_SIGNALING=1`). */
   socket.on("send-ice-candidate", (data: SendIceCandidatePayload) => {
     const v = validateRelay(data ?? {});
     if (!v.ok) { rejectRelay("send-ice-candidate", v.reason, data?.to, true); return; }
@@ -304,6 +350,11 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     }
   });
 
+  /**
+   * Sincroniza cambios de estado de medios (micrófono, cámara, pantalla,
+   * actividad de voz) al `UserInfo` en memoria y los difunde al resto de la
+   * sala para que los pares actualicen su UI.
+   */
   // ponytail: Listen to media state changes, sync to UserInfo, and broadcast to other peers in room
   socket.on("user-muted", () => {
     const roomId = findRoomOf(rooms, socket.id);
@@ -378,6 +429,14 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     }
   });
 
+  /**
+   * Limpia la salida de un socket: lo elimina de la sala en memoria (y borra
+   * la sala si queda vacía), purga sus referencias en `activePeerConnections`,
+   * y notifica al resto con `user-left` y `room-participants-update`.
+   * Envuelto en try/catch para que la caída de un peer no tire el servidor.
+   *
+   * @param socketId - ID del socket que sale
+   */
   const handleLeaveRoom = (socketId: string) => {
     // ponytail: Wrap in try-catch to prevent a single peer leave failure from crashing the server
     try {
@@ -423,6 +482,7 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     }
   };
 
+  /** `leave-room`: el cliente abandona explícitamente todas sus salas Socket.IO y dispara la limpieza. */
   socket.on("leave-room", () => {
     socket.rooms.forEach((room) => {
       if (room !== socket.id) {
@@ -432,16 +492,23 @@ io.on("connection", (socket: AuthenticatedSocket) => {
     handleLeaveRoom(socket.id);
   });
 
+  /** `disconnecting`: limpieza proactiva cuando el socket está cerrando (antes de `disconnect`). */
   socket.on("disconnecting", () => {
     // ponytail: clean up on disconnecting to ensure early and robust purge
     handleLeaveRoom(socket.id);
   });
 
+  /** `disconnect`: limpieza final cuando el socket ya se cerró. */
   socket.on("disconnect", () => {
     console.log("Usuario desconectado:", socket.id);
     handleLeaveRoom(socket.id);
   });
 
+  /**
+   * `peer-closed`: cierre explícito de una conexión peer (éxito o fallo).
+   * Purga las referencias mutuas en `activePeerConnections` y avisa al par
+   * con `peer-disconnected` para que libere su `RTCPeerConnection`.
+   */
   // ponytail: handle explicit peer connection closed/failed events gracefully
   socket.on("peer-closed", (data: { to?: unknown }) => {
     try {
@@ -462,6 +529,9 @@ io.on("connection", (socket: AuthenticatedSocket) => {
   });
 });
 
+/**
+ * Inicia el servidor HTTP + Socket.IO en el puerto configurado.
+ */
 server.listen(PORT, () => {
   console.log(`Servidor de tiempo real corriendo en puerto ${PORT}`);
 });

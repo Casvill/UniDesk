@@ -22,8 +22,3 @@ export const db = admin.firestore();
  * Instancia de Firestore Auth para administrar usuarios y verificar tokens
  */
 export const auth = admin.auth();
-
-/**
- * Módulo de Firebase Admin inizializado
- */
-export default admin;

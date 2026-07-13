@@ -1,5 +1,14 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+/**
+ * Configuración de la especificación OpenAPI 3.0 generada por `swagger-jsdoc`.
+ *
+ * - Define el esquema de seguridad `bearerAuth` (JWT de Firebase) aplicado por
+ *   defecto a todos los endpoints (cada ruta puede sobreescribirlo con
+ *   `security: []` para hacerse pública).
+ * - Escanea los JSDoc con anotaciones `@swagger` de los archivos `types/*.ts`,
+ *   `routes/*.ts` y `server.ts`.
+ */
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: "3.0.0",
@@ -33,4 +42,7 @@ const options: swaggerJsdoc.Options = {
   apis: ["./src/types/*.ts", "./src/routes/*.ts", "./src/server.ts"],
 };
 
+/**
+ * Especificación OpenAPI ya generada, lista para servirse con `swagger-ui-express`.
+ */
 export const swaggerSpec = swaggerJsdoc(options);

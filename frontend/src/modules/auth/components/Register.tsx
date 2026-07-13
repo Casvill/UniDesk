@@ -7,6 +7,8 @@ import { api } from "@/services/api";
 import { showToast } from "@/shared/components/ui/toast";
 import { GoogleIcon } from "@/shared/components/ui/google-icon"
 import { useAutoTour } from "@/hooks/useAutoTour";
+import { validateImage, resizeAndCompress, revokeObjectUrl } from "@/shared/utils/image";
+import { AvatarCropDialog } from "@/shared/components/AvatarCropDialog";
 
 type FormState = {
   fullName: string;
@@ -70,6 +72,9 @@ function getRegisterErrorMessage(error: unknown): string {
     case "backend/profile-create-failed":
       return "No pudimos completar el registro porque el servidor de perfiles no está disponible. Verifica que el backend esté corriendo e inténtalo nuevamente.";
 
+    case "backend/username-invalid":
+      return getErrorMessage(error);
+
     case "backend/username-already-exists":
       return "El nombre de usuario ya está en uso. Intenta con otro.";
 
@@ -101,6 +106,14 @@ function getRegisterErrorMessage(error: unknown): string {
     message.includes("already exists")
   ) {
     return "El nombre de usuario ya está en uso. Intenta con otro.";
+  }
+
+  if (message.includes("institucional")) {
+    return getErrorMessage(error);
+  }
+
+  if (message.includes("caracteres") || message.includes("permitidos")) {
+    return getErrorMessage(error);
   }
 
   return "No pudimos crear la cuenta. Revisa los datos e inténtalo nuevamente.";
@@ -136,6 +149,10 @@ function getGoogleRegisterErrorMessage(error: unknown): string {
     return "Iniciaste sesión con Google, pero no pudimos completar tu perfil porque el servidor no está disponible.";
   }
 
+  if (message.includes("institucional")) {
+    return getErrorMessage(error);
+  }
+
   return "No pudimos registrar la cuenta con Google. Inténtalo nuevamente.";
 }
 
@@ -159,6 +176,9 @@ export function Register() {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -279,7 +299,8 @@ export function Register() {
         form.email.trim(),
         form.password,
         form.fullName.trim(),
-        form.username.trim()
+        form.username.trim(),
+        selectedAvatarFile
       );
 
       showToast.success("Cuenta creada exitosamente");
@@ -347,9 +368,37 @@ export function Register() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setAvatarPreview(URL.createObjectURL(file));
+    try {
+      validateImage(file);
+      revokeObjectUrl(avatarPreview ?? "");
+      setCropImageUrl(URL.createObjectURL(file));
+      setCropDialogOpen(true);
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
+    }
+  };
 
-    showToast.success("Imagen de perfil seleccionada correctamente.");
+  const handleCropConfirm = async (croppedBlob: Blob) => {
+    try {
+      const processed = await resizeAndCompress(croppedBlob);
+      const processedFile = new File([processed], "avatar.jpg", { type: "image/jpeg" });
+      setSelectedAvatarFile(processedFile);
+      setAvatarPreview(URL.createObjectURL(processed));
+
+      revokeObjectUrl(cropImageUrl ?? "");
+      setCropImageUrl(null);
+      setCropDialogOpen(false);
+
+      showToast.success("Imagen de perfil seleccionada correctamente.");
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
+    }
+  };
+
+  const handleCropCancel = () => {
+    revokeObjectUrl(cropImageUrl ?? "");
+    setCropImageUrl(null);
+    setCropDialogOpen(false);
   };
 
   const getUsernameMessage = () => {
@@ -755,6 +804,15 @@ export function Register() {
       </p>
 
     </form>
+
+      {cropImageUrl && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          imageUrl={cropImageUrl}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </main>
   );
 }

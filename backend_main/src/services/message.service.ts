@@ -1,6 +1,6 @@
 import { db } from "../config/firebase";
 import { Message, CreateMessageDTO } from "../types/message.types";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, WriteBatch } from "firebase-admin/firestore";
 
 const MESSAGES_COLLECTION = "messages";
 
@@ -125,4 +125,27 @@ export async function searchMessages(roomId: string, searchTerm: string): Promis
   return allMessages.filter(msg => 
     msg.content?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+}
+
+/**
+ * (D) Elimina todos los mensajes de una sala.
+ * Si se proporciona un batch, las eliminaciones se agregan a él (útil para operaciones atómicas).
+ * 
+ * @param roomId - ID de la sala
+ * @param batch - Batch opcional para agrupar operaciones
+ */
+export async function deleteMessagesByRoom(
+  roomId: string,
+  batch?: WriteBatch
+): Promise<void> {
+  const snapshot = await db.collection(MESSAGES_COLLECTION)
+    .where("roomId", "==", roomId)
+    .get();
+
+  if (snapshot.empty) return;
+
+  const b = batch ?? db.batch();
+  snapshot.docs.forEach(doc => b.delete(doc.ref));
+
+  if (!batch) await b.commit();
 }

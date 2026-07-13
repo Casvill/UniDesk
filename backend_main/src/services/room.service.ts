@@ -1,6 +1,7 @@
 import { db } from "../config/firebase";
 import { Room, CreateRoomDTO, UpdateRoomDTO } from "../types/room.types";
 import { Timestamp } from "firebase-admin/firestore";
+import { deleteMessagesByRoom } from "./message.service";
 
 const ROOMS_COLLECTION = "rooms";
 
@@ -114,6 +115,7 @@ export async function deleteRoom(id: string): Promise<void> {
     throw new Error(`La sala con ID ${id} no existe`);
   }
 
+  await deleteMessagesByRoom(id);
   await docRef.delete();
 }
 
@@ -133,9 +135,10 @@ export async function deleteRoomsByOwner(ownerUid: string): Promise<Room[]> {
   const deletedRooms = snapshot.docs.map(doc => doc.data() as Room);
   const batch = db.batch();
   
-  snapshot.docs.forEach(doc => {
+  for (const doc of snapshot.docs) {
     batch.delete(doc.ref);
-  });
+    await deleteMessagesByRoom(doc.id, batch);
+  }
 
   await batch.commit();
   return deletedRooms;
