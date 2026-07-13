@@ -7,6 +7,7 @@ ___
 - [Requisitos](#requisitos)
 - [Estructura del Proyecto](#estructura-del-proyecto)
 - [Ejecución Local](#ejecución-local)
+- [Variables de Entorno](#variables-de-entorno)
 - [Calidad de código (Backend)](#calidad-de-código-backend)
 - [Calidad de código (Frontend)](#calidad-de-código-frontend)
 - [Convención de Ramas](#convención-de-ramas)
@@ -54,23 +55,11 @@ UniTasker/
 ___
 # Ejecución local
 
-## Backend main
-
-**Variables de Entorno:**
-El proyecto utiliza variables de entorno para configuración sensible.
-Para configurar el entorno local:
-
-1. Copiar el archivo de ejemplo:
-```bash
-cp .env.example .env
-# (En Windows puedes duplicarlo manualmente.)
-```
-2. Completar las variables con los valores correspondientes.
-
+### Backend main
 
 **Configuración del entorno**
 ```bash
-cd backend
+cd backend_main
 npm install
 npm run dev
 ```
@@ -79,21 +68,9 @@ Con esto ya estará andando el backend de manera local en http://localhost:3000/
 
 ## Backend realtime
 
-**Variables de Entorno:**
-El proyecto utiliza variables de entorno para configuración sensible.
-Para configurar el entorno local:
-
-1. Copiar el archivo de ejemplo:
-```bash
-cp .env.example .env
-# (En Windows puedes duplicarlo manualmente.)
-```
-2. Completar las variables con los valores correspondientes.
-
-
 **Configuración del entorno**
 ```bash
-cd backend
+cd backend_realtime
 npm install
 npm start
 ```
@@ -104,6 +81,7 @@ Con esto ya estará andando el backend de manera local en http://localhost:3001/
 
 1. Instalar dependencias:
 ```bash
+cd frontend
 npm install
 ``` 
 
@@ -113,6 +91,52 @@ npm run dev
 ```
 
 **Nota:** Por defecto, el frontend estará disponible en http://localhost:5173.
+
+[Tabla de Contenido](#tabla-de-contenido) 
+___
+# Variables de Entorno
+
+Cada componente del proyecto contiene un archivo `.env.example` con las variables necesarias para su funcionamiento. Para configurar el entorno local, copia el archivo de ejemplo y completa los valores:
+
+```bash
+cp .env.example .env
+```
+
+## backend_main/.env.example
+
+| Variable | Descripción |
+|----------|-------------|
+| `PORT` | Puerto del servidor REST (por defecto: `3000`) |
+| `FIREBASE_PROJECT_ID` | ID del proyecto en Firebase |
+| `FIREBASE_CLIENT_EMAIL` | Correo del cliente de servicio de Firebase Admin |
+| `FIREBASE_PRIVATE_KEY` | Clave privada RSA de Firebase Admin |
+| `TURN_URL` | URL del servidor TURN para WebRTC (opcional) |
+| `TURN_SHARED_SECRET` | Secreto compartido del servidor TURN (opcional) |
+| `TURN_TTL_SECONDS` | TTL de las credenciales TURN en segundos (opcional, por defecto `3600`) |
+
+## backend_realtime/.env.example
+
+| Variable | Descripción |
+|----------|-------------|
+| `REALTIME_PORT` | Puerto del servidor Socket.io (por defecto: `3001`) |
+| `CLIENT_URL` | URL del frontend para CORS (por defecto: permite todos los orígenes) |
+| `FIREBASE_PROJECT_ID` | ID del proyecto en Firebase |
+| `FIREBASE_CLIENT_EMAIL` | Correo del cliente de servicio de Firebase Admin |
+| `FIREBASE_PRIVATE_KEY` | Clave privada RSA de Firebase Admin |
+| `DEBUG_SIGNALING` | Activa logs de señalización WebRTC (`1`/`0`, opcional) |
+
+## frontend/.env.example
+
+| Variable | Descripción |
+|----------|-------------|
+| `VITE_FIREBASE_API_KEY` | API Key de Firebase |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Auth domain de Firebase |
+| `VITE_FIREBASE_PROJECT_ID` | ID del proyecto en Firebase |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Storage bucket de Firebase |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Sender ID de Firebase Messaging |
+| `VITE_FIREBASE_APP_ID` | App ID de Firebase |
+| `VITE_API_URL` | URL base de la API REST (`http://localhost:3000`) |
+| `VITE_SOCKET_URL` | URL del servidor Socket.io (`http://localhost:3001`) |
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
@@ -218,13 +242,13 @@ ___
 # Estado del Proyecto
 
 🟢 Sprint 0 — Equipo operativo + Arquitectura base + UX preliminar  
-🟢 Sprint 1 - Identidad y Autenticación (T1)  
-🟢 Sprint 2 - Perfil y Gestión Base de Salas (T1)  
-🟢 Sprint 3 - Salas Colaborativas y Mensajería Instantánea (T2)  
-🟡 Sprint 4 - Infraestructura WebRTC y Video Básico (T3)  
-⚪ Sprint 5 - Control de Medios y Presentación (T3, T4)  
-⚪ Sprint 6 - Accesibilidad, Pruebas Heurísticas y Estabilización  
-⚪ Sprint 7 - Integración final, despliegues y cierre de producto  
+🟢 Sprint 1 — Identidad y Autenticación (T1)  
+🟢 Sprint 2 — Perfil y Gestión Base de Salas (T1)  
+🟢 Sprint 3 — Salas Colaborativas y Mensajería Instantánea (T2)  
+🟢 Sprint 4 — Infraestructura WebRTC y Video Básico (T3)  
+🟢 Sprint 5 — Control de Medios y Presentación (T3, T4)  
+🟢 Sprint 6 — Accesibilidad, Pruebas Heurísticas y Estabilización  
+🟢 Sprint 7 — Integración final, despliegues y cierre de producto (actual)  
 
 [Tabla de Contenido](#tabla-de-contenido) 
 ___
