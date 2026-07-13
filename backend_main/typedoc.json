@@ -1,0 +1,24 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs/html",
+  "name": "UniDesk — Backend Principal (REST API)",
+  "includeVersion": true,
+  "readme": "none",
+  "exclude": ["**/__tests__/**", "**/*.test.ts", "node_modules", "dist"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "categoryOrder": ["Modules", "Configuration", "Middleware", "Routes", "Services", "Types", "Utils", "*"],
+  "navigation": {
+    "includeCategories": true,
+    "includeFolders": true
+  },
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "inherited": true,
+    "external": true
+  },
+  "searchInComments": true
+}

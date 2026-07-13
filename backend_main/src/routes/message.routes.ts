@@ -36,6 +36,7 @@ const router = Router();
  *       401:
  *         description: No autenticado
  */
+/** Handler de `POST /messages`: persiste un nuevo mensaje en una sala. */
 router.post("/", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -90,6 +91,7 @@ router.post("/", verifyToken, async (req: Request, res: Response) => {
  *       200:
  *         description: Lista de mensajes
  */
+/** Handler de `GET /messages/:roomId`: lista los mensajes de una sala con paginación opcional. */
 router.get("/:roomId", verifyToken, async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
@@ -120,6 +122,7 @@ router.get("/:roomId", verifyToken, async (req: Request, res: Response) => {
  *       200:
  *         description: Mensajes encontrados
  */
+/** Handler de `GET /messages/:roomId/search?q=`: busca mensajes por contenido (requiere `q`). */
 router.get("/:roomId/search", verifyToken, async (req: Request, res: Response) => {
   try {
     const query = req.query.q as string;
@@ -161,6 +164,7 @@ router.get("/:roomId/search", verifyToken, async (req: Request, res: Response) =
  *       403:
  *         description: No tienes permiso para editar este mensaje
  */
+/** Handler de `PUT /messages/:id`: edita el contenido de un mensaje propio (verifica propiedad contra Firestore). */
 router.put("/:id", verifyToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {

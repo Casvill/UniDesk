@@ -2,6 +2,23 @@
 
 Este servidor maneja la comunicación en tiempo real utilizando **Socket.IO**. Está encargado de la presencia de usuarios en las salas y el intercambio de mensajes en vivo.
 
+## Documentación del Código (JSDoc / TypeDoc)
+
+La documentación completa del código fuente (señalización WebRTC, middleware, eventos de Socket.IO y tipos) se genera automáticamente a partir de los JSDoc con **TypeDoc**.
+
+```bash
+npm run docs        # genera backend_realtime/docs/html/index.html
+open docs/html       # ábrela en tu navegador
+```
+
+Para reconstruir después de un cambio:
+
+```bash
+npm run docs
+```
+
+---
+
 ## Seguridad
 
 El servidor utiliza un middleware de autenticación que verifica el **ID Token de Firebase** en cada conexión.

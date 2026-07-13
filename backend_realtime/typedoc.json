@@ -1,0 +1,24 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs/html",
+  "name": "UniDesk — Backend de Tiempo Real (Socket.IO + WebRTC)",
+  "includeVersion": true,
+  "readme": "none",
+  "exclude": ["node_modules", "dist", "**/*.js"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "categoryOrder": ["Modules", "Configuration", "Middleware", "Signaling", "Server", "*"],
+  "navigation": {
+    "includeCategories": true,
+    "includeFolders": true
+  },
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "inherited": true,
+    "external": true
+  },
+  "searchInComments": true
+}

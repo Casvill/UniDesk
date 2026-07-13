@@ -26,6 +26,7 @@ const router = Router();
  *       501:
  *         description: TURN no configurado en el servidor
  */
+/** Handler de `GET /turn/credentials`: devuelve `iceServers` con credenciales TURN efímeras, o 501 si TURN no está configurado. */
 router.get("/credentials", verifyToken, (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json({ message: "No autenticado" });

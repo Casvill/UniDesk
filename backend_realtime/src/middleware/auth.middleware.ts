@@ -1,14 +1,26 @@
 import { Socket } from "socket.io";
-import { auth } from "../config/firebase.js"; // Note: I used firebase.ts in the previous turn, but I should check the export
+import { auth } from "../config/firebase.js";
 import { DecodedIdToken } from "firebase-admin/auth";
 
+/**
+ * Socket de Socket.IO extendido con el usuario decodificado cuando el token
+ * de Firebase es válido.
+ */
 export interface AuthenticatedSocket extends Socket {
   user?: DecodedIdToken;
 }
 
 /**
- * Middleware de Socket.IO para verificar el token de Firebase.
- * El token debe enviarse en el objeto `auth` al conectar.
+ * Middleware de Socket.IO que verifica el token JWT de Firebase recibido en
+ * `socket.handshake.auth.token` al conectar.
+ *
+ * Comprueba primero un formato mínimo (3 partes separadas por `.`) para
+ * descartar tokens malformados sin llamar a Firebase. Si el token es válido,
+ * asigna los datos decodificados a `socket.user` y llama a `next()`.
+ * En caso contrario emite un `error` al cliente y desconecta el socket.
+ *
+ * @param socket - Socket entrante a autenticar
+ * @param next - Función next de Socket.IO
  */
 export async function socketAuthMiddleware(socket: AuthenticatedSocket, next: (err?: Error) => void) {
   const token = socket.handshake.auth?.token;
