@@ -13,6 +13,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { storage } from "@/shared/services/firebase";
 import { showToast } from "@/shared/components/ui/toast";
+import { validateImage, resizeAndCompress, revokeObjectUrl } from "@/shared/utils/image";
+import { AvatarCropDialog } from "@/shared/components/AvatarCropDialog";
 import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { api } from "@/services/api";
 import { useAutoTour } from "@/hooks/useAutoTour";
@@ -134,9 +136,7 @@ function getInitials(name?: string | null, email?: string | null) {
 }
 
 async function uploadAvatarToStorage(userId: string, file: File): Promise<string> {
-  const extension = file.name.split(".").pop() || "jpg";
-  const fileName = `avatar-${Date.now()}.${extension}`;
-  const avatarRef = ref(storage, `avatars/${userId}/${fileName}`);
+  const avatarRef = ref(storage, `avatars/${userId}/profile.jpg`);
 
   await uploadBytes(avatarRef, file);
 
@@ -172,6 +172,8 @@ export function MyProfile() {
 
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -183,10 +185,17 @@ export function MyProfile() {
   const cleanUniversity = form.university.trim();
 
   const currentUsername = profile?.username || "";
-  const isUsernameUnchanged = cleanUsername === currentUsername;
+  const isUsernameUnchanged = cleanUsername.toLowerCase() === currentUsername.toLowerCase();
+
+  const hasChanges =
+    cleanDisplayName !== (profile?.displayName || "") ||
+    !isUsernameUnchanged ||
+    cleanEmail.toLowerCase() !== (profile?.email || "").toLowerCase() ||
+    cleanUniversity !== (profile?.university || "") ||
+    selectedAvatarFile !== null;
 
   const isUsernameFormatValid =
-    cleanUsername.length >= 3 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
+    cleanUsername.length >= 3 && cleanUsername.length <= 15 && /^[a-zA-Z0-9_]+$/.test(cleanUsername);
 
   const isUsernameValid =
     isUsernameFormatValid &&
@@ -207,7 +216,8 @@ export function MyProfile() {
     isUsernameValid &&
     isEmailValid &&
     !loading &&
-    !deletingAccount;
+    !deletingAccount &&
+    hasChanges;
 
   useEffect(() => {
     const currentPhotoURL = profile?.photoURL || user?.photoURL || "";
@@ -237,7 +247,7 @@ export function MyProfile() {
       return;
     }
 
-    if (cleanUsername.length < 3) {
+    if (cleanUsername.length < 3 || cleanUsername.length > 15) {
       setUsernameAvailable(null);
       setCheckingUsername(false);
       return;
@@ -314,6 +324,7 @@ export function MyProfile() {
 
     if (!cleanUsername) return "El nombre de usuario es obligatorio.";
     if (cleanUsername.length < 3) return "Mínimo 3 caracteres.";
+    if (cleanUsername.length > 15) return "Máximo 15 caracteres.";
     if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
       return "Solo puedes usar letras, números y guiones bajos.";
     }
@@ -381,25 +392,37 @@ export function MyProfile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      showToast.error("Selecciona un archivo de imagen válido.");
-      return;
+    try {
+      validateImage(file);
+      revokeObjectUrl(avatarPreview);
+      setCropImageUrl(URL.createObjectURL(file));
+      setCropDialogOpen(true);
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
     }
+  };
 
-    const maxSizeInMB = 2;
-    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+  const handleCropConfirm = async (croppedBlob: Blob) => {
+    try {
+      const processed = await resizeAndCompress(croppedBlob);
+      const processedFile = new File([processed], "avatar.jpg", { type: "image/jpeg" });
+      setSelectedAvatarFile(processedFile);
+      setAvatarPreview(URL.createObjectURL(processed));
 
-    if (file.size > maxSizeInBytes) {
-      showToast.error("La imagen es muy pesada. Usa una imagen de máximo 2 MB.");
-      return;
+      revokeObjectUrl(cropImageUrl ?? "");
+      setCropImageUrl(null);
+      setCropDialogOpen(false);
+
+      showToast.success("Imagen de perfil seleccionada correctamente. Recuerda guardar los cambios.");
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : "Error al procesar la imagen.");
     }
+  };
 
-    const previewUrl = URL.createObjectURL(file);
-
-    setSelectedAvatarFile(file);
-    setAvatarPreview(previewUrl);
-
-    showToast.success("Imagen de perfil seleccionada correctamente. Recuerda guardar los cambios.");
+  const handleCropCancel = () => {
+    revokeObjectUrl(cropImageUrl ?? "");
+    setCropImageUrl(null);
+    setCropDialogOpen(false);
   };
 
   const validateForm = () => {
@@ -413,6 +436,8 @@ export function MyProfile() {
       newErrors.username = "El nombre de usuario es obligatorio.";
     } else if (cleanUsername.length < 3) {
       newErrors.username = "Mínimo 3 caracteres.";
+    } else if (cleanUsername.length > 15) {
+      newErrors.username = "Máximo 15 caracteres.";
     } else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
       newErrors.username = "Solo puedes usar letras, números y guiones bajos.";
     } else if (!isUsernameValid) {
@@ -755,6 +780,14 @@ export function MyProfile() {
 
   return (
     <div>
+      {cropImageUrl && (
+        <AvatarCropDialog
+          open={cropDialogOpen}
+          imageUrl={cropImageUrl}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
       <div
         ref={tourStep(0)}
         tabIndex={-1}

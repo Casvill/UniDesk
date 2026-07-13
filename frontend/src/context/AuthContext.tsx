@@ -11,7 +11,8 @@ import {
   deleteUser
 } from 'firebase/auth';
 
-import { auth } from '../shared/services/firebase';
+import { auth, storage } from '../shared/services/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { api, UserProfile } from '../services/api';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'needs-profile';
@@ -38,7 +39,7 @@ interface AuthContextType {
     profile: UserProfile | null;
   }>;
   completeProfile: (data: { username: string; displayName: string; photoURL?: string }) => Promise<UserProfile>;
-  register: (email: string, pass: string, name: string, username: string) => Promise<void>;
+  register: (email: string, pass: string, name: string, username: string, avatarFile?: File) => Promise<void>;
   updateProfileData: (data: UpdateProfileData) => Promise<UserProfile>;
   deleteAccount: () => Promise<void>;
 }
@@ -78,11 +79,23 @@ function getBackendErrorCode(error: unknown): string {
 
   if (
     message.includes('username') ||
-    message.includes('usuario') ||
+    message.includes('usuario')
+  ) {
+    if (message.includes('caracteres') || message.includes('permitidos')) {
+      return 'backend/username-invalid';
+    }
+    return 'backend/username-already-exists';
+  }
+
+  if (
     message.includes('already exists') ||
     message.includes('ocupado')
   ) {
     return 'backend/username-already-exists';
+  }
+
+  if (message.includes('institucional')) {
+    return 'backend/email-not-institutional';
   }
 
   if (
@@ -144,6 +157,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
 
+      const email = result.user.email ?? '';
+      const domain = email.split('@')[1]?.toLowerCase() || '';
+      if (!domain.includes('.edu') && !domain.includes('.ac.')) {
+        await result.user.delete();
+        throw new Error("El correo debe ser institucional (.edu o .ac.)");
+      }
+
       const token = await result.user.getIdToken();
       const existingProfile = await api.getProfile(result.user.uid, token);
 
@@ -189,7 +209,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (email: string, pass: string, name: string, username: string) => {
+  const register = async (email: string, pass: string, name: string, username: string, avatarFile?: File) => {
     setIsProcessing(true);
     let userCredential;
 
@@ -198,12 +218,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       await updateProfile(userCredential.user, { displayName: name });
 
+      let photoURL: string | undefined;
+      if (avatarFile) {
+        const avatarRef = ref(storage, `avatars/${userCredential.user.uid}/profile.jpg`);
+        await uploadBytes(avatarRef, avatarFile);
+        photoURL = await getDownloadURL(avatarRef);
+      }
+
       const token = await userCredential.user.getIdToken();
 
       const newProfile = await api.createProfile(
         {
           username,
-          displayName: name
+          displayName: name,
+          ...(photoURL && { photoURL }),
         },
         token
       );
@@ -253,9 +281,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsProcessing(true);
 
     try {
+      const uid = user.uid;
       const token = await user.getIdToken();
 
-      await api.deleteProfile(user.uid, token);
+      try {
+        const avatarRef = ref(storage, `avatars/${uid}/profile.jpg`);
+        await deleteObject(avatarRef);
+      } catch {
+        // Ignore — user may not have an avatar in Storage
+      }
+
+      await api.deleteProfile(uid, token);
 
       setUser(null);
       setProfile(null);
